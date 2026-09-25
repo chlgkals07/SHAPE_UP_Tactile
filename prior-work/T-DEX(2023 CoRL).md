@@ -1,4 +1,4 @@
-\[← 선행연구 목록](README.md)
+[← 선행연구 목록](README.md)
 
 
 
@@ -43,6 +43,8 @@
 
 
 **방법론**
+
+
 
 (1) task-agostic play data를 많이 수집 -> tactile encoder를 pretraining.
 
