@@ -2,21 +2,21 @@
 
 
 
-\# Dexterity from Touch: Self-Supervised Pre-Training of Tactile Representations with Robotic Play
+# Dexterity from Touch: Self-Supervised Pre-Training of Tactile Representations with Robotic Play
 
 
 
-\- 링크: https://arxiv.org/abs/2303.12076
+- 링크: https://arxiv.org/abs/2303.12076
 
-\- 읽은 사람: 임세화
+- 읽은 사람: 임세화
 
-\- 날짜: 26.09.05
+- 날짜: 26.09.05
 
-\- CORL 2023
+- CORL 2023
 
 
 
-\# 내용
+# 내용
 
 
 
@@ -30,6 +30,8 @@
 
 
 
+
+
 **선행 연구와 차별점**
 
 
@@ -39,6 +41,8 @@
 (2) 선행 연구에서는 tactile representation을 위해서 많은 양의 task-centric data가 필요했지만,
 
 우리는 task-agostic play data로 pretrained tactile encoder를 학습하고 그 다음에 task마다 소량의 demo만으로 policy 학습.  
+
+
 
 
 
@@ -56,6 +60,8 @@ task-specific demonstration을 소량으로 수집. visual and tactile observati
 
 
 
+
+
 **결과**
 
 
@@ -63,6 +69,8 @@ task-specific demonstration을 소량으로 수집. visual and tactile observati
 policy input으로 both(vision, tactile), vision only, tactile only하여 비교한 실험에서
 
 vision only는 contact를 잘 인지하지 못했고, tactile only는 robot의 위치를 제대로 못잡음.  
+
+
 
 
 
@@ -78,7 +86,9 @@ tactile sensor: 15 XELA uSkin
 
 
 
-\# 우리 연구와의 연결
+
+
+# 우리 연구와의 연결
 
 
 
