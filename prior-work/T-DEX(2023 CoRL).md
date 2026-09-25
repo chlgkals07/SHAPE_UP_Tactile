@@ -16,7 +16,7 @@
 
 
 
-\## 내용
+\# 내용
 
 
 
@@ -26,7 +26,7 @@
 
 (1) tectile sensor는 simulation, calibtration 하기 어려움.
 
-(2) multi-fingered hands에서는 tactile sensor가 large area를 커버해야 해서 high dimensional임.
+(2) multi-fingered hands에서는 tactile sensor가 large area를 커버해야 해서 high dimensional임.  
 
 
 
@@ -38,7 +38,7 @@
 
 (2) 선행 연구에서는 tactile representation을 위해서 많은 양의 task-centric data가 필요했지만,
 
-우리는 task-agostic play data로 pretrained tactile encoder를 학습하고 그 다음에 task마다 소량의 demo만으로 policy 학습.
+우리는 task-agostic play data로 pretrained tactile encoder를 학습하고 그 다음에 task마다 소량의 demo만으로 policy 학습.  
 
 
 
@@ -50,11 +50,9 @@
 
 (2) non-parametric policy such as Nearnest Neighbor (parametric model은 data를 많이 필요로 해서)
 
-
-
 task-specific demonstration을 소량으로 수집. visual and tactile observation을 input으로 하여 non parametric policy 학습.
 
-이때 tactile observation을 pretrained tactile encoder로 feature를 추출해서 사용.
+이때 tactile observation을 pretrained tactile encoder로 feature를 추출해서 사용.  
 
 
 
@@ -64,11 +62,7 @@ task-specific demonstration을 소량으로 수집. visual and tactile observati
 
 policy input으로 both(vision, tactile), vision only, tactile only하여 비교한 실험에서
 
-vision only는 contact를 잘 인지하지 못했고, tactile only는 robot의 위치를 제대로 못잡음.
-
-
-
-the image-only baseline is unable to recognize contact with the bottle. The tactile-only baseline can return a tactilely similar neighbor, but fails to capture the position of the robot.
+vision only는 contact를 잘 인지하지 못했고, tactile only는 robot의 위치를 제대로 못잡음.  
 
 
 
@@ -80,11 +74,11 @@ arm: 6-dof Kinova Jaco
 
 hand: a 16-dof Allegro hand with four fingers
 
-tactile sensor: 15 XELA uSkin
+tactile sensor: 15 XELA uSkin  
 
 
 
-\## 우리 연구와의 연결
+\# 우리 연구와의 연결
 
 
 
