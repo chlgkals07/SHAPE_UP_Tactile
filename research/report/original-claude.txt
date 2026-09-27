@@ -1,0 +1,372 @@
+# Tactile Sensors for LEAP Hand Dexterous Manipulation
+
+결론부터 말하면, LEAP Hand용 tactile sensor 중 문헌 근거가 가장 탄탄한 것은 세 가지다. PaXini PX-6AX 계열의 3-axis taxel array는 LEAP 위 실험 논문이 2편 있다. XELA uSkin은 제조사가 공식 LEAP 전신(全身) 통합 제품을 팔고, Allegro에서 쌓인 policy-learning 문헌이 가장 많다. AnySkin/WowSkin 계열 magnetic skin은 LEAP 장착 시연이 있고 오픈소스이며 sensor instance 간 일관성이 좋다. 예산 제약이 없다면 실제 구매 1순위는 XELA uSkin "For LEAP Hand"다.
+
+**TL;DR**
+- **Top 3 (근거 순):** ① PaXini PX-6AX: 논문 2편이 LEAP의 fingertip과 finger pad에 3×5 tri-axial taxel을 붙여 visuo-tactile policy를 학습했다(Level A). ② XELA uSkin: 제조사가 LEAP용 368-taxel 통합 구성을 공식 판매하고(Level B), Allegro에서는 T-DEX, See to Touch, Sparsh-skin, PTLD 같은 대표 연구가 이 센서를 썼다. ③ AnySkin/WowSkin: AnySkin 논문이 LEAP 장착을 직접 보였고, WowSkin 판매처는 LeapHand용 구조 부품을 판다.
+- **LEAP 연구자들이 실제로 쓰는 것:** 가장 흔한 것은 FSR/TwinTac/Velostat 같은 저가 저해상도 센서다. 그다음이 PaXini 3-axis array, 그다음이 Tac3D·GelSight Mini·FingerEye 같은 vision-based fingertip이다. 현재까지 **XELA를 실제로 LEAP에 달고 실험한 논문은 찾지 못했다.** XELA의 LEAP 적합성 근거는 제조사 통합 제품과 Allegro 문헌이다.
+- **추천 경로:** RL/sim-to-real(PPO 등)이 주력이면 3-axis force array를 사서, 학습에는 binary contact나 force-magnitude로 단순화해 넣고 real-world fine-tuning이나 imitation에는 full 3-axis를 쓰는 이중 구조가 가장 실용적이다. eFlesh/AnySkin 기반 custom skin은 2차 연구 기여로 충분히 가치가 있다. 다만 기본값은 "센서는 도구"로 두는 것이 맞다.
+
+---
+
+## 1. Executive Summary
+
+핵심 발견은 다섯 가지다.
+
+1. **LEAP Hand는 tactile이 없는 손이다.** 그래서 연구자마다 제각각 센서를 붙이고 있다. Feel Robot Feels(arXiv 2603.28542)의 저자들도 "The LeapHand is extensively employed in robotic manipulation research; however, it notably lacks integrated tactile sensing capabilities"라고 썼다. 그 결과 LEAP tactile 문헌은 한 가지 센서로 수렴하지 않았다. FSR, TwinTac, Velostat array, PaXini, Tac3D, GelSight Mini, FingerEye, AnySkin, DexSkin으로 파편화돼 있다.
+2. **3-axis distributed force array가 LEAP 문헌에서 policy input으로 가장 잘 검증됐다.** 대표가 PKU Hao Dong 그룹의 PaXini 기반 2편이다. 3DTacDex(arXiv 2409.17549)는 실제 4개 task에서 평균 78% 성공률을 보고했다. AdapTac(arXiv 2505.13982)은 3개 task에서 평균 93%를 기록해 vision-only RISE(73%)를 앞섰다.
+3. **XELA는 "LEAP에 공식 통합"과 "dexterous hand 문헌 성숙도" 두 축에서 가장 강하다.** 반면 LEAP 위 논문 근거는 없다. XELA 공식 페이지에 따르면 LEAP 구성은 4 fingertips × 30 + 11 phalanges × 16 + palm 72 = 368 sensing points, 최대 220 Hz이고, 손 전체를 CAN bus 케이블 2개로 연결한다(제조사 제공 사양).
+4. **Vision-based tactile(DIGIT, GelSight Mini, Tac3D, Digit 360)도 LEAP 위에서 쓰인 적은 있다.** 하지만 모두 fingertip을 통째로 바꿔야 하고, 30–60 Hz급 frame rate와 카메라 대역폭을 감당해야 한다. full-hand coverage는 불가능하다. 따라서 이 프로젝트(q, q̇, tactile 기반 policy, RL)의 주력 센서로는 부적합하다.
+5. **사람 손 수준의 "센서 선택 가이드"는 아직 없다.** UCSD–CMU–SNU 공동 benchmark인 TacO(arXiv 2605.21976)의 결론은 tactile의 유용성이 "depends strongly on sensor modality, material properties, and the specific manipulation tasks"라는 것이다. 센서 하나를 정답으로 고르기보다 task에 맞춘 선택이 필요하다.
+
+### Overall Top 3
+
+| 순위 | Sensor | LEAP 근거 등급 | 핵심 이유 | 가장 큰 약점 |
+|---|---|---|---|---|
+| 1 | PaXini PX-6AX (3×5 tri-axial array, fingertip + finger pad) | **Level A** (LEAP 실험 논문 2편) | LEAP 위에서 3D force + taxel pose 기반 GNN/attention policy가 검증됨. 저가 | 공식 LEAP kit 없음. 사용된 세대/모델 미공개. SDK·ROS 지원이 약함 |
+| 2 | XELA uSkin "For LEAP Hand" (uSCu ALHA + uSPa) | **Level B** (공식 LEAP 통합 제품) | 368 taxel 전신 coverage, 3-axis, ROS/ROS2, Allegro 문헌이 가장 풍부 | LEAP 위 논문 없음. quote-only. magnetic 간섭, raw 신호의 hysteresis |
+| 3 | AnySkin / WowSkin (magnetic elastomer + 5-magnetometer) | **Level A(장착 시연) + Level B(판매처의 LeapHand 부품)** | 오픈소스, 12초 교체, 교체 후에도 policy 재사용 가능한 instance 간 일관성 | 공간 해상도 낮음(skin당 magnetometer 5개). LEAP 위 policy 실험은 없음 |
+
+### High-End Shortlist
+
+| Sensor | 왜 high-end인가 | LEAP 근거 |
+|---|---|---|
+| XELA uSkin For LEAP Hand | 전신 368×3-axis, 개별 calibration 옵션, 온도·자기 보상, CAN 기반 저배선 | Level B |
+| PaXini PX-6AX GEN3 (Elite/Omega) | 제조사 사양상 normal 0–25 N, tangential ±10 N, 최대 1000 Hz 출력(제조사 lab 수치) | Level A는 이전 세대(3×5)로 추정. GEN3는 LEAP 근거 없음 |
+| Digit 360 (Meta/GelSight) | 240 Hz 카메라, multimodal(압력·진동·온도 등), on-device 처리 | LEAP 근거 없음(MOTIF Hand 저자들이 향후 장착 계획만 언급) |
+
+---
+
+## 2. What LEAP Hand Researchers Actually Use
+
+### LEAP Hand + tactile sensing papers
+
+| Paper | Year / Venue | LEAP version | Tactile sensor | Sensor placement | Number of sensors / taxels | Task | Tactile representation | Policy/model | Key result |
+|---|---|---|---|---|---|---|---|---|---|
+| Canonical Representation and Force-Based Pretraining of 3D Tactile for Dexterous Visuo-Tactile Policy Learning (3DTacDex; Wu, Li, Zhang, Wu, Dong) | 2024 / arXiv 2409.17549 | v1 16-DoF (JAKA MiniCobo 장착) | PaXini | 손가락마다 fingertip 1 + finger pad 1 | 8 센서 × 3×5 = 120 taxel, taxel당 3-axis force | Open Box, Reorientation, Flip, Assembly | taxel별 12D [sensor 6D pose, canonical 3D 위치, 3D force], 4-neighborhood graph | GraphMAE pretraining(masked local force + net force 예측) → Diffusion Policy(DinoV2 vision과 concat), 5 Hz | 실제 4개 task 평균 78% 성공. ablation에서 canonical 표현과 force pretraining 모두 효과 확인 |
+| Adaptive Visuo-Tactile Fusion with Predictive Force Attention for Dexterous Manipulation (AdapTac; Li, Wu, Zhang, Chen, Jin, Wu, Shen, Yang, Dong) | 2025 / arXiv 2505.13982 | "customized" 16-DoF LEAP (Flexiv Rizon 4) | PaXini | fingertip + finger pad | 3×5 tri-axial array, 손가락당 2개 | Open Box, Reorientation, Flip | 3D tactile + point cloud | force-guided attention fusion + future force prediction 보조 task | 평균 93%. 비교군 RISE 73%, 3DTacDex-P 40%, FoAR 50%. Flip ablation에서 force prediction/guidance 없으면 50% → FFP 추가 시 90% |
+| AnySkin: Plug-and-play Skin Sensing for Robotic Touch (Bhirangi, Pattabiraman, Erciyes, Cao, Hellebrekers, Pinto) | 2024 / arXiv 2409.08276 | LEAP (4-finger) | AnySkin | fingertip | skin당 magnetometer 5개(각 3-axis) | LEAP은 장착 시연. policy는 xArm/Franka 등에서 USB/plug insertion | raw magnetic flux | visuo-tactile policy(비LEAP), LSTM slip detection | 교체 후 zero-shot 성능 하락 13%(ReSkin은 43%). 평균 교체 시간 12초 |
+| Robust Model-Based In-Hand Manipulation with Integrated Real-Time Motion-Contact Planning and Tracking | 2025 / arXiv 2505.04978 | LEAP (UR5 장착) | Tac3D (vision-based) | 원래 fingertip 4개를 Tac3D로 교체 | 4 센서 | in-hand manipulation, open door 등 | contact normal + force, 30 Hz | model-based motion-contact planning/tracking | 실험 도중 센서 고장으로 Tac3D 4개를 전량 교체했다고 보고함(내구성 신호) |
+| In-Hand Following of Deformable Linear Objects Using Dexterous Fingers with Tactile Sensing | 2024 / arXiv 2403.12676 | LEAP | GelSight Mini | 손가락 2개의 fingertip | 2 센서 | DLO(케이블) following | tactile image → contact region segmentation → 3D line fitting | IK + hybrid position/force control | 저자들은 dexterous hand 기반 DLO following을 실제 로봇에서 처음 시도했다고 주장 |
+| FingerEye: Learning Dexterous Manipulation with Continuous Vision-Tactile Sensing | 2026 / arXiv 2604.20689 | LEAP (xArm7) | FingerEye (custom vision-tactile) | 모든 fingertip | fingertip당 카메라 모듈 1개 | contact-sensitive task | multi-camera image | leader–follower teleop + imitation, sim digital twin, 10 Hz 기록 | 카메라 기반 fingertip의 대역폭 부담을 보여주는 사례 |
+| Blind Dexterous Grasping via Real2Sim2Real Tactile Policy Learning | 2026 / arXiv 2606.11767 | v1 16-DoF (xArm6) | TwinTac(custom recast) + FSR | fingertip TwinTac 4개, 링크·palm에 FSR 12개 | 44 channel(TwinTac 8 taxel × 4 + FSR 12) | vision 없는 grasping | **binary** 44-ch + proprioception | sim에서 tactile encoder pretraining → diffusion policy, real 데이터 없이 zero-shot | 보지 않은 물체 10개로 평가. sim-to-real용 binary tactile 설계의 대표 사례 |
+| AURORA: Active Uncertainty-Driven Re-Orientation for In-Hand Reconstruction | 2026 / arXiv 2609.08493 | LEAP (fingertip link 연장) | FSR | fingertip, PIP/DIP phalange, palm | FSR 다수 | in-hand rotation(재구성 보조) | contact state, 약 50 Hz 비동기 | Rotating without Seeing policy를 LEAP용으로 재학습(RL) | FSR만으로도 axis-conditioned rotation이 가능 |
+| Feel Robot Feels: Tactile Feedback Array Glove for Dexterous Manipulation | 2026 / arXiv 2603.28542 | LeapHand | LeapTac (custom Velostat piezoresistive FPC) | fingertip | fingertip당 7×6 taxel(4 mm pitch) | teleop 촉각 피드백 | pressure map | glove haptic rendering | LEAP에 tactile이 없다는 점을 명시적으로 문제로 지적 |
+| Visual-tactile pretraining and online multitask learning for humanlike manipulation dexterity (Ye et al.) | 2026 / Science Robotics (eady2869) | LeapHand platform | "low-cost" 센서(종류는 본문 미확인) | 미확인 | 미확인 | multitask dexterous manipulation | **simple binary tactile signals** | visual-tactile SSL → RL + online IL | 초록 기준: monocular image + binary tactile만으로 일반화 가능한 skill 획득 |
+| DexSkin: High-Coverage Conformable Robotic Skin for Learning Contact-Rich Manipulation | 2025 / arXiv 2509.18830 | LEAP | DexSkin (capacitive) | palm + thumb link | 미공개(LEAP 적용은 시연) | 형태 적응성 시연 | taxel map | 주 실험은 gripper에서 RL | LEAP 위에서는 시각화만 했고 policy 실험은 없음 |
+| The MOTIF Hand (arXiv 2506.19201) | 2025 / arXiv | LEAP 기반 파생 hand | thin-film tactile | 손가락 표면 | 미공개 | multimodal 관측 | — | — | fingertip에 Digit 360을 "pending availability"로 장착 계획 |
+| RGB-S (arXiv 2606.08765) | 2026 / arXiv | LEAP | FSR 12 + TwinTac 4 | 관절 부위 + fingertip | 16 센서 | — | — | — | Blind Grasping과 같은 저가 조합(서브에이전트 확인, 본문 세부는 미검증) |
+
+### 문헌에서 보이는 패턴
+
+- **패턴 1, 두 갈래로 나뉜다.** LEAP tactile 문헌은 "저가·저차원·sim2real용"과 "고차원 3-axis·real-world IL용"으로 갈린다. RL/sim-to-real 계열(Blind Grasping, AURORA, Science Robotics 논문)은 FSR/TwinTac 같은 저가 센서를 쓰고 신호를 **binary contact**로 줄인다. 3DTacDex 저자들도 related work에서 "To close the sim-to-real gap, most works use discrete tactile signals or only activated tactile positions as input, limiting the full potential of tactile sensors"라고 정리했다. 반면 real-world imitation 계열(3DTacDex, AdapTac)은 3-axis force를 그대로 쓴다.
+- **패턴 2, vision-based는 fingertip 교체형으로만 쓰인다.** Tac3D, GelSight Mini, FingerEye가 모두 그렇다. 게다가 수량이 2–4개로 제한된다. 이 방식은 palm이나 phalange 접촉을 보지 못한다.
+- **패턴 3, "상용 3-axis array를 LEAP에 달고 policy를 학습한" 사례는 사실상 PaXini(PKU) 두 편뿐이다.** XELA는 LEAP 공식 통합 제품이 2025년 12월에야 게시됐다(페이지 published_time 2025-12-02). 그래서 LEAP 위 논문이 아직 없을 가능성이 높다. 이것은 기회이기도 하다. XELA-LEAP 구성으로 낸 첫 policy 논문은 그 자체로 참조점이 된다.
+- **패턴 4, LEAP v2 위 tactile 논문은 찾지 못했다.** 위 논문들은 모두 원형 16-DoF LEAP(v1)이거나 파생 hand다. LEAP v2(RSS 2025 demo, Humanoids 2025 "v2 Advanced")를 쓸 계획이라면 모든 센서의 mount 호환성을 새로 확인해야 한다.
+
+---
+
+## 3. Candidate Landscape
+
+### Commercial / ready-to-buy
+
+- **XELA uSkin (For LEAP Hand, uSCu ALHA, uSPa 44/46):** magnetic(Hall-effect) 3-axis taxel이다. LEAP용 완제 구성이 있고, 주문하면 "XELA Robotics provides the robot hand itself at the cost of the parts"(제조사). 즉 hand까지 조립된 상태로 받을 수 있다.
+- **WowSkin (WowRobo):** AnySkin 설계를 양산한 제품이다. 판매처는 "custom structural parts tailored for integration with projects like Koch, SO-100, SO-101, and LeapHand"를 제공한다고 밝힌다(판매처 주장). 소프트웨어는 AnySkin 코드에 GUI Reset 버튼만 추가한 수준이고, 하드웨어 설계는 proprietary다.
+- **GelSight Mini / DIGIT:** 완제품 구매가 가능하다. GelSight 공식 스토어는 GelSight Mini System을 $510.00(재고 있음, 주문 후 약 4주 리드타임)에 판매하고, DIGIT 제품 페이지는 "Estimated lead time: 4-6 weeks after receipt of order"라고 적고 있다. digit.ml은 DIGIT이 "natively compatible with the Wonik's Allegro Hand"라고 밝히지만 LEAP 호환은 언급하지 않는다. 따라서 LEAP 장착에는 custom fingertip 교체가 필요하다(Category D에서 다룸).
+
+### Commercial + custom integration
+
+- **PaXini PX-6AX (GEN2/GEN3):** 센서 모듈은 공식몰(mall.paxini.com), AliExpress flagship store, 리셀러를 통해 살 수 있다. 하지만 **공식 LEAP kit는 없다.** PKU 그룹도 "customized" LEAP에 자체 mount를 만들었다. GEN3 제조사 사양은 normal 0–25 N, tangential ±10 N, 최소 인식력 0.01 N, 최대 출력 1000 Hz이며, 제조사는 "*数据源于帕西尼实验室"(자사 lab 수치)라고 단서를 단다.
+- **Tac3D:** vision-based 3D force 센서다. LEAP fingertip 교체형으로 쓰인 사례가 있다(arXiv 2505.04978).
+
+### Fabrication required
+
+- **AnySkin (오픈소스):** DragonSkin 10 Slow, MQFP-15-7 magnetic particle, pulse magnetizer, 5-magnetometer PCB가 필요하다. 교체 시간은 평균 12초다.
+- **ReSkin:** AnySkin의 전신이다. 교체 후 zero-shot 성능 하락이 43%로 커서, 새 프로젝트라면 AnySkin을 쓰는 편이 낫다.
+- **eFlesh (arXiv 2506.09994):** 3D 프린팅한 cut-cell microstructure에 magnet을 넣고, 아래에 magnetometer board를 둔다. 저자들이 보고한 수치는 contact localization 0.5 mm, force error z 0.27 N / xy 0.12 N, 선형 분류기 slip detection 95%다. 재료는 "<$5" magnet이면 된다.
+- **TwinTac / FSR / Velostat(LeapTac):** 저가 저해상도 baseline이다.
+- **DexSkin(capacitive), 9DTact, DenseTact:** DenseTact와 9DTact는 LEAP 근거를 찾지 못했다.
+
+### Vision-based tactile
+
+- **DIGIT(원 논문 사양):** 20×27×18 mm, 20 g, sensing field 19×16 mm, 640×480, 60 FPS. LEAP fingertip보다 부피가 크고 깊이 방향 두께 때문에 교체형 mount가 필요하다.
+- **GelSight Mini:** LEAP 위 DLO 논문 1편에서 fingertip 2개에 사용됐다.
+- **Digit 360:** 240 Hz 카메라, 18종 이상의 sensing feature. on-device 처리로 event-to-action latency가 1.2 ms이고, 기존 경로는 Digit 360 2.5 ms, DIGIT 6 ms 이상이다(Meta 논문 수치). LEAP 위 사용 사례는 없다.
+- **Tac3D, FingerEye:** LEAP 위 사용 사례가 있다.
+- **평가:** Kasolowsky & Bäuml(arXiv 2409.12735)은 camera-based 센서가 "bulky and can not be easily added to an existing robot structure (e.g., the complete fingertip has to be replaced)"라고 지적했다. Sparsh-skin 저자들도 vision-based 센서는 "restricted to the fingertips and limited by bandwidth"라고 썼다. 이 프로젝트의 o_t = [q_t, q̇_t, tactile_t] 형태 RL policy에서는 이미지 encoder 비용과 sim 렌더링 비용이 크다. 그래서 주력이 아니라 **특정 fingertip 한두 개의 geometry 정보가 필요할 때 쓰는 보조 센서**로 보는 것이 맞다.
+
+---
+
+## 4. Detailed Sensor Comparison
+
+"(M)"은 제조사 제공, "(P)"는 논문 보고, "(R)"은 리셀러/제3자 정보다.
+
+| Sensor | Principle | Purchase / Fabrication | LEAP Evidence | Spatial sensing | Shear | Output | Sampling rate | Size | Raw data | SDK | ROS | Integration effort | Price | Representative papers |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| XELA uSkin For LEAP | Magnetic (Hall) 3-axis taxel | 구매(완제 hand 포함 가능) | Level B | LEAP 구성 368 taxel. sensing point 약 4×4 mm (M). Allegro 곡면 fingertip taxel 간격 약 6.5 mm (P, TaSA) | 있음 | 3-axis + 온도, N 단위 calibration(standard 무료, individual 유료) (M) | LEAP 구성 최대 220 Hz. 모듈 일반 최대 500 Hz (M) | 두께 4 mm부터 (M) | 있음(PTLD는 raw 3-axis 사용) | uAi, websocket server, Python/C++ 샘플 (M) | ROS/ROS2 (M) | 낮음(공식 통합) | Quote required | T-DEX, See to Touch, Sparsh-skin, PTLD, TaSA (모두 Allegro) |
+| PaXini PX-6AX | Hall-effect 3-axis array | 모듈 구매 + custom mount | Level A (2편) | LEAP 논문: 센서당 3×5 taxel (P). GEN3: 모델별 9–239 taxel (R). MIDAS: S2015-Elite 52 / M2826-Omega 127 (P) | 있음 | taxel별 3D force | GEN3 최대 1000 Hz (M) vs 83.3 Hz (P, MIDAS) vs 약 91 Hz auto-push (R) — **불일치** | S2015-Elite 20×15×10 mm, M2826-Omega 28×26×14 mm (M) | 있음(논문이 taxel별 force 사용) | PXSR(Windows), community `paxini-sdk` (R) | native driver 미확인. pyserial wrapper (R) | 중간(mount 설계, 배선) | 모듈 $55.96–$70.25 (R, AIFITLAB) | 3DTacDex, AdapTac, MIDAS Hand |
+| AnySkin | Magnetic elastomer + 5 magnetometer | 오픈소스 제작 | Level A(장착 시연) | skin당 5 point (저해상도) | 있음(flux로 간접) | uncalibrated raw magnetic flux (3×5=15 dims) | 공개 사양 미확인 | fingertip형(삼각형 단면 설계) | 있음 | 오픈소스 Python | 공식 ROS 미확인 | 중간(casting, magnetizer 필요) | 재료비 기반. 공식가 없음 | AnySkin, Visuo-Skin(arXiv 2410.17246) |
+| WowSkin | AnySkin 양산품 | 구매 | Level B(판매처의 LeapHand 부품 주장) | AnySkin과 동일 | 있음 | raw flux | 공개 사양 미확인 | — | 있음 | AnySkin 기반 GUI (MIT) | 미확인 | 낮음 | €180 net / €214.20 VAT 포함 (R, Eckstein) | 전용 논문 없음 |
+| eFlesh | 3D-printed microstructure + magnet + magnetometer | 제작 | 없음(이론적 호환) | localization 0.5 mm (P) | 있음(xy error 0.12 N) (P) | 학습 기반 force 추정 | 미확인 | CAD 형상 임의 | 있음 | 오픈소스(CAD→STL 도구) | 미확인 | 중간–높음 | magnet <$5 + board | eFlesh, TacO |
+| TwinTac + FSR | Piezoresistive/pressure | 제작/저가 부품 | Level A | 8 taxel/fingertip + FSR 단일점 | 없음 | pressure/binary | FSR 약 50 Hz (P, AURORA) | 소형 | 있음 | 자작 | 자작 | 중간 | 저가(정확한 값 미공개) | Blind Grasping, AURORA, RGB-S |
+| Tac3D | Vision-based 3D force | 구매 | Level A | 고밀도 displacement/force field | 있음 | contact normal + force | 30 Hz (P) | fingertip 교체형 | 있음 | vendor | 미확인 | 높음 | not publicly specified(본 조사 미확인) | arXiv 2505.04978 |
+| GelSight Mini | Vision-based | 구매 | Level A(1편) | 고해상도 image | 간접(marker) | RGB image | 미확인 | fingertip 교체형 | 있음 | vendor SDK | 커뮤니티 | 높음 | $510.00 (M, GelSight 공식 스토어, GelSight Mini System) | arXiv 2403.12676 |
+| DIGIT | Vision-based | 구매 | 없음 | 640×480, field 19×16 mm (P) | 간접 | RGB image | 60 FPS (P) | 20×27×18 mm (P) | 있음 | 오픈소스 | 커뮤니티 | 높음 | 본 조사 미확인 | DIGIT(arXiv 2005.14679), AnySkin 비교 실험 |
+| Digit 360 | Vision + multimodal | early access(call for proposals), GelSight가 제조·유통 | 없음 | 고해상도 omnidirectional | 있음 | image + 다중 modality | 카메라 240 Hz (P) | fingertip형 | 있음 | Meta/GelSight | 미확인 | 높음 | 본 조사 미확인 | Digitizing Touch(arXiv 2411.02479) |
+
+---
+
+## 5. Sensor-by-Sensor Analysis
+
+### 5.1 PaXini PX-6AX
+
+- **무엇인가.** Hall-effect 기반 tri-axial taxel array다. PKU 논문들은 fingertip용과 finger pad용 두 종류를 썼고, 둘 다 3×5 taxel이며 배치만 조금 다르다.
+- **LEAP 근거.** 3DTacDex와 AdapTac 두 편이 있다. 둘 다 실제 로봇 실험이고, AdapTac은 ablation까지 있다.
+- **sensing quality.** taxel마다 3D force가 나오므로 shear를 직접 관측할 수 있다. 이 점은 slip onset과 net force 추정에 핵심이다. 3DTacDex는 taxel pose(FK)와 force를 결합해 net force를 자기지도 target으로 썼다. force가 물리적으로 의미 있는 단위로 나온다는 전제가 있어야 가능한 설계다.
+- **약점.**
+  - 논문이 **센서 세대나 모델명을 밝히지 않는다.** 3×5 배열은 GEN3 공식 라인업(Elite/Core/Omega 12종)과 바로 대응되지 않는다. GEN2이거나 custom일 가능성이 있는데, 이는 추론이다.
+  - 사양 수치가 서로 맞지 않는다. 제조사 GEN3 표는 "最大输出频率 1000 Hz"라고 하지만, MIDAS Hand 논문은 제조사 사양을 인용해 "maximum output rate of 83.3 Hz"라고 썼고, 서드파티 PyPI 패키지는 통신보드 auto-push를 "~91 Hz"로 적었다. **실제 policy 루프에서는 100 Hz 안팎으로 계획하는 것이 안전하다.**
+  - 리셀러 AIFITLAB은 "Maximum 121" 신호와 IP65를 표기하는데, 공식 수치(717 신호, IP68)와 다르다.
+  - 공식 ROS driver를 확인하지 못했다. SDK도 Windows용 PXSR과 커뮤니티 패키지 중심이다.
+- **판정.** "LEAP 위 3-axis array policy 학습"을 가장 빨리 재현할 수 있는 경로다. 다만 SDK와 mount를 직접 해결해야 한다.
+
+### 5.2 XELA uSkin
+
+- **무엇인가.** 각 taxel에 작은 magnet과 Hall 센서를 둔 soft skin이다. 3-axis force와 온도를 함께 측정한다.
+- **LEAP 근거.** Level B다. 공식 LEAP 통합 제품이 있다.
+  - 제조사 사양: fingertip은 uSkin ALHA 30 taxel, phalange는 uSPa 16 taxel, palm은 72 taxel, 합계 368 taxel이고 측정값은 1,472개다. 최대 220 Hz. 마이크로컨트롤러는 손가락 뒷면과 palm 안쪽에 봉입돼 있다. 손가락당 4선 케이블 1개, 손 전체는 CAN 케이블 2개로 연결한다. 외피는 교체할 수 있다.
+  - "Users can choose which part of the hand to cover with sensors"라고 명시돼 있어 부분 구성도 가능하다.
+- **dexterous hand 문헌 성숙도가 가장 높다.** Allegro 기준으로 보면 다음과 같다.
+  - T-DEX(Guzey et al., "Dexterity from Touch," arXiv 2303.12076): uSkin 15개로 Allegro를 덮고 robotic play로 tactile representation을 pretraining했다.
+  - See to Touch / TAVI(arXiv 2309.12300): 공식 코드가 "Allegro hand with XELA sensors integration"을 명시한다.
+  - Sparsh-skin(arXiv 2505.11420): 368 센서 Allegro에서 self-distillation 표현을 학습했고, 기존 대비 41% 이상 향상을 보고했다.
+  - PTLD(arXiv 2603.04531): sim-to-real privileged tactile latent distillation.
+- **알려진 문제(논문 근거).**
+  - PTLD는 "We use the 3-axis raw sensor measurements over processed force measurements as force measurements contain significant hysteresis and lag"라고 썼다. 매 수집 전에 2분간 무접촉 baseline을 빼는 절차도 적용했다. 즉 제조사의 N 단위 calibration을 그대로 policy에 넣기보다 **raw + baseline subtraction**이 실전 관행이다.
+  - Sparsh-skin 저자들은 magnetic skin 보급이 늦은 이유로 "challenges with interpreting magnetic flux and calibration"을 꼽았다.
+  - 초기 uSkin 연구(arXiv 1803.03435)는 shear가 약 2 N에서 한계에 이르고 과부하 시 silicone이 PCB에서 찢어질 수 있다고 보고해 lycra 커버를 썼다. 오래된 세대 기준이므로 현행품에는 그대로 적용되지 않을 수 있다.
+  - 자기 간섭. XELA는 reference 측정으로 보상한다고 밝힌다. 2026년 4월 29일 보도자료(PR Newswire, The Robot Report 보도)에서는 "CAN FD enhanced tactile sensors are available for immediate ordering with first deliveries set for May 2026. The optional magnetic interference compensation sensor capability will be available in the third quarter of this year"라고 발표했다. 데모 기준으로 "Strong magnet (pull force of 3 kg) nearly touching sensor (size: 3x3 mm2) has no effect on compensated sensor readings"라고 주장하지만, 이는 제조사 시연이다. LEAP의 Dynamixel 모터 근처에서 실제 간섭이 어느 정도인지는 공개 데이터가 없다.
+- **판정.** 예산이 허락하면 가장 "research infrastructure다운" 선택이다. 전신 coverage이고 ROS2를 지원한다. 다만 LEAP 위 첫 논문을 우리가 쓰게 될 수 있다는 점, 즉 검증되지 않은 통합 이슈(무게, 케이블, 간섭)를 떠안을 수 있다는 점은 감수해야 한다.
+
+### 5.3 AnySkin / WowSkin
+
+- **무엇인가.** 자화된 elastomer skin이 아래 magnetometer PCB와 분리된 구조다. 휴대폰 케이스처럼 끼우는 방식이다.
+- **강점.**
+  - instance 간 신호 일관성이 좋다. AnySkin 논문 Table I에서 cross-instance normalized std가 ReSkin 0.54/0.87에서 AnySkin 0.12/0.10으로 줄었다.
+  - 교체 후 zero-shot 성능 하락이 13%다(ReSkin 43%).
+  - 수명이 짧은 soft skin을 자주 갈아야 하는 장기 데이터 수집에서 가장 중요한 특성이 바로 이 일관성이다.
+- **LEAP 근거.** AnySkin 논문은 "AnySkin can readily be used on a variety of robots including xArm, Franka, and the four-fingered Leap hand"라고 쓰고 Fig. 1에서 장착을 보였다. 다만 LEAP 위 policy 성능 실험은 없다. WowSkin 판매처는 LeapHand용 구조 부품을 판다고 주장한다.
+- **약점.**
+  - skin당 magnetometer가 5개뿐이라 contact geometry 해상도가 낮다.
+  - "uncalibrated" 설계라서 N 단위 force가 나오지 않는다. sim에서 모사하기도 어렵다.
+  - fingertip 이외 phalange와 palm으로 넓히려면 PCB와 mold를 직접 설계해야 한다.
+- **판정.** 가장 싸고 빠른 prototype 경로다. 또 instance consistency 자체가 연구 주제(tactile representation transfer)로 이어질 수 있다.
+
+### 5.4 eFlesh
+
+- **개요.** NYU(Pinto, Bhirangi 그룹)의 3D-printable magnetic 센서다. 필요한 것은 "a hobbyist 3D printer, off-the-shelf magnets (<$5), a CAD model of the desired shape, and a magnetometer circuit board"이다(저자).
+- **강점.** LEAP fingertip CAD를 그대로 입력해 센서화할 수 있어 형상 자유도가 가장 높다.
+- **TacO benchmark 결과.** 6개 센서(FSR, FlexiTac, eGain, eFlesh, Daimon, Contact Mic) 비교에서 eFlesh 사양은 normal 0–30 N, shear 0–17.5 N으로 정리됐다. 결론은 "accessible, open-source sensors can achieve performance comparable to more expensive commercial systems"였다.
+- **판정.** LEAP 근거는 없고 이론적 호환만 있다. 그래서 custom 연구 확장의 1순위다(12장).
+
+### 5.5 Vision-based (Tac3D, GelSight Mini, DIGIT, Digit 360, FingerEye)
+
+- **LEAP 사용 사례.** Tac3D, GelSight Mini, FingerEye가 LEAP에서 쓰였다. DIGIT과 Digit 360은 사례가 없다.
+- **문제점.**
+  - fingertip을 교체해야 한다.
+  - 30–60 Hz frame rate의 제약이 있다(Tac3D 30 Hz, DIGIT 60 FPS). Digit 360은 240 Hz로 예외다.
+  - 카메라가 여러 대 붙으면 USB 대역폭과 image encoder 계산량이 커진다.
+  - 내구성 문제. Tac3D 논문은 실험 중 고장으로 센서 4개를 모두 교체했다.
+  - palm과 phalange를 덮을 수 없다.
+- **판정.** contact geometry(edge, 모양, 미세 slip)를 fingertip 수준에서 봐야 하는 과제에만 선택적으로 쓴다. 이 프로젝트의 기본 센서로는 권장하지 않는다.
+
+### 5.6 저가 baseline (FSR, TwinTac, Velostat)
+
+- LEAP 문헌에서 가장 흔하다. Blind Grasping, AURORA, RGB-S, Feel Robot Feels, preprints.org의 Compliant Robotic Hand가 여기에 속한다.
+- 해결해야 할 문제가 있다. preprints.org 논문은 작고 평평한 FSR이 "did not consistently capture forces applied on the curved fingertip surfaces of the LEAP Hand"라고 보고하고, 3D 프린팅한 반구형 force propagation element를 끼워 해결했다.
+- shear가 없고 hysteresis와 drift가 크다(TacO가 resistive 센서의 약점으로 명시).
+- **판정.** ablation용 baseline(binary contact)으로는 반드시 하나 갖춰 둘 가치가 있다.
+
+---
+
+## 6. Representative Papers
+
+### PaXini
+1. **Canonical Representation and Force-Based Pretraining of 3D Tactile for Dexterous Visuo-Tactile Policy Learning.** Tianhao Wu, Jinzhou Li, Jiyao Zhang, Mingdong Wu, Hao Dong. 2024, arXiv 2409.17549. LEAP v1 + JAKA MiniCobo. fingertip과 pad에 3×5 tri-axial array. GraphMAE pretraining 후 Diffusion Policy. real robot 4 task 평균 78%. ablation 있음.
+2. **Adaptive Visuo-Tactile Fusion with Predictive Force Attention for Dexterous Manipulation.** Jinzhou Li, Tianhao Wu, Jiyao Zhang, Zeyuan Chen, Haotian Jin, Mingdong Wu, Yujun Shen, Yaodong Yang, Hao Dong. 2025, arXiv 2505.13982. customized LEAP + Flexiv. force-guided attention. 평균 93%. ablation(Flip 50% → 70% → 90%).
+3. **MIDAS Hand: Modular low-Impedance Direct-drive Anthropomorphic Sensing Hand.** 2026, arXiv 2607.14487. LEAP이 아닌 자체 hand. PX6AX-GEN3-DP-S2015-Elite(52 taxel) × 3과 M2826-Omega(127 taxel) 1개, 총 283 taxel. GEN3 모델 구성의 참고 사례.
+
+### XELA uSkin
+1. **Dexterity from Touch: Self-Supervised Pre-Training of Tactile Representations with Robotic Play (T-DEX).** Irmak Guzey, Ben Evans, Soumith Chintala, Lerrel Pinto. 2023, CoRL, arXiv 2303.12076. Allegro에 uSkin 15개. tactile image 기반 SSL pretraining. real robot.
+2. **See to Touch: Learning Tactile Dexterity through Visual Incentives (TAVI).** Guzey et al. 2024, ICRA, arXiv 2309.12300. Allegro + XELA. online IL과 visual reward.
+3. **Self-supervised perception for tactile skin covered dexterous hands (Sparsh-skin).** 2025, arXiv 2505.11420. Allegro 368 taxel. self-distillation embedding. 기존 대비 41% 이상 향상.
+4. **PTLD: Sim-to-real Privileged Tactile Latent Distillation for Dexterous Manipulation.** 2026, arXiv 2603.04531. Allegro 368 taxel. raw 3-axis에서 baseline을 빼 사용. sim-to-real.
+5. **TaSA: Two-Phased Deep Predictive Learning of Tactile Sensory Attenuation for Improving In-Grasp Manipulation.** 2026, arXiv 2602.05468. Allegro와 uSCu curved fingertip. taxel 간격 약 6.5 mm.
+
+### AnySkin / ReSkin
+1. **AnySkin: Plug-and-play Skin Sensing for Robotic Touch.** Raunaq Bhirangi, Venkatesh Pattabiraman, Enes Erciyes, Yifeng Cao, Tess Hellebrekers, Lerrel Pinto. 2024, arXiv 2409.08276. LEAP 장착 시연. cross-instance 비교에서 DIGIT, ReSkin과 대비.
+2. **Learning Precise, Contact-Rich Manipulation through Uncalibrated Tactile Skins (Visuo-Skin).** 2024, arXiv 2410.17246. uncalibrated magnetic skin 기반 policy.
+3. **All the Feels: A dexterous hand with large-area tactile sensing.** Bhirangi et al. 2023, RA-L, arXiv 2210.15658. D'Manus hand. ReSkin magnetometer 56개(fingertip 8개씩 + palm 32개).
+4. **ReSkin: versatile, replaceable, lasting tactile skins.** Bhirangi et al. 2021, CoRL.
+
+### eFlesh
+1. **eFlesh: Highly customizable Magnetic Touch Sensing using Cut-Cell Microstructures.** Pattabiraman, Huang, Panozzo, Zorin, Pinto, Bhirangi. 2025, arXiv 2506.09994.
+2. **TacO: Benchmarking Tactile Sensors for Object Manipulation.** Zorin, Si, Park, … Yong-Lae Park(SNU), Kroemer, Temel, Tolley, Yi, Wang. 2026, arXiv 2605.21976. ACT 기반 visuotactile과 vision-only 비교.
+
+### Vision-based
+1. **Robust Model-Based In-Hand Manipulation with Integrated Real-Time Motion-Contact Planning and Tracking.** 2025, arXiv 2505.04978. LEAP + Tac3D × 4.
+2. **In-Hand Following of Deformable Linear Objects Using Dexterous Fingers with Tactile Sensing.** 2024, arXiv 2403.12676. LEAP + GelSight Mini × 2.
+3. **FingerEye: Learning Dexterous Manipulation with Continuous Vision-Tactile Sensing.** 2026, arXiv 2604.20689. LEAP.
+4. **DIGIT: A Novel Design for a Low-Cost Compact High-Resolution Tactile Sensor with Application to In-Hand Manipulation.** Lambeta et al. 2020, RA-L, arXiv 2005.14679.
+5. **Digitizing Touch with an Artificial Multimodal Fingertip (Digit 360).** Lambeta et al. 2024, arXiv 2411.02479.
+
+---
+
+## 7. Policy Input and Tactile Representations
+
+기초부터 정리한다. tactile을 policy에 넣는 방법은 크게 네 가지다.
+
+1. **Flatten + MLP.** 예를 들어 PaXini 8개 × 15 taxel × 3 = 360 dim을 펴서 넣는다. 가장 단순하다. 3DTacDex 저자들은 저차원일 때는 이 방식이 유효하지만 coverage가 커지면 비효율적이라고 정리했다. AdapTac의 비교군 "3DTacDex-P"(단순 concat 계열)는 40%에 그쳤다. 반면 force-guided fusion은 93%였다. 표현과 fusion 방식이 센서만큼 중요하다는 뜻이다.
+2. **Tactile image + CNN.** 3-axis를 RGB 3채널에 매핑해 2D 이미지로 만든다. T-DEX 계열이 여기에 속한다. vision backbone을 재사용할 수 있지만, 서로 다른 센서 간 공간 관계는 잃는다(3DTacDex의 비판).
+3. **Graph/point-set.** taxel마다 [sensor pose(6), 정규화 위치(3), force(3)] 12D node를 만들고 GNN/GraphMAE로 인코딩한다. 3DTacDex 방식이며, **LEAP처럼 링크마다 센서가 흩어진 손에 가장 자연스럽다.**
+4. **Pretrained embedding.** Sparsh-skin(XELA Allegro)은 tactile+kinematics 이력을 받아 latent를 출력한다. PTLD는 privileged tactile latent를 distillation한다.
+
+**sim-to-real(PPO 등) 관점의 실무 권고**
+- **1단계, sim에서 쓰는 tactile은 단순화한다.** Blind Grasping(44-ch binary), Science Robotics 논문(binary), AURORA(FSR contact)가 보여주듯, LEAP에서 RL policy를 real로 옮긴 사례는 대부분 **binary 또는 thresholded contact**를 썼다. 3-axis force array를 사더라도 RL 관측에는 taxel별 |F| threshold나 sensor별 net force만 넣는 것이 안전하다.
+- **2단계, real에서는 full 3-axis를 쓴다.** imitation(Diffusion Policy/ACT), residual RL, tactile encoder fine-tuning에서 사용한다. XELA 기준 T_t ∈ R^{368×3}, PaXini 기준 R^{120×3}이다.
+- **정규화.** 무접촉 baseline을 빼는 것이 기본이다(PTLD). magnetic 센서는 온도와 주변 자기장에 따라 drift가 생기므로 에피소드 시작마다 re-zero한다. WowSkin GUI의 Reset 버튼도 같은 목적이다.
+- **주파수 맞추기.** policy가 5–10 Hz(3DTacDex 5 Hz, FingerEye 10 Hz)라면 센서 100–220 Hz 신호를 window 통계(평균, 최대, 미분)로 요약해 넣는다. 그래야 slip 같은 고주파 정보를 잃지 않는다.
+- **Vision-based tactile은 T_t ∈ R^{H×W×3}이다.** RL sim에서 렌더링 비용이 크고 sim2real gap도 크다. 이 프로젝트에서는 imitation 전용 보조 입력으로 한정한다.
+
+---
+
+## 8. Practical LEAP Integration
+
+- **Fingertip.**
+  - XELA는 곡면 fingertip 교체형(uSCu ALHA 계열)이다.
+  - PaXini는 fingertip용 모듈과 custom holder가 필요하다.
+  - AnySkin/WowSkin은 fingertip PCB 위에 skin을 씌운다.
+  - vision-based는 fingertip 전체를 교체한다.
+  - LEAP fingertip은 곡면이다. 평평한 센서(FSR 등)는 off-center 하중을 놓친다(preprints.org 논문). AURORA는 contact coverage를 위해 distal link를 연장했다. **fingertip 형상 변경은 kinematics와 sim 모델(URDF/MJCF)을 함께 바꾼다는 뜻**이니 CAD와 URDF를 동시에 수정해야 한다.
+- **Finger pad / phalange.** 여기에 3-axis를 넣은 LEAP 구성은 XELA(uSPa 16 taxel × 11)와 PaXini(pad 3×5 × 4) 두 가지뿐이다. in-hand rotation과 power grasp에서는 phalange 접촉이 흔하므로 이 부위 coverage가 policy 성능을 좌우할 수 있다.
+- **Palm.** XELA LEAP 구성(72 taxel)이 유일한 상용 옵션이다. DexSkin도 LEAP palm 적용을 시연했지만 연구용이다.
+- **Wiring.**
+  - LEAP은 Dynamixel 버스를 쓴다.
+  - XELA는 손 전체를 CAN 2선로로 처리한다(제조사).
+  - PaXini는 모듈별 신호선과 통신보드가 필요하다.
+  - Blind Grasping의 TwinTac은 센서마다 Seeed XIAO를 붙여 USB로 바꿨는데, 저자들은 이것이 "simplifies wiring and reduces cable interference with finger motion"이라고 썼다.
+  - 케이블은 MCP 관절의 abduction 축을 지나므로 slack과 strain relief를 CAD 단계에서 설계해야 한다.
+- **Communication.** XELA는 CAN2USB와 websocket server를 거치며, 변화분만 전송해 주파수를 유지한다(제조사). PaXini는 USB serial(리셀러 정보)이다. AnySkin은 USB serial이다.
+- **Compute.** magnetic과 force array는 수백 dim 수준이라 CPU만으로 충분하다. vision-based 4개(각 640×480 @60)는 USB 3 대역폭과 GPU encoder가 필요하다.
+- **자기 간섭.** Dynamixel 모터 속 영구자석, 금속 물체, 인접 skin끼리의 상호 간섭 가능성이 있다. 구매 후 **첫 실험은 손가락 관절을 움직이며 무접촉 신호가 흔들리는지 측정하는 것**이어야 한다.
+
+---
+
+## 9. Cost and Procurement
+
+| 항목 | 단가 | LEAP 구성 수량 | 합계 | 비고 |
+|---|---|---|---|---|
+| LEAP Hand v1 본체 | 2000 USD(원 논문 RSS 2023: "can be assembled in under 4 hours at a cost of 2000 USD") | 1 | 2000 USD | XELA 통합 주문 시 "at the cost of the parts"로 제공 |
+| XELA uSkin For LEAP | Quote required / not publicly disclosed | 368 taxel 전신 | 견적 필요 | individual calibration은 유료 옵션. 일본(도쿄) 본사, distributor 목록 있음 |
+| PaXini PX-6AX 모듈 | $55.96–$70.25 (리셀러 AIFITLAB, 변형별) | 8(fingertip 4 + pad 4) | 모듈만 약 $450–$560 | 통신보드 가격 미확인. 공식몰, AliExpress, Amazon flagship. 한국 전용 distributor 미확인(paxini.com/kr 존재) |
+| WowSkin | €180 net / €214.20 VAT 포함(Eckstein) | 4(fingertip) | 약 €720 net | LeapHand 구조 부품은 판매처 문의 |
+| AnySkin 자작 | 재료비(공식가 없음) | 4 | — | pulse magnetizer 접근성이 병목 |
+| eFlesh 자작 | magnet <$5 + magnetometer board | 4 이상 | — | 3D 프린터 필요 |
+| GelSight Mini / DIGIT / Tac3D / Digit 360 | GelSight Mini System $510.00(GelSight 공식 스토어, 리드타임 약 4주; 출시 발표가 $499). DIGIT은 리드타임 4–6주(가격 미확인). Tac3D·Digit 360은 가격 미확인 | 2–4 | — | fingertip 교체 mount를 별도 제작 |
+
+- 한국 조달: PaXini는 AliExpress와 Amazon 공식 스토어로 개인·연구실 구매가 가능해 보인다(ZDNet Korea 2025-12-04 보도). XELA는 일본 본사나 distributor를 통한 견적이 필요하다. 학술 할인 여부는 두 회사 모두 공개되지 않았다.
+
+---
+
+## 10. Final Top 3 Recommendation
+
+### #1 PaXini PX-6AX: LEAP 문헌 근거 1위
+- **왜 Top 3인가.** 조사 범위 안에서 LEAP 위 3-axis array로 policy를 학습하고 ablation까지 보인 유일한 상용 센서다.
+- **가장 강한 근거.** 3DTacDex(78%, ablation)와 AdapTac(93% 대 vision-only 73%)이다. 두 논문 모두 methods/setup 섹션에서 "Leap Hand … PaXini tactile sensors … 3×5 array of taxels … tri-axial forces"를 확인했다.
+- **LEAP 통합 근거.** Level A다. 다만 공식 kit는 없고, PKU도 "customized" LEAP를 썼다.
+- **sensing 장점.** taxel별 3D force로 shear와 net force를 직접 얻는다. fingertip과 pad를 모두 덮는다.
+- **한계.**
+  - 두 논문이 같은 그룹(PKU Hao Dong lab)에서 나왔다. 독립 재현은 없다.
+  - 모델과 세대를 밝히지 않았다.
+  - 출력 주파수 사양이 1000 Hz, 83.3 Hz, 약 91 Hz로 서로 다르다.
+  - ROS와 SDK가 약하다.
+- **가능해지는 실험.** 3DTacDex/AdapTac를 LEAP에서 재현하고 baseline을 확보하기. 그 위에 RL/AMP 기반 in-hand rotation과 force-aware grasp stabilization 얹기.
+
+### #2 XELA uSkin For LEAP Hand: 공식 통합 + 문헌 성숙도 1위 (high-end 1순위)
+- **왜 Top 3인가.** 제조사가 LEAP 전신 368 taxel 통합과 hand 제공을 공식 판매한다(Level B). 같은 센서의 Allegro 문헌(T-DEX, TAVI, Sparsh-skin, PTLD)이 tactile representation과 policy learning 분야에서 가장 두텁다. Sparsh-skin 같은 pretrained encoder도 활용할 여지가 있다. Allegro와 LEAP은 둘 다 16-DoF 4-finger이고 taxel 구성(fingertip 30, phalange 16)도 같다. 다만 이식 가능성은 검증되지 않았다.
+- **한계.**
+  - LEAP 위 논문이 0편이다(서브에이전트 검색으로도 확인).
+  - 가격은 견적제다.
+  - raw 신호의 hysteresis와 lag(PTLD).
+  - 자기 간섭.
+- **가능해지는 실험.** palm·phalange를 포함한 whole-hand contact-state estimation. slip onset 검출(shear). Sparsh-skin 방식 tactile SSL을 LEAP으로 옮기기. **"XELA-LEAP 첫 policy 논문"이라는 포지셔닝.**
+
+### #3 AnySkin / WowSkin: 빠른 시작 + 교체 일관성
+- **왜 Top 3인가.** LEAP 장착 시연이 있고(Level A-lite), 판매처가 LeapHand 부품을 판다(Level B, 판매처 주장). 전부 오픈소스이고, instance 간 일관성이 정량적으로 검증됐다.
+- **한계.** 해상도가 낮다(5 point). uncalibrated다. LEAP policy 실험이 없다.
+- **가능해지는 실험.** fingertip slip detection. 교체 가능한 skin 위에서의 tactile representation transfer. eFlesh로 넘어가기 전의 magnetic pipeline 구축.
+
+**실행 권고.** XELA 견적(LEAP 전신 구성, lead time, raw access, ROS2)을 즉시 요청한다. 동시에 WowSkin 4개나 PaXini 8개를 사서 2–4주 안에 pipeline을 구축한다. 견적과 납기가 수용 가능하면 주력은 XELA, 아니면 PaXini로 간다. 어느 쪽이든 FSR binary baseline은 ablation용으로 유지한다.
+
+---
+
+## 11. High-End Recommendation
+
+1. **XELA uSkin For LEAP Hand (전신 368 taxel, individual calibration 옵션 포함).** 가장 완성된 구성이다. 전신 coverage, 3-axis, 온도 보상, CAN 저배선, ROS2를 갖췄다. 추가로 요청할 것: 개별 calibration, 자기 간섭 보상 옵션(2026 Q3 발표), CAN FD 버전(2026년 5월부터 출하 발표).
+2. **PaXini GEN3 (fingertip S2015-Elite급 + pad 모듈).** 제조사 사양상 GEN3의 taxel 밀도와 force range(0–25 N / ±10 N)가 LEAP 논문에 쓰인 3×5 세대보다 높다. MIDAS Hand가 GEN3 조합을 실제로 썼다. 다만 LEAP mount는 직접 설계해야 한다.
+3. **Digit 360 (선택적 fingertip 보강).** fingertip 1–2개에 multimodal 고해상도 정보가 꼭 필요할 때만 쓴다. GelSight와 Meta AI는 2024년 10월 31일 "GelSight will manufacture and distribute Digit 360, targeting wide availability next year. Members of the research community can apply to Digit 360 call for proposals to gain early access"라고 발표했다. 가격은 여전히 확인하지 못했다.
+
+---
+
+## 12. Custom Sensor / Research Extension
+
+- **eFlesh로 LEAP fingertip, phalange, palm을 통째로 센서화한다.** LEAP 링크 CAD를 cut-cell microstructure로 변환하고 magnet과 magnetometer PCB를 넣는 구조다.
+  - 만들어야 할 것: PCB(다중 magnetometer), 3D 프린팅 microstructure, calibration rig(TacO가 공개하는 repeatability 테스트 키트 참고), 학습 기반 force 회귀.
+  - 부담: 기계공학 학부생 기준 CAD와 프린팅은 강점이다. PCB와 calibration에 수 주에서 수 개월이 걸린다고 보는 게 현실적이다.
+  - 연구 기회: (a) **sim-friendly tactile 설계.** microstructure 강성을 sim contact model과 맞춰 설계해 sim2real gap을 줄인다(tendon/compliant 설계 경험과 직결된다). (b) 교체 간 일관성과 representation transfer. (c) LEAP v2 hybrid rigid-soft 구조와 일체형 skin.
+- **AnySkin을 phalange와 palm으로 확장.** mold와 PCB 형상만 바꾸면 된다. 난이도는 eFlesh보다 낮다.
+- **SNU 로컬 이점.** TacO 공저자에 SNU Yong-Lae Park 교수 그룹이 포함돼 있다. 교내에 soft sensor 제작 인프라와 benchmark 경험이 있다는 뜻이니 협업을 먼저 타진해 볼 가치가 있다.
+- **권고.** 1차 논문은 구매 센서로 manipulation 기여에 집중한다. custom skin은 2차 과제나 workshop 논문으로 병행한다. "센서가 도구"라는 기본 가정은 유지한다.
+
+---
+
+## 13. Open Questions
+
+제조사에 직접 물어야 할 것들이다.
+
+**XELA**
+- LEAP 구성의 학술가와 lead time.
+- LEAP v1 전용인지, v2 대응 여부.
+- 220 Hz가 전신 368 taxel 동시 기준인지.
+- raw 16-bit 값에 직접 접근 가능한지.
+- ROS2 driver의 timestamp와 latency.
+- Dynamixel 근처에서 자기 간섭을 실측한 데이터가 있는지.
+- 외피 교체 비용.
+- individual calibration 가격.
+- 무게 증가량.
+- 한국 distributor.
+
+**PaXini**
+- PKU 논문에 쓰인 3×5 모듈의 정확한 모델명과 세대, 현재 구매 가능 여부.
+- GEN3 실제 출력 주파수. 1000 Hz, 83.3 Hz, 약 91 Hz 중 어느 조건의 값인지.
+- 모델별 taxel 수(S2015-Elite 52 / M2826-Omega 127은 MIDAS 논문 기준).
+- Linux SDK와 ROS2 공식 지원 여부.
+- LEAP mount 제공 여부.
+- calibration 절차와 sensor 간 편차.
+- 학술 할인 여부.
+
+**WowSkin**
+- LeapHand 구조 부품의 구체 형상과 호환 버전.
+- skin 교체품 가격.
+- 샘플링 주파수.
+- AnySkin 원본 대비 instance 일관성 데이터.
+
+**AnySkin/eFlesh 공통**
+- LEAP 위 policy 성능 데이터가 있는지(저자 문의).
+- 인접 skin 간 자기 crosstalk.
+
+**Science Robotics 논문(Ye et al. 2026)**
+- 사용한 tactile 센서의 정확한 종류. 본문 접근이 막혀 확인하지 못했다.
+
+**LEAP 팀(Shaw/Pathak)**
+- LEAP v2/v2 Advanced용 공식 tactile 로드맵이 있는지.

@@ -1,0 +1,1926 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="LEAP Hand 촉각 센서 통합 연구 보고서. 실제 논문 근거, 구매 판단, 센서 비교와 원문 보관."><title>내용은 그대로,&lt;br&gt;읽기는 편하게. · LEAP Tactile Review</title><style>
+:root{--bg:#f6f5f0;--paper:#fffefa;--ink:#182d2b;--muted:#60736d;--line:#dce2d9;--accent:#176858;--pale:#e6f0e8;--warm:#ae6539;--side:244px}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:100px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.85 -apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;letter-spacing:-.015em}a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:4px}a:hover{color:#ae6539}button,input,select{font:inherit}button{cursor:pointer}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #cd9b53;outline-offset:4px}.skip{position:fixed;top:-100px;left:20px;background:white;padding:12px;z-index:100}.skip:focus{top:10px}
+.sidebar{position:fixed;inset:0 auto 0 0;width:var(--side);background:#173d35;color:#eef1e8;padding:36px 26px;overflow:auto;z-index:20}.brand{font-size:12px;letter-spacing:.2em;color:#b8cdb6}.brand-title{font-size:25px;line-height:1.3;letter-spacing:-.04em;margin:12px 0 28px;font-weight:650}.side-label{font-size:10px;letter-spacing:.16em;color:#adc0ad;margin:24px 0 9px}.sidebar a{display:block;color:#ccd8cd;text-decoration:none;font-size:13px;line-height:1.5;padding:7px 10px;margin-left:-10px;border-radius:5px}.sidebar a:hover,.sidebar a.current{background:#31564a;color:#fff}.sidebar .page-link{font-size:14px;font-weight:600}.side-footer{font-size:11px;line-height:1.8;color:#a9c0ac;border-top:1px solid #416054;padding-top:18px;margin-top:30px}
+.topbar{position:sticky;top:0;margin-left:var(--side);height:65px;background:rgba(246,245,240,.96);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 44px;z-index:10;backdrop-filter:blur(12px);font-size:12px;letter-spacing:.02em}.topbar span{color:var(--muted)}.topbar button{border:1px solid var(--line);background:var(--paper);padding:6px 12px;border-radius:4px;color:var(--ink);font-size:12px}.mobile-menu{display:none}.progress{position:fixed;top:0;left:var(--side);height:3px;width:0;background:#c7a263;z-index:50}
+main{margin-left:var(--side);padding:48px 52px 80px;max-width:1500px}.hero{border-bottom:1px solid var(--line);padding-bottom:35px;margin-bottom:36px;position:relative}.eyebrow{font-size:11px;letter-spacing:.17em;font-weight:700;color:var(--accent);text-transform:uppercase}.hero h1{font-size:clamp(32px,3.6vw,52px);line-height:1.2;letter-spacing:-.055em;max-width:790px;margin:14px 0 18px}.hero .lead{color:var(--muted);font-size:17px;max-width:740px;line-height:1.85}.meta{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px;font-size:11px;color:var(--muted)}.meta span{padding:4px 10px;border:1px solid var(--line);border-radius:3px}.hero-grid{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:12px;margin:30px 0 0}.decision-card{padding:20px;border:1px solid var(--line);border-radius:8px;background:var(--paper);text-decoration:none;color:var(--ink)}.decision-card.primary{background:var(--accent);color:#fff;border-color:var(--accent)}.decision-card small{font-size:11px;letter-spacing:.04em;opacity:.8}.decision-card strong{display:block;font-size:24px;letter-spacing:-.04em;margin:7px 0}.decision-card p{font-size:12px;line-height:1.7;margin:0;opacity:.85}.decision-card:hover{color:inherit;box-shadow:0 4px 15px #12332812}
+.section{padding:18px 0 36px;border-bottom:1px solid var(--line);margin-bottom:22px;scroll-margin-top:90px}.section h2{font-size:27px;line-height:1.4;letter-spacing:-.04em;margin:14px 0 22px}.section h2 .n{font-size:12px;font-weight:600;display:block;letter-spacing:.12em;color:var(--accent);margin-bottom:9px}.section h3{font-size:19px;line-height:1.55;margin:32px 0 12px}.section p,.section li{max-width:890px}.section p{margin:14px 0}.section li{margin:6px 0}.section strong{font-weight:700}.section ul,.section ol{padding-left:24px}.formula{background:var(--pale);border-left:3px solid var(--accent);padding:20px 25px;font-size:21px;letter-spacing:.03em}.callout{padding:20px 24px;background:#e9f0e7;border-left:3px solid var(--accent);border-radius:0 6px 6px 0;margin:20px 0;font-size:14px;line-height:1.85}.callout.warn{background:#f4ece0;border-color:#bd8851}.table-wrap{width:100%;overflow:auto;border:1px solid var(--line);border-radius:7px;background:var(--paper);margin:19px 0 25px}table{width:100%;border-collapse:collapse;font-size:13px;line-height:1.65;text-align:left}th,td{padding:14px 16px;vertical-align:top;border-bottom:1px solid var(--line);min-width:120px;word-break:normal;overflow-wrap:anywhere}th{background:#eaf0e8;color:#345348;font-size:11px;font-weight:700;letter-spacing:.02em;position:sticky;top:0}td:first-child{font-weight:600;color:#24453b}tr:last-child td{border-bottom:0}tbody tr:hover{background:#f3f6ee}table td a{font-weight:500}table{min-width:620px}.table-wrap:has(th:nth-child(10)) table{min-width:1780px}.table-wrap:has(th:nth-child(15)) table{min-width:2600px}
+details{margin:18px 0;border:1px solid var(--line);border-radius:7px;background:var(--paper);overflow:hidden}summary{padding:16px 20px;cursor:pointer;font-size:14px;font-weight:600;list-style:none;position:relative;padding-right:42px}summary::-webkit-details-marker{display:none}summary:after{content:'+';position:absolute;right:19px;top:16px;color:var(--accent);font-size:20px;font-weight:400}details[open]>summary:after{content:'−'}details[open]>summary{border-bottom:1px solid var(--line)}details>.table-wrap{border:0;margin:0;border-radius:0}details>p{padding:0 20px}.sensor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}.sensor-card{margin:0}.sensor-card summary strong{display:block;font-size:21px;margin:5px 0}.sensor-card .sub{font-size:12px;font-weight:400;color:var(--muted)}.tag{font-size:10px;letter-spacing:.04em;background:var(--pale);color:var(--accent);display:inline-block;padding:2px 8px;border-radius:3px;font-weight:600}.detail-body{padding:7px 20px 20px;font-size:14px}.detail-body .risk{border-top:1px solid var(--line);padding-top:12px;color:#6d614f}.detail-body>a{font-size:12px}.detail-body p{margin:13px 0}
+.searchbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:20px 0}.searchbar input{flex:1;min-width:190px;background:var(--paper);border:1px solid #bccabe;padding:12px 15px;border-radius:6px;color:var(--ink)}.searchbar select{padding:12px;border:1px solid #bccabe;border-radius:6px;background:var(--paper);color:var(--ink)}.count{font-size:12px;color:var(--muted)}.paper-list{display:grid;gap:13px}.paper{background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:23px 25px}.paper h3{font-size:18px;margin:8px 0 12px;line-height:1.5}.paper p{font-size:14px;margin:10px 0;line-height:1.9}.paper .bibliography{color:var(--muted);font-size:12px}.paper .paper-label{font-size:10px;color:var(--accent);letter-spacing:.08em}.paper .tags{display:flex;gap:5px;flex-wrap:wrap}.paper[hidden]{display:none}.no-results{background:var(--pale);padding:25px;border-radius:7px}.tabs{display:flex;gap:8px;margin:23px 0}.tabs button{padding:11px 19px;border:1px solid var(--line);border-radius:5px;background:var(--paper);color:var(--ink);font-size:14px}.tabs button.active{background:var(--accent);color:white}.archive-intro{font-size:14px;color:var(--muted)}.archive-body{padding:8px 25px 25px;font-size:15px}.archive-body h1{font-size:26px}.archive-body h2{font-size:24px}.archive-body h3{font-size:19px}.archive-body .table-wrap{margin-left:0}.archive-controls{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12px;margin:18px 0}.archive-controls button{font-size:12px;border:1px solid var(--line);background:var(--paper);padding:7px 12px;border-radius:4px}.archive-panel[hidden]{display:none}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#eff2e9;padding:15px;font-size:13px;border-radius:5px}code{font-size:.88em;background:#edf0e8;padding:2px 5px;border-radius:3px}blockquote{border-left:3px solid #b4c6b4;padding-left:18px;color:var(--muted);margin:22px 0}.footer{font-size:12px;color:var(--muted);padding-top:30px}.backtop{position:fixed;right:22px;bottom:20px;background:var(--accent);color:#fff;padding:9px 14px;text-decoration:none;border-radius:6px;font-size:12px}.backtop:hover{color:white}.print-only{display:none}
+@media(min-width:1600px){main{padding-left:70px;padding-right:70px}}@media(max-width:1100px){:root{--side:205px}.sidebar{padding:30px 20px}main{padding:35px 30px}.topbar{padding:0 30px}.hero-grid{grid-template-columns:1fr}.decision-card{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;padding:15px 20px}.decision-card strong{grid-column:1;grid-row:2;font-size:21px;margin:0}.decision-card p{grid-column:2;grid-row:1/3;align-self:center}.sensor-grid{grid-template-columns:1fr}}
+@media(max-width:760px){:root{--side:0px}.sidebar{display:none;width:260px;box-shadow:0 0 0 100vmax #0007}.sidebar.mobile-open{display:block}.mobile-menu{display:inline-block;margin-right:10px}.topbar{padding:0 18px;height:58px}.topbar .crumb{display:none}main{padding:26px 20px 60px}.hero h1{font-size:35px}.hero .lead{font-size:15px}.hero{padding-bottom:24px}.hero-grid{gap:9px}.decision-card{grid-template-columns:1fr;padding:16px}.decision-card p{grid-column:1;grid-row:3}.section h2{font-size:24px}.section{padding-bottom:24px}body{font-size:15px;line-height:1.9}th,td{padding:12px}.paper{padding:19px}.archive-body{padding:5px 16px 20px}.tabs button{padding:10px 12px}.backtop{right:15px;bottom:15px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}@media print{.sidebar,.topbar,.progress,.backtop,.searchbar,.tabs,.archive-controls{display:none!important}main{margin:0;padding:0;max-width:none}body{background:white;font-size:11pt;color:black}.hero h1{font-size:30pt}.section{break-inside:auto}.hero-grid,.sensor-grid{display:block}.decision-card{display:block;margin:12px 0;color:black!important;background:white!important}.table-wrap{overflow:visible}table{min-width:0!important;font-size:8pt}th,td{min-width:0;padding:5px;position:static}.paper{break-inside:avoid;margin-bottom:12px}.sensor-card{margin:12px 0}.print-only{display:block}.hero{margin-bottom:20px}.archive-panel[hidden]{display:none!important}a{color:#174937}.footer{font-size:9pt}}
+</style></head><body id="top"><a class="skip" href="#content">본문으로 건너뛰기</a><div class="progress"></div><aside class="sidebar"><div class="brand">SHAPE-UP / RESEARCH</div><div class="brand-title">Touch for<br>dexterity.</div><div class="side-label">REPORT COLLECTION</div><a class="page-link " href="index.html">최종 통합 보고서</a><a class="page-link " href="top3.html">구매 후보 3종 결정문</a><a class="page-link " href="papers.html">논문 라이브러리</a><a class="page-link current" href="originals.html">두 원문 보관함</a><div class="side-footer">LEAP Hand · Tactile sensing<br>검토 기준일 2026.09.27<br>논문 근거 / 제조사 사양 구분<br><br>외부 자료는 새 탭에서 열립니다.</div></aside><header class="topbar"><div><button class="mobile-menu" aria-label="목차 열기" aria-expanded="false">☰ 목차</button><span class="crumb">RESEARCH NOTE &nbsp;/&nbsp; TACTILE INFRASTRUCTURE</span></div><button onclick="window.print()">인쇄 / PDF 저장</button></header><main id="content"><div style="margin:0 0 24px;padding:16px 18px;border:1px solid #e0a100;border-radius:12px;background:#fff8df;color:#4d3a00;line-height:1.6"><strong>조사 스냅샷</strong> — AI의 도움으로 정리한 하드웨어 후보 사전 조사입니다. 팀이 모든 논문을 정독·검증한 literature review가 아니며, 일부 순위와 구매 수량은 이후 검토에서 변경되었습니다. 현재 구매 판단은 <a href="../README.md">research/README.md</a>를 먼저 확인해 주세요.</div><header class="hero"><div class="eyebrow">Evidence-led hardware selection · 2026</div><h1>내용은 그대로,<br>읽기는 편하게.</h1><p class="lead">두 보고서의 전체 내용을 장별로 나눴습니다. 필요한 부분만 펼치거나 원본 파일로 내려받을 수 있습니다.</p><div class="meta"><span>LEAP HAND</span><span>TACTILE + PROPRIOCEPTION</span><span>통합·재검증 최종본</span></div></header><div class="callout warn"><b>원문 보관본입니다.</b> 당시의 판단과 미확인 주장도 그대로 남아 있습니다. 현재 권고는 <a href="index.html#s13">통합 정정 기록</a>과 함께 읽어 주세요. 아래 HTML은 서식과 링크 편의만 개선했으며, 다운로드 파일에는 원문 텍스트가 그대로 보존되어 있습니다.</div><div class="tabs" role="tablist" aria-label="원문 선택"><button id="tab-claude" class="active" data-archive="claude" role="tab" aria-controls="claude" aria-selected="true">Claude 보고서</button><button id="tab-codex" data-archive="codex" role="tab" aria-controls="codex" aria-selected="false">기존 조사 보고서</button></div><div class="archive-controls"><button data-expand="true">현재 원문 전체 펼치기</button><button data-expand="false">모두 접기</button><a download href="original-claude.txt">Claude 원본 .txt</a><a download href="original-codex.md">기존 원본 .md</a></div><section id="claude" class="archive-panel" role="tabpanel" aria-labelledby="tab-claude"><p class="archive-intro">한국어 · 사용자 제공 보고서 · 34,361 characters · arXiv 번호에 이동 링크 추가</p><details id="claude-chapter-0" open><summary>원문 시작 · Executive overview</summary><div class="archive-body"><h1>Tactile Sensors for LEAP Hand Dexterous Manipulation</h1>
+<p>결론부터 말하면, LEAP Hand용 tactile sensor 중 문헌 근거가 가장 탄탄한 것은 세 가지다. PaXini PX-6AX 계열의 3-axis taxel array는 LEAP 위 실험 논문이 2편 있다. XELA uSkin은 제조사가 공식 LEAP 전신(全身) 통합 제품을 팔고, Allegro에서 쌓인 policy-learning 문헌이 가장 많다. AnySkin/WowSkin 계열 magnetic skin은 LEAP 장착 시연이 있고 오픈소스이며 sensor instance 간 일관성이 좋다. 예산 제약이 없다면 실제 구매 1순위는 XELA uSkin &quot;For LEAP Hand&quot;다.</p>
+<p><strong>TL;DR</strong></p>
+<ul>
+<li><strong>Top 3 (근거 순):</strong> ① PaXini PX-6AX: 논문 2편이 LEAP의 fingertip과 finger pad에 3×5 tri-axial taxel을 붙여 visuo-tactile policy를 학습했다(Level A). ② XELA uSkin: 제조사가 LEAP용 368-taxel 통합 구성을 공식 판매하고(Level B), Allegro에서는 T-DEX, See to Touch, Sparsh-skin, PTLD 같은 대표 연구가 이 센서를 썼다. ③ AnySkin/WowSkin: AnySkin 논문이 LEAP 장착을 직접 보였고, WowSkin 판매처는 LeapHand용 구조 부품을 판다.</li>
+<li><strong>LEAP 연구자들이 실제로 쓰는 것:</strong> 가장 흔한 것은 FSR/TwinTac/Velostat 같은 저가 저해상도 센서다. 그다음이 PaXini 3-axis array, 그다음이 Tac3D·GelSight Mini·FingerEye 같은 vision-based fingertip이다. 현재까지 <strong>XELA를 실제로 LEAP에 달고 실험한 논문은 찾지 못했다.</strong> XELA의 LEAP 적합성 근거는 제조사 통합 제품과 Allegro 문헌이다.</li>
+<li><strong>추천 경로:</strong> RL/sim-to-real(PPO 등)이 주력이면 3-axis force array를 사서, 학습에는 binary contact나 force-magnitude로 단순화해 넣고 real-world fine-tuning이나 imitation에는 full 3-axis를 쓰는 이중 구조가 가장 실용적이다. eFlesh/AnySkin 기반 custom skin은 2차 연구 기여로 충분히 가치가 있다. 다만 기본값은 &quot;센서는 도구&quot;로 두는 것이 맞다.</li>
+</ul>
+<hr>
+</div></details><details id="claude-chapter-1" ><summary>1. Executive Summary</summary><div class="archive-body"><p>핵심 발견은 다섯 가지다.</p>
+<ol>
+<li><strong>LEAP Hand는 tactile이 없는 손이다.</strong> 그래서 연구자마다 제각각 센서를 붙이고 있다. Feel Robot Feels(arXiv <a href="https://arxiv.org/abs/2603.28542" target="_blank" rel="noopener noreferrer">2603.28542</a>)의 저자들도 &quot;The LeapHand is extensively employed in robotic manipulation research; however, it notably lacks integrated tactile sensing capabilities&quot;라고 썼다. 그 결과 LEAP tactile 문헌은 한 가지 센서로 수렴하지 않았다. FSR, TwinTac, Velostat array, PaXini, Tac3D, GelSight Mini, FingerEye, AnySkin, DexSkin으로 파편화돼 있다.</li>
+<li><strong>3-axis distributed force array가 LEAP 문헌에서 policy input으로 가장 잘 검증됐다.</strong> 대표가 PKU Hao Dong 그룹의 PaXini 기반 2편이다. 3DTacDex(arXiv <a href="https://arxiv.org/abs/2409.17549" target="_blank" rel="noopener noreferrer">2409.17549</a>)는 실제 4개 task에서 평균 78% 성공률을 보고했다. AdapTac(arXiv <a href="https://arxiv.org/abs/2505.13982" target="_blank" rel="noopener noreferrer">2505.13982</a>)은 3개 task에서 평균 93%를 기록해 vision-only RISE(73%)를 앞섰다.</li>
+<li><strong>XELA는 &quot;LEAP에 공식 통합&quot;과 &quot;dexterous hand 문헌 성숙도&quot; 두 축에서 가장 강하다.</strong> 반면 LEAP 위 논문 근거는 없다. XELA 공식 페이지에 따르면 LEAP 구성은 4 fingertips × 30 + 11 phalanges × 16 + palm 72 = 368 sensing points, 최대 220 Hz이고, 손 전체를 CAN bus 케이블 2개로 연결한다(제조사 제공 사양).</li>
+<li><strong>Vision-based tactile(DIGIT, GelSight Mini, Tac3D, Digit 360)도 LEAP 위에서 쓰인 적은 있다.</strong> 하지만 모두 fingertip을 통째로 바꿔야 하고, 30–60 Hz급 frame rate와 카메라 대역폭을 감당해야 한다. full-hand coverage는 불가능하다. 따라서 이 프로젝트(q, q̇, tactile 기반 policy, RL)의 주력 센서로는 부적합하다.</li>
+<li><strong>사람 손 수준의 &quot;센서 선택 가이드&quot;는 아직 없다.</strong> UCSD–CMU–SNU 공동 benchmark인 TacO(arXiv <a href="https://arxiv.org/abs/2605.21976" target="_blank" rel="noopener noreferrer">2605.21976</a>)의 결론은 tactile의 유용성이 &quot;depends strongly on sensor modality, material properties, and the specific manipulation tasks&quot;라는 것이다. 센서 하나를 정답으로 고르기보다 task에 맞춘 선택이 필요하다.</li>
+</ol>
+<h3>Overall Top 3</h3>
+<div class="table-wrap" tabindex="0" role="region" aria-label="비교 표 · 좌우 스크롤 가능"><table>
+<thead>
+<tr>
+<th>순위</th>
+<th>Sensor</th>
+<th>LEAP 근거 등급</th>
+<th>핵심 이유</th>
+<th>가장 큰 약점</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>PaXini PX-6AX (3×5 tri-axial array, fingertip + finger pad)</td>
+<td><strong>Level A</strong> (LEAP 실험 논문 2편)</td>
+<td>LEAP 위에서 3D force + taxel pose 기반 GNN/attention policy가 검증됨. 저가</td>
+<td>공식 LEAP kit 없음. 사용된 세대/모델 미공개. SDK·ROS 지원이 약함</td>
+</tr>
+<tr>
+<td>2</td>
+<td>XELA uSkin &quot;For LEAP Hand&quot; (uSCu ALHA + uSPa)</td>
+<td><strong>Level B</strong> (공식 LEAP 통합 제품)</td>
+<td>368 taxel 전신 coverage, 3-axis, ROS/ROS2, Allegro 문헌이 가장 풍부</td>
+<td>LEAP 위 논문 없음. quote-only. magnetic 간섭, raw 신호의 hysteresis</td>
+</tr>
+<tr>
+<td>3</td>
+<td>AnySkin / WowSkin (magnetic elastomer + 5-magnetometer)</td>
+<td><strong>Level A(장착 시연) + Level B(판매처의 LeapHand 부품)</strong></td>
+<td>오픈소스, 12초 교체, 교체 후에도 policy 재사용 가능한 instance 간 일관성</td>
+<td>공간 해상도 낮음(skin당 magnetometer 5개). LEAP 위 policy 실험은 없음</td>
+</tr>
+</tbody></table></div>
+<h3>High-End Shortlist</h3>
+<div class="table-wrap" tabindex="0" role="region" aria-label="비교 표 · 좌우 스크롤 가능"><table>
+<thead>
+<tr>
+<th>Sensor</th>
+<th>왜 high-end인가</th>
+<th>LEAP 근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>XELA uSkin For LEAP Hand</td>
+<td>전신 368×3-axis, 개별 calibration 옵션, 온도·자기 보상, CAN 기반 저배선</td>
+<td>Level B</td>
+</tr>
+<tr>
+<td>PaXini PX-6AX GEN3 (Elite/Omega)</td>
+<td>제조사 사양상 normal 0–25 N, tangential ±10 N, 최대 1000 Hz 출력(제조사 lab 수치)</td>
+<td>Level A는 이전 세대(3×5)로 추정. GEN3는 LEAP 근거 없음</td>
+</tr>
+<tr>
+<td>Digit 360 (Meta/GelSight)</td>
+<td>240 Hz 카메라, multimodal(압력·진동·온도 등), on-device 처리</td>
+<td>LEAP 근거 없음(MOTIF Hand 저자들이 향후 장착 계획만 언급)</td>
+</tr>
+</tbody></table></div>
+<hr>
+</div></details><details id="claude-chapter-2" ><summary>2. What LEAP Hand Researchers Actually Use</summary><div class="archive-body"><h3>LEAP Hand + tactile sensing papers</h3>
+<div class="table-wrap" tabindex="0" role="region" aria-label="비교 표 · 좌우 스크롤 가능"><table>
+<thead>
+<tr>
+<th>Paper</th>
+<th>Year / Venue</th>
+<th>LEAP version</th>
+<th>Tactile sensor</th>
+<th>Sensor placement</th>
+<th>Number of sensors / taxels</th>
+<th>Task</th>
+<th>Tactile representation</th>
+<th>Policy/model</th>
+<th>Key result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Canonical Representation and Force-Based Pretraining of 3D Tactile for Dexterous Visuo-Tactile Policy Learning (3DTacDex; Wu, Li, Zhang, Wu, Dong)</td>
+<td>2024 / arXiv <a href="https://arxiv.org/abs/2409.17549" target="_blank" rel="noopener noreferrer">2409.17549</a></td>
+<td>v1 16-DoF (JAKA MiniCobo 장착)</td>
+<td>PaXini</td>
+<td>손가락마다 fingertip 1 + finger pad 1</td>
+<td>8 센서 × 3×5 = 120 taxel, taxel당 3-axis force</td>
+<td>Open Box, Reorientation, Flip, Assembly</td>
+<td>taxel별 12D [sensor 6D pose, canonical 3D 위치, 3D force], 4-neighborhood graph</td>
+<td>GraphMAE pretraining(masked local force + net force 예측) → Diffusion Policy(DinoV2 vision과 concat), 5 Hz</td>
+<td>실제 4개 task 평균 78% 성공. ablation에서 canonical 표현과 force pretraining 모두 효과 확인</td>
+</tr>
+<tr>
+<td>Adaptive Visuo-Tactile Fusion with Predictive Force Attention for Dexterous Manipulation (AdapTac; Li, Wu, Zhang, Chen, Jin, Wu, Shen, Yang, Dong)</td>
+<td>2025 / arXiv <a href="https://arxiv.org/abs/2505.13982" target="_blank" rel="noopener noreferrer">2505.13982</a></td>
+<td>&quot;customized&quot; 16-DoF LEAP (Flexiv Rizon 4)</td>
+<td>PaXini</td>
+<td>fingertip + finger pad</td>
+<td>3×5 tri-axial array, 손가락당 2개</td>
+<td>Open Box, Reorientation, Flip</td>
+<td>3D tactile + point cloud</td>
+<td>force-guided attention fusion + future force prediction 보조 task</td>
+<td>평균 93%. 비교군 RISE 73%, 3DTacDex-P 40%, FoAR 50%. Flip ablation에서 force prediction/guidance 없으면 50% → FFP 추가 시 90%</td>
+</tr>
+<tr>
+<td>AnySkin: Plug-and-play Skin Sensing for Robotic Touch (Bhirangi, Pattabiraman, Erciyes, Cao, Hellebrekers, Pinto)</td>
+<td>2024 / arXiv <a href="https://arxiv.org/abs/2409.08276" target="_blank" rel="noopener noreferrer">2409.08276</a></td>
+<td>LEAP (4-finger)</td>
+<td>AnySkin</td>
+<td>fingertip</td>
+<td>skin당 magnetometer 5개(각 3-axis)</td>
+<td>LEAP은 장착 시연. policy는 xArm/Franka 등에서 USB/plug insertion</td>
+<td>raw magnetic flux</td>
+<td>visuo-tactile policy(비LEAP), LSTM slip detection</td>
+<td>교체 후 zero-shot 성능 하락 13%(ReSkin은 43%). 평균 교체 시간 12초</td>
+</tr>
+<tr>
+<td>Robust Model-Based In-Hand Manipulation with Integrated Real-Time Motion-Contact Planning and Tracking</td>
+<td>2025 / arXiv <a href="https://arxiv.org/abs/2505.04978" target="_blank" rel="noopener noreferrer">2505.04978</a></td>
+<td>LEAP (UR5 장착)</td>
+<td>Tac3D (vision-based)</td>
+<td>원래 fingertip 4개를 Tac3D로 교체</td>
+<td>4 센서</td>
+<td>in-hand manipulation, open door 등</td>
+<td>contact normal + force, 30 Hz</td>
+<td>model-based motion-contact planning/tracking</td>
+<td>실험 도중 센서 고장으로 Tac3D 4개를 전량 교체했다고 보고함(내구성 신호)</td>
+</tr>
+<tr>
+<td>In-Hand Following of Deformable Linear Objects Using Dexterous Fingers with Tactile Sensing</td>
+<td>2024 / arXiv <a href="https://arxiv.org/abs/2403.12676" target="_blank" rel="noopener noreferrer">2403.12676</a></td>
+<td>LEAP</td>
+<td>GelSight Mini</td>
+<td>손가락 2개의 fingertip</td>
+<td>2 센서</td>
+<td>DLO(케이블) following</td>
+<td>tactile image → contact region segmentation → 3D line fitting</td>
+<td>IK + hybrid position/force control</td>
+<td>저자들은 dexterous hand 기반 DLO following을 실제 로봇에서 처음 시도했다고 주장</td>
+</tr>
+<tr>
+<td>FingerEye: Learning Dexterous Manipulation with Continuous Vision-Tactile Sensing</td>
+<td>2026 / arXiv <a href="https://arxiv.org/abs/2604.20689" target="_blank" rel="noopener noreferrer">2604.20689</a></td>
+<td>LEAP (xArm7)</td>
+<td>FingerEye (custom vision-tactile)</td>
+<td>모든 fingertip</td>
+<td>fingertip당 카메라 모듈 1개</td>
+<td>contact-sensitive task</td>
+<td>multi-camera image</td>
+<td>leader–follower teleop + imitation, sim digital twin, 10 Hz 기록</td>
+<td>카메라 기반 fingertip의 대역폭 부담을 보여주는 사례</td>
+</tr>
+<tr>
+<td>Blind Dexterous Grasping via Real2Sim2Real Tactile Policy Learning</td>
+<td>2026 / arXiv <a href="https://arxiv.org/abs/2606.11767" target="_blank" rel="noopener noreferrer">2606.11767</a></td>
+<td>v1 16-DoF (xArm6)</td>
+<td>TwinTac(custom recast) + FSR</td>
+<td>fingertip TwinTac 4개, 링크·palm에 FSR 12개</td>
+<td>44 channel(TwinTac 8 taxel × 4 + FSR 12)</td>
+<td>vision 없는 grasping</td>
+<td><strong>binary</strong> 44-ch + proprioception</td>
+<td>sim에서 tactile encoder pretraining → diffusion policy, real 데이터 없이 zero-shot</td>
+<td>보지 않은 물체 10개로 평가. sim-to-real용 binary tactile 설계의 대표 사례</td>
+</tr>
+<tr>
+<td>AURORA: Active Uncertainty-Driven Re-Orientation for In-Hand Reconstruction</td>
+<td>2026 / arXiv <a href="https://arxiv.org/abs/2609.08493" target="_blank" rel="noopener noreferrer">2609.08493</a></td>
+<td>LEAP (fingertip link 연장)</td>
+<td>FSR</td>
+<td>fingertip, PIP/DIP phalange, palm</td>
+<td>FSR 다수</td>
+<td>in-hand rotation(재구성 보조)</td>
+<td>contact state, 약 50 Hz 비동기</td>
+<td>Rotating without Seeing policy를 LEAP용으로 재학습(RL)</td>
+<td>FSR만으로도 axis-conditioned rotation이 가능</td>
+</tr>
+<tr>
+<td>Feel Robot Feels: Tactile Feedback Array Glove for Dexterous Manipulation</td>
+<td>2026 / arXiv <a href="https://arxiv.org/abs/2603.28542" target="_blank" rel="noopener noreferrer">2603.28542</a></td>
+<td>LeapHand</td>
+<td>LeapTac (custom Velostat piezoresistive FPC)</td>
+<td>fingertip</td>
+<td>fingertip당 7×6 taxel(4 mm pitch)</td>
+<td>teleop 촉각 피드백</td>
+<td>pressure map</td>
+<td>glove haptic rendering</td>
+<td>LEAP에 tactile이 없다는 점을 명시적으로 문제로 지적</td>
+</tr>
+<tr>
+<td>Visual-tactile pretraining and online multitask learning for humanlike manipulation dexterity (Ye et al.)</td>
+<td>2026 / Science Robotics (eady2869)</td>
+<td>LeapHand platform</td>
+<td>&quot;low-cost&quot; 센서(종류는 본문 미확인)</td>
+<td>미확인</td>
+<td>미확인</td>
+<td>multitask dexterous manipulation</td>
+<td><strong>simple binary tactile signals</strong></td>
+<td>visual-tactile SSL → RL + online IL</td>
+<td>초록 기준: monocular image + binary tactile만으로 일반화 가능한 skill 획득</td>
+</tr>
+<tr>
+<td>DexSkin: High-Coverage Conformable Robotic Skin for Learning Contact-Rich Manipulation</td>
+<td>2025 / arXiv <a href="https://arxiv.org/abs/2509.18830" target="_blank" rel="noopener noreferrer">2509.18830</a></td>
+<td>LEAP</td>
+<td>DexSkin (capacitive)</td>
+<td>palm + thumb link</td>
+<td>미공개(LEAP 적용은 시연)</td>
+<td>형태 적응성 시연</td>
+<td>taxel map</td>
+<td>주 실험은 gripper에서 RL</td>
+<td>LEAP 위에서는 시각화만 했고 policy 실험은 없음</td>
+</tr>
+<tr>
+<td>The MOTIF Hand (arXiv <a href="https://arxiv.org/abs/2506.19201" target="_blank" rel="noopener noreferrer">2506.19201</a>)</td>
+<td>2025 / arXiv</td>
+<td>LEAP 기반 파생 hand</td>
+<td>thin-film tactile</td>
+<td>손가락 표면</td>
+<td>미공개</td>
+<td>multimodal 관측</td>
+<td>—</td>
+<td>—</td>
+<td>fingertip에 Digit 360을 &quot;pending availability&quot;로 장착 계획</td>
+</tr>
+<tr>
+<td>RGB-S (arXiv <a href="https://arxiv.org/abs/2606.08765" target="_blank" rel="noopener noreferrer">2606.08765</a>)</td>
+<td>2026 / arXiv</td>
+<td>LEAP</td>
+<td>FSR 12 + TwinTac 4</td>
+<td>관절 부위 + fingertip</td>
+<td>16 센서</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>Blind Grasping과 같은 저가 조합(서브에이전트 확인, 본문 세부는 미검증)</td>
+</tr>
+</tbody></table></div>
+<h3>문헌에서 보이는 패턴</h3>
+<ul>
+<li><strong>패턴 1, 두 갈래로 나뉜다.</strong> LEAP tactile 문헌은 &quot;저가·저차원·sim2real용&quot;과 &quot;고차원 3-axis·real-world IL용&quot;으로 갈린다. RL/sim-to-real 계열(Blind Grasping, AURORA, Science Robotics 논문)은 FSR/TwinTac 같은 저가 센서를 쓰고 신호를 <strong>binary contact</strong>로 줄인다. 3DTacDex 저자들도 related work에서 &quot;To close the sim-to-real gap, most works use discrete tactile signals or only activated tactile positions as input, limiting the full potential of tactile sensors&quot;라고 정리했다. 반면 real-world imitation 계열(3DTacDex, AdapTac)은 3-axis force를 그대로 쓴다.</li>
+<li><strong>패턴 2, vision-based는 fingertip 교체형으로만 쓰인다.</strong> Tac3D, GelSight Mini, FingerEye가 모두 그렇다. 게다가 수량이 2–4개로 제한된다. 이 방식은 palm이나 phalange 접촉을 보지 못한다.</li>
+<li><strong>패턴 3, &quot;상용 3-axis array를 LEAP에 달고 policy를 학습한&quot; 사례는 사실상 PaXini(PKU) 두 편뿐이다.</strong> XELA는 LEAP 공식 통합 제품이 2025년 12월에야 게시됐다(페이지 published_time 2025-12-02). 그래서 LEAP 위 논문이 아직 없을 가능성이 높다. 이것은 기회이기도 하다. XELA-LEAP 구성으로 낸 첫 policy 논문은 그 자체로 참조점이 된다.</li>
+<li><strong>패턴 4, LEAP v2 위 tactile 논문은 찾지 못했다.</strong> 위 논문들은 모두 원형 16-DoF LEAP(v1)이거나 파생 hand다. LEAP v2(RSS 2025 demo, Humanoids 2025 &quot;v2 Advanced&quot;)를 쓸 계획이라면 모든 센서의 mount 호환성을 새로 확인해야 한다.</li>
+</ul>
+<hr>
+</div></details><details id="claude-chapter-3" ><summary>3. Candidate Landscape</summary><div class="archive-body"><h3>Commercial / ready-to-buy</h3>
+<ul>
+<li><strong>XELA uSkin (For LEAP Hand, uSCu ALHA, uSPa 44/46):</strong> magnetic(Hall-effect) 3-axis taxel이다. LEAP용 완제 구성이 있고, 주문하면 &quot;XELA Robotics provides the robot hand itself at the cost of the parts&quot;(제조사). 즉 hand까지 조립된 상태로 받을 수 있다.</li>
+<li><strong>WowSkin (WowRobo):</strong> AnySkin 설계를 양산한 제품이다. 판매처는 &quot;custom structural parts tailored for integration with projects like Koch, SO-100, SO-101, and LeapHand&quot;를 제공한다고 밝힌다(판매처 주장). 소프트웨어는 AnySkin 코드에 GUI Reset 버튼만 추가한 수준이고, 하드웨어 설계는 proprietary다.</li>
+<li><strong>GelSight Mini / DIGIT:</strong> 완제품 구매가 가능하다. GelSight 공식 스토어는 GelSight Mini System을 $510.00(재고 있음, 주문 후 약 4주 리드타임)에 판매하고, DIGIT 제품 페이지는 &quot;Estimated lead time: 4-6 weeks after receipt of order&quot;라고 적고 있다. digit.ml은 DIGIT이 &quot;natively compatible with the Wonik&#39;s Allegro Hand&quot;라고 밝히지만 LEAP 호환은 언급하지 않는다. 따라서 LEAP 장착에는 custom fingertip 교체가 필요하다(Category D에서 다룸).</li>
+</ul>
+<h3>Commercial + custom integration</h3>
+<ul>
+<li><strong>PaXini PX-6AX (GEN2/GEN3):</strong> 센서 모듈은 공식몰(mall.paxini.com), AliExpress flagship store, 리셀러를 통해 살 수 있다. 하지만 <strong>공식 LEAP kit는 없다.</strong> PKU 그룹도 &quot;customized&quot; LEAP에 자체 mount를 만들었다. GEN3 제조사 사양은 normal 0–25 N, tangential ±10 N, 최소 인식력 0.01 N, 최대 출력 1000 Hz이며, 제조사는 &quot;*数据源于帕西尼实验室&quot;(자사 lab 수치)라고 단서를 단다.</li>
+<li><strong>Tac3D:</strong> vision-based 3D force 센서다. LEAP fingertip 교체형으로 쓰인 사례가 있다(arXiv <a href="https://arxiv.org/abs/2505.04978" target="_blank" rel="noopener noreferrer">2505.04978</a>).</li>
+</ul>
+<h3>Fabrication required</h3>
+<ul>
+<li><strong>AnySkin (오픈소스):</strong> DragonSkin 10 Slow, MQFP-15-7 magnetic particle, pulse magnetizer, 5-magnetometer PCB가 필요하다. 교체 시간은 평균 12초다.</li>
+<li><strong>ReSkin:</strong> AnySkin의 전신이다. 교체 후 zero-shot 성능 하락이 43%로 커서, 새 프로젝트라면 AnySkin을 쓰는 편이 낫다.</li>
+<li><strong>eFlesh (arXiv <a href="https://arxiv.org/abs/2506.09994" target="_blank" rel="noopener noreferrer">2506.09994</a>):</strong> 3D 프린팅한 cut-cell microstructure에 magnet을 넣고, 아래에 magnetometer board를 둔다. 저자들이 보고한 수치는 contact localization 0.5 mm, force error z 0.27 N / xy 0.12 N, 선형 분류기 slip detection 95%다. 재료는 &quot;&lt;$5&quot; magnet이면 된다.</li>
+<li><strong>TwinTac / FSR / Velostat(LeapTac):</strong> 저가 저해상도 baseline이다.</li>
+<li><strong>DexSkin(capacitive), 9DTact, DenseTact:</strong> DenseTact와 9DTact는 LEAP 근거를 찾지 못했다.</li>
+</ul>
+<h3>Vision-based tactile</h3>
+<ul>
+<li><strong>DIGIT(원 논문 사양):</strong> 20×27×18 mm, 20 g, sensing field 19×16 mm, 640×480, 60 FPS. LEAP fingertip보다 부피가 크고 깊이 방향 두께 때문에 교체형 mount가 필요하다.</li>
+<li><strong>GelSight Mini:</strong> LEAP 위 DLO 논문 1편에서 fingertip 2개에 사용됐다.</li>
+<li><strong>Digit 360:</strong> 240 Hz 카메라, 18종 이상의 sensing feature. on-device 처리로 event-to-action latency가 1.2 ms이고, 기존 경로는 Digit 360 2.5 ms, DIGIT 6 ms 이상이다(Meta 논문 수치). LEAP 위 사용 사례는 없다.</li>
+<li><strong>Tac3D, FingerEye:</strong> LEAP 위 사용 사례가 있다.</li>
+<li><strong>평가:</strong> Kasolowsky &amp; Bäuml(arXiv <a href="https://arxiv.org/abs/2409.12735" target="_blank" rel="noopener noreferrer">2409.12735</a>)은 camera-based 센서가 &quot;bulky and can not be easily added to an existing robot structure (e.g., the complete fingertip has to be replaced)&quot;라고 지적했다. Sparsh-skin 저자들도 vision-based 센서는 &quot;restricted to the fingertips and limited by bandwidth&quot;라고 썼다. 이 프로젝트의 o_t = [q_t, q̇_t, tactile_t] 형태 RL policy에서는 이미지 encoder 비용과 sim 렌더링 비용이 크다. 그래서 주력이 아니라 <strong>특정 fingertip 한두 개의 geometry 정보가 필요할 때 쓰는 보조 센서</strong>로 보는 것이 맞다.</li>
+</ul>
+<hr>
+</div></details><details id="claude-chapter-4" ><summary>4. Detailed Sensor Comparison</summary><div class="archive-body"><p>&quot;(M)&quot;은 제조사 제공, &quot;(P)&quot;는 논문 보고, &quot;(R)&quot;은 리셀러/제3자 정보다.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="비교 표 · 좌우 스크롤 가능"><table>
+<thead>
+<tr>
+<th>Sensor</th>
+<th>Principle</th>
+<th>Purchase / Fabrication</th>
+<th>LEAP Evidence</th>
+<th>Spatial sensing</th>
+<th>Shear</th>
+<th>Output</th>
+<th>Sampling rate</th>
+<th>Size</th>
+<th>Raw data</th>
+<th>SDK</th>
+<th>ROS</th>
+<th>Integration effort</th>
+<th>Price</th>
+<th>Representative papers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>XELA uSkin For LEAP</td>
+<td>Magnetic (Hall) 3-axis taxel</td>
+<td>구매(완제 hand 포함 가능)</td>
+<td>Level B</td>
+<td>LEAP 구성 368 taxel. sensing point 약 4×4 mm (M). Allegro 곡면 fingertip taxel 간격 약 6.5 mm (P, TaSA)</td>
+<td>있음</td>
+<td>3-axis + 온도, N 단위 calibration(standard 무료, individual 유료) (M)</td>
+<td>LEAP 구성 최대 220 Hz. 모듈 일반 최대 500 Hz (M)</td>
+<td>두께 4 mm부터 (M)</td>
+<td>있음(PTLD는 raw 3-axis 사용)</td>
+<td>uAi, websocket server, Python/C++ 샘플 (M)</td>
+<td>ROS/ROS2 (M)</td>
+<td>낮음(공식 통합)</td>
+<td>Quote required</td>
+<td>T-DEX, See to Touch, Sparsh-skin, PTLD, TaSA (모두 Allegro)</td>
+</tr>
+<tr>
+<td>PaXini PX-6AX</td>
+<td>Hall-effect 3-axis array</td>
+<td>모듈 구매 + custom mount</td>
+<td>Level A (2편)</td>
+<td>LEAP 논문: 센서당 3×5 taxel (P). GEN3: 모델별 9–239 taxel (R). MIDAS: S2015-Elite 52 / M2826-Omega 127 (P)</td>
+<td>있음</td>
+<td>taxel별 3D force</td>
+<td>GEN3 최대 1000 Hz (M) vs 83.3 Hz (P, MIDAS) vs 약 91 Hz auto-push (R) — <strong>불일치</strong></td>
+<td>S2015-Elite 20×15×10 mm, M2826-Omega 28×26×14 mm (M)</td>
+<td>있음(논문이 taxel별 force 사용)</td>
+<td>PXSR(Windows), community <code>paxini-sdk</code> (R)</td>
+<td>native driver 미확인. pyserial wrapper (R)</td>
+<td>중간(mount 설계, 배선)</td>
+<td>모듈 $55.96–$70.25 (R, AIFITLAB)</td>
+<td>3DTacDex, AdapTac, MIDAS Hand</td>
+</tr>
+<tr>
+<td>AnySkin</td>
+<td>Magnetic elastomer + 5 magnetometer</td>
+<td>오픈소스 제작</td>
+<td>Level A(장착 시연)</td>
+<td>skin당 5 point (저해상도)</td>
+<td>있음(flux로 간접)</td>
+<td>uncalibrated raw magnetic flux (3×5=15 dims)</td>
+<td>공개 사양 미확인</td>
+<td>fingertip형(삼각형 단면 설계)</td>
+<td>있음</td>
+<td>오픈소스 Python</td>
+<td>공식 ROS 미확인</td>
+<td>중간(casting, magnetizer 필요)</td>
+<td>재료비 기반. 공식가 없음</td>
+<td>AnySkin, Visuo-Skin(arXiv <a href="https://arxiv.org/abs/2410.17246" target="_blank" rel="noopener noreferrer">2410.17246</a>)</td>
+</tr>
+<tr>
+<td>WowSkin</td>
+<td>AnySkin 양산품</td>
+<td>구매</td>
+<td>Level B(판매처의 LeapHand 부품 주장)</td>
+<td>AnySkin과 동일</td>
+<td>있음</td>
+<td>raw flux</td>
+<td>공개 사양 미확인</td>
+<td>—</td>
+<td>있음</td>
+<td>AnySkin 기반 GUI (MIT)</td>
+<td>미확인</td>
+<td>낮음</td>
+<td>€180 net / €214.20 VAT 포함 (R, Eckstein)</td>
+<td>전용 논문 없음</td>
+</tr>
+<tr>
+<td>eFlesh</td>
+<td>3D-printed microstructure + magnet + magnetometer</td>
+<td>제작</td>
+<td>없음(이론적 호환)</td>
+<td>localization 0.5 mm (P)</td>
+<td>있음(xy error 0.12 N) (P)</td>
+<td>학습 기반 force 추정</td>
+<td>미확인</td>
+<td>CAD 형상 임의</td>
+<td>있음</td>
+<td>오픈소스(CAD→STL 도구)</td>
+<td>미확인</td>
+<td>중간–높음</td>
+<td>magnet &lt;$5 + board</td>
+<td>eFlesh, TacO</td>
+</tr>
+<tr>
+<td>TwinTac + FSR</td>
+<td>Piezoresistive/pressure</td>
+<td>제작/저가 부품</td>
+<td>Level A</td>
+<td>8 taxel/fingertip + FSR 단일점</td>
+<td>없음</td>
+<td>pressure/binary</td>
+<td>FSR 약 50 Hz (P, AURORA)</td>
+<td>소형</td>
+<td>있음</td>
+<td>자작</td>
+<td>자작</td>
+<td>중간</td>
+<td>저가(정확한 값 미공개)</td>
+<td>Blind Grasping, AURORA, RGB-S</td>
+</tr>
+<tr>
+<td>Tac3D</td>
+<td>Vision-based 3D force</td>
+<td>구매</td>
+<td>Level A</td>
+<td>고밀도 displacement/force field</td>
+<td>있음</td>
+<td>contact normal + force</td>
+<td>30 Hz (P)</td>
+<td>fingertip 교체형</td>
+<td>있음</td>
+<td>vendor</td>
+<td>미확인</td>
+<td>높음</td>
+<td>not publicly specified(본 조사 미확인)</td>
+<td>arXiv <a href="https://arxiv.org/abs/2505.04978" target="_blank" rel="noopener noreferrer">2505.04978</a></td>
+</tr>
+<tr>
+<td>GelSight Mini</td>
+<td>Vision-based</td>
+<td>구매</td>
+<td>Level A(1편)</td>
+<td>고해상도 image</td>
+<td>간접(marker)</td>
+<td>RGB image</td>
+<td>미확인</td>
+<td>fingertip 교체형</td>
+<td>있음</td>
+<td>vendor SDK</td>
+<td>커뮤니티</td>
+<td>높음</td>
+<td>$510.00 (M, GelSight 공식 스토어, GelSight Mini System)</td>
+<td>arXiv <a href="https://arxiv.org/abs/2403.12676" target="_blank" rel="noopener noreferrer">2403.12676</a></td>
+</tr>
+<tr>
+<td>DIGIT</td>
+<td>Vision-based</td>
+<td>구매</td>
+<td>없음</td>
+<td>640×480, field 19×16 mm (P)</td>
+<td>간접</td>
+<td>RGB image</td>
+<td>60 FPS (P)</td>
+<td>20×27×18 mm (P)</td>
+<td>있음</td>
+<td>오픈소스</td>
+<td>커뮤니티</td>
+<td>높음</td>
+<td>본 조사 미확인</td>
+<td>DIGIT(arXiv <a href="https://arxiv.org/abs/2005.14679" target="_blank" rel="noopener noreferrer">2005.14679</a>), AnySkin 비교 실험</td>
+</tr>
+<tr>
+<td>Digit 360</td>
+<td>Vision + multimodal</td>
+<td>early access(call for proposals), GelSight가 제조·유통</td>
+<td>없음</td>
+<td>고해상도 omnidirectional</td>
+<td>있음</td>
+<td>image + 다중 modality</td>
+<td>카메라 240 Hz (P)</td>
+<td>fingertip형</td>
+<td>있음</td>
+<td>Meta/GelSight</td>
+<td>미확인</td>
+<td>높음</td>
+<td>본 조사 미확인</td>
+<td>Digitizing Touch(arXiv <a href="https://arxiv.org/abs/2411.02479" target="_blank" rel="noopener noreferrer">2411.02479</a>)</td>
+</tr>
+</tbody></table></div>
+<hr>
+</div></details><details id="claude-chapter-5" ><summary>5. Sensor-by-Sensor Analysis</summary><div class="archive-body"><h3>5.1 PaXini PX-6AX</h3>
+<ul>
+<li><strong>무엇인가.</strong> Hall-effect 기반 tri-axial taxel array다. PKU 논문들은 fingertip용과 finger pad용 두 종류를 썼고, 둘 다 3×5 taxel이며 배치만 조금 다르다.</li>
+<li><strong>LEAP 근거.</strong> 3DTacDex와 AdapTac 두 편이 있다. 둘 다 실제 로봇 실험이고, AdapTac은 ablation까지 있다.</li>
+<li><strong>sensing quality.</strong> taxel마다 3D force가 나오므로 shear를 직접 관측할 수 있다. 이 점은 slip onset과 net force 추정에 핵심이다. 3DTacDex는 taxel pose(FK)와 force를 결합해 net force를 자기지도 target으로 썼다. force가 물리적으로 의미 있는 단위로 나온다는 전제가 있어야 가능한 설계다.</li>
+<li><strong>약점.</strong><ul>
+<li>논문이 <strong>센서 세대나 모델명을 밝히지 않는다.</strong> 3×5 배열은 GEN3 공식 라인업(Elite/Core/Omega 12종)과 바로 대응되지 않는다. GEN2이거나 custom일 가능성이 있는데, 이는 추론이다.</li>
+<li>사양 수치가 서로 맞지 않는다. 제조사 GEN3 표는 &quot;最大输出频率 1000 Hz&quot;라고 하지만, MIDAS Hand 논문은 제조사 사양을 인용해 &quot;maximum output rate of 83.3 Hz&quot;라고 썼고, 서드파티 PyPI 패키지는 통신보드 auto-push를 &quot;~91 Hz&quot;로 적었다. <strong>실제 policy 루프에서는 100 Hz 안팎으로 계획하는 것이 안전하다.</strong></li>
+<li>리셀러 AIFITLAB은 &quot;Maximum 121&quot; 신호와 IP65를 표기하는데, 공식 수치(717 신호, IP68)와 다르다.</li>
+<li>공식 ROS driver를 확인하지 못했다. SDK도 Windows용 PXSR과 커뮤니티 패키지 중심이다.</li>
+</ul>
+</li>
+<li><strong>판정.</strong> &quot;LEAP 위 3-axis array policy 학습&quot;을 가장 빨리 재현할 수 있는 경로다. 다만 SDK와 mount를 직접 해결해야 한다.</li>
+</ul>
+<h3>5.2 XELA uSkin</h3>
+<ul>
+<li><strong>무엇인가.</strong> 각 taxel에 작은 magnet과 Hall 센서를 둔 soft skin이다. 3-axis force와 온도를 함께 측정한다.</li>
+<li><strong>LEAP 근거.</strong> Level B다. 공식 LEAP 통합 제품이 있다.<ul>
+<li>제조사 사양: fingertip은 uSkin ALHA 30 taxel, phalange는 uSPa 16 taxel, palm은 72 taxel, 합계 368 taxel이고 측정값은 1,472개다. 최대 220 Hz. 마이크로컨트롤러는 손가락 뒷면과 palm 안쪽에 봉입돼 있다. 손가락당 4선 케이블 1개, 손 전체는 CAN 케이블 2개로 연결한다. 외피는 교체할 수 있다.</li>
+<li>&quot;Users can choose which part of the hand to cover with sensors&quot;라고 명시돼 있어 부분 구성도 가능하다.</li>
+</ul>
+</li>
+<li><strong>dexterous hand 문헌 성숙도가 가장 높다.</strong> Allegro 기준으로 보면 다음과 같다.<ul>
+<li>T-DEX(Guzey et al., &quot;Dexterity from Touch,&quot; arXiv <a href="https://arxiv.org/abs/2303.12076" target="_blank" rel="noopener noreferrer">2303.12076</a>): uSkin 15개로 Allegro를 덮고 robotic play로 tactile representation을 pretraining했다.</li>
+<li>See to Touch / TAVI(arXiv <a href="https://arxiv.org/abs/2309.12300" target="_blank" rel="noopener noreferrer">2309.12300</a>): 공식 코드가 &quot;Allegro hand with XELA sensors integration&quot;을 명시한다.</li>
+<li>Sparsh-skin(arXiv <a href="https://arxiv.org/abs/2505.11420" target="_blank" rel="noopener noreferrer">2505.11420</a>): 368 센서 Allegro에서 self-distillation 표현을 학습했고, 기존 대비 41% 이상 향상을 보고했다.</li>
+<li>PTLD(arXiv <a href="https://arxiv.org/abs/2603.04531" target="_blank" rel="noopener noreferrer">2603.04531</a>): sim-to-real privileged tactile latent distillation.</li>
+</ul>
+</li>
+<li><strong>알려진 문제(논문 근거).</strong><ul>
+<li>PTLD는 &quot;We use the 3-axis raw sensor measurements over processed force measurements as force measurements contain significant hysteresis and lag&quot;라고 썼다. 매 수집 전에 2분간 무접촉 baseline을 빼는 절차도 적용했다. 즉 제조사의 N 단위 calibration을 그대로 policy에 넣기보다 <strong>raw + baseline subtraction</strong>이 실전 관행이다.</li>
+<li>Sparsh-skin 저자들은 magnetic skin 보급이 늦은 이유로 &quot;challenges with interpreting magnetic flux and calibration&quot;을 꼽았다.</li>
+<li>초기 uSkin 연구(arXiv <a href="https://arxiv.org/abs/1803.03435" target="_blank" rel="noopener noreferrer">1803.03435</a>)는 shear가 약 2 N에서 한계에 이르고 과부하 시 silicone이 PCB에서 찢어질 수 있다고 보고해 lycra 커버를 썼다. 오래된 세대 기준이므로 현행품에는 그대로 적용되지 않을 수 있다.</li>
+<li>자기 간섭. XELA는 reference 측정으로 보상한다고 밝힌다. 2026년 4월 29일 보도자료(PR Newswire, The Robot Report 보도)에서는 &quot;CAN FD enhanced tactile sensors are available for immediate ordering with first deliveries set for May 2026. The optional magnetic interference compensation sensor capability will be available in the third quarter of this year&quot;라고 발표했다. 데모 기준으로 &quot;Strong magnet (pull force of 3 kg) nearly touching sensor (size: 3x3 mm2) has no effect on compensated sensor readings&quot;라고 주장하지만, 이는 제조사 시연이다. LEAP의 Dynamixel 모터 근처에서 실제 간섭이 어느 정도인지는 공개 데이터가 없다.</li>
+</ul>
+</li>
+<li><strong>판정.</strong> 예산이 허락하면 가장 &quot;research infrastructure다운&quot; 선택이다. 전신 coverage이고 ROS2를 지원한다. 다만 LEAP 위 첫 논문을 우리가 쓰게 될 수 있다는 점, 즉 검증되지 않은 통합 이슈(무게, 케이블, 간섭)를 떠안을 수 있다는 점은 감수해야 한다.</li>
+</ul>
+<h3>5.3 AnySkin / WowSkin</h3>
+<ul>
+<li><strong>무엇인가.</strong> 자화된 elastomer skin이 아래 magnetometer PCB와 분리된 구조다. 휴대폰 케이스처럼 끼우는 방식이다.</li>
+<li><strong>강점.</strong><ul>
+<li>instance 간 신호 일관성이 좋다. AnySkin 논문 Table I에서 cross-instance normalized std가 ReSkin 0.54/0.87에서 AnySkin 0.12/0.10으로 줄었다.</li>
+<li>교체 후 zero-shot 성능 하락이 13%다(ReSkin 43%).</li>
+<li>수명이 짧은 soft skin을 자주 갈아야 하는 장기 데이터 수집에서 가장 중요한 특성이 바로 이 일관성이다.</li>
+</ul>
+</li>
+<li><strong>LEAP 근거.</strong> AnySkin 논문은 &quot;AnySkin can readily be used on a variety of robots including xArm, Franka, and the four-fingered Leap hand&quot;라고 쓰고 Fig. 1에서 장착을 보였다. 다만 LEAP 위 policy 성능 실험은 없다. WowSkin 판매처는 LeapHand용 구조 부품을 판다고 주장한다.</li>
+<li><strong>약점.</strong><ul>
+<li>skin당 magnetometer가 5개뿐이라 contact geometry 해상도가 낮다.</li>
+<li>&quot;uncalibrated&quot; 설계라서 N 단위 force가 나오지 않는다. sim에서 모사하기도 어렵다.</li>
+<li>fingertip 이외 phalange와 palm으로 넓히려면 PCB와 mold를 직접 설계해야 한다.</li>
+</ul>
+</li>
+<li><strong>판정.</strong> 가장 싸고 빠른 prototype 경로다. 또 instance consistency 자체가 연구 주제(tactile representation transfer)로 이어질 수 있다.</li>
+</ul>
+<h3>5.4 eFlesh</h3>
+<ul>
+<li><strong>개요.</strong> NYU(Pinto, Bhirangi 그룹)의 3D-printable magnetic 센서다. 필요한 것은 &quot;a hobbyist 3D printer, off-the-shelf magnets (&lt;$5), a CAD model of the desired shape, and a magnetometer circuit board&quot;이다(저자).</li>
+<li><strong>강점.</strong> LEAP fingertip CAD를 그대로 입력해 센서화할 수 있어 형상 자유도가 가장 높다.</li>
+<li><strong>TacO benchmark 결과.</strong> 6개 센서(FSR, FlexiTac, eGain, eFlesh, Daimon, Contact Mic) 비교에서 eFlesh 사양은 normal 0–30 N, shear 0–17.5 N으로 정리됐다. 결론은 &quot;accessible, open-source sensors can achieve performance comparable to more expensive commercial systems&quot;였다.</li>
+<li><strong>판정.</strong> LEAP 근거는 없고 이론적 호환만 있다. 그래서 custom 연구 확장의 1순위다(12장).</li>
+</ul>
+<h3>5.5 Vision-based (Tac3D, GelSight Mini, DIGIT, Digit 360, FingerEye)</h3>
+<ul>
+<li><strong>LEAP 사용 사례.</strong> Tac3D, GelSight Mini, FingerEye가 LEAP에서 쓰였다. DIGIT과 Digit 360은 사례가 없다.</li>
+<li><strong>문제점.</strong><ul>
+<li>fingertip을 교체해야 한다.</li>
+<li>30–60 Hz frame rate의 제약이 있다(Tac3D 30 Hz, DIGIT 60 FPS). Digit 360은 240 Hz로 예외다.</li>
+<li>카메라가 여러 대 붙으면 USB 대역폭과 image encoder 계산량이 커진다.</li>
+<li>내구성 문제. Tac3D 논문은 실험 중 고장으로 센서 4개를 모두 교체했다.</li>
+<li>palm과 phalange를 덮을 수 없다.</li>
+</ul>
+</li>
+<li><strong>판정.</strong> contact geometry(edge, 모양, 미세 slip)를 fingertip 수준에서 봐야 하는 과제에만 선택적으로 쓴다. 이 프로젝트의 기본 센서로는 권장하지 않는다.</li>
+</ul>
+<h3>5.6 저가 baseline (FSR, TwinTac, Velostat)</h3>
+<ul>
+<li>LEAP 문헌에서 가장 흔하다. Blind Grasping, AURORA, RGB-S, Feel Robot Feels, preprints.org의 Compliant Robotic Hand가 여기에 속한다.</li>
+<li>해결해야 할 문제가 있다. preprints.org 논문은 작고 평평한 FSR이 &quot;did not consistently capture forces applied on the curved fingertip surfaces of the LEAP Hand&quot;라고 보고하고, 3D 프린팅한 반구형 force propagation element를 끼워 해결했다.</li>
+<li>shear가 없고 hysteresis와 drift가 크다(TacO가 resistive 센서의 약점으로 명시).</li>
+<li><strong>판정.</strong> ablation용 baseline(binary contact)으로는 반드시 하나 갖춰 둘 가치가 있다.</li>
+</ul>
+<hr>
+</div></details><details id="claude-chapter-6" ><summary>6. Representative Papers</summary><div class="archive-body"><h3>PaXini</h3>
+<ol>
+<li><strong>Canonical Representation and Force-Based Pretraining of 3D Tactile for Dexterous Visuo-Tactile Policy Learning.</strong> Tianhao Wu, Jinzhou Li, Jiyao Zhang, Mingdong Wu, Hao Dong. 2024, arXiv <a href="https://arxiv.org/abs/2409.17549" target="_blank" rel="noopener noreferrer">2409.17549</a>. LEAP v1 + JAKA MiniCobo. fingertip과 pad에 3×5 tri-axial array. GraphMAE pretraining 후 Diffusion Policy. real robot 4 task 평균 78%. ablation 있음.</li>
+<li><strong>Adaptive Visuo-Tactile Fusion with Predictive Force Attention for Dexterous Manipulation.</strong> Jinzhou Li, Tianhao Wu, Jiyao Zhang, Zeyuan Chen, Haotian Jin, Mingdong Wu, Yujun Shen, Yaodong Yang, Hao Dong. 2025, arXiv <a href="https://arxiv.org/abs/2505.13982" target="_blank" rel="noopener noreferrer">2505.13982</a>. customized LEAP + Flexiv. force-guided attention. 평균 93%. ablation(Flip 50% → 70% → 90%).</li>
+<li><strong>MIDAS Hand: Modular low-Impedance Direct-drive Anthropomorphic Sensing Hand.</strong> 2026, arXiv <a href="https://arxiv.org/abs/2607.14487" target="_blank" rel="noopener noreferrer">2607.14487</a>. LEAP이 아닌 자체 hand. PX6AX-GEN3-DP-S2015-Elite(52 taxel) × 3과 M2826-Omega(127 taxel) 1개, 총 283 taxel. GEN3 모델 구성의 참고 사례.</li>
+</ol>
+<h3>XELA uSkin</h3>
+<ol>
+<li><strong>Dexterity from Touch: Self-Supervised Pre-Training of Tactile Representations with Robotic Play (T-DEX).</strong> Irmak Guzey, Ben Evans, Soumith Chintala, Lerrel Pinto. 2023, CoRL, arXiv <a href="https://arxiv.org/abs/2303.12076" target="_blank" rel="noopener noreferrer">2303.12076</a>. Allegro에 uSkin 15개. tactile image 기반 SSL pretraining. real robot.</li>
+<li><strong>See to Touch: Learning Tactile Dexterity through Visual Incentives (TAVI).</strong> Guzey et al. 2024, ICRA, arXiv <a href="https://arxiv.org/abs/2309.12300" target="_blank" rel="noopener noreferrer">2309.12300</a>. Allegro + XELA. online IL과 visual reward.</li>
+<li><strong>Self-supervised perception for tactile skin covered dexterous hands (Sparsh-skin).</strong> 2025, arXiv <a href="https://arxiv.org/abs/2505.11420" target="_blank" rel="noopener noreferrer">2505.11420</a>. Allegro 368 taxel. self-distillation embedding. 기존 대비 41% 이상 향상.</li>
+<li><strong>PTLD: Sim-to-real Privileged Tactile Latent Distillation for Dexterous Manipulation.</strong> 2026, arXiv <a href="https://arxiv.org/abs/2603.04531" target="_blank" rel="noopener noreferrer">2603.04531</a>. Allegro 368 taxel. raw 3-axis에서 baseline을 빼 사용. sim-to-real.</li>
+<li><strong>TaSA: Two-Phased Deep Predictive Learning of Tactile Sensory Attenuation for Improving In-Grasp Manipulation.</strong> 2026, arXiv <a href="https://arxiv.org/abs/2602.05468" target="_blank" rel="noopener noreferrer">2602.05468</a>. Allegro와 uSCu curved fingertip. taxel 간격 약 6.5 mm.</li>
+</ol>
+<h3>AnySkin / ReSkin</h3>
+<ol>
+<li><strong>AnySkin: Plug-and-play Skin Sensing for Robotic Touch.</strong> Raunaq Bhirangi, Venkatesh Pattabiraman, Enes Erciyes, Yifeng Cao, Tess Hellebrekers, Lerrel Pinto. 2024, arXiv <a href="https://arxiv.org/abs/2409.08276" target="_blank" rel="noopener noreferrer">2409.08276</a>. LEAP 장착 시연. cross-instance 비교에서 DIGIT, ReSkin과 대비.</li>
+<li><strong>Learning Precise, Contact-Rich Manipulation through Uncalibrated Tactile Skins (Visuo-Skin).</strong> 2024, arXiv <a href="https://arxiv.org/abs/2410.17246" target="_blank" rel="noopener noreferrer">2410.17246</a>. uncalibrated magnetic skin 기반 policy.</li>
+<li><strong>All the Feels: A dexterous hand with large-area tactile sensing.</strong> Bhirangi et al. 2023, RA-L, arXiv <a href="https://arxiv.org/abs/2210.15658" target="_blank" rel="noopener noreferrer">2210.15658</a>. D&#39;Manus hand. ReSkin magnetometer 56개(fingertip 8개씩 + palm 32개).</li>
+<li><strong>ReSkin: versatile, replaceable, lasting tactile skins.</strong> Bhirangi et al. 2021, CoRL.</li>
+</ol>
+<h3>eFlesh</h3>
+<ol>
+<li><strong>eFlesh: Highly customizable Magnetic Touch Sensing using Cut-Cell Microstructures.</strong> Pattabiraman, Huang, Panozzo, Zorin, Pinto, Bhirangi. 2025, arXiv <a href="https://arxiv.org/abs/2506.09994" target="_blank" rel="noopener noreferrer">2506.09994</a>.</li>
+<li><strong>TacO: Benchmarking Tactile Sensors for Object Manipulation.</strong> Zorin, Si, Park, … Yong-Lae Park(SNU), Kroemer, Temel, Tolley, Yi, Wang. 2026, arXiv <a href="https://arxiv.org/abs/2605.21976" target="_blank" rel="noopener noreferrer">2605.21976</a>. ACT 기반 visuotactile과 vision-only 비교.</li>
+</ol>
+<h3>Vision-based</h3>
+<ol>
+<li><strong>Robust Model-Based In-Hand Manipulation with Integrated Real-Time Motion-Contact Planning and Tracking.</strong> 2025, arXiv <a href="https://arxiv.org/abs/2505.04978" target="_blank" rel="noopener noreferrer">2505.04978</a>. LEAP + Tac3D × 4.</li>
+<li><strong>In-Hand Following of Deformable Linear Objects Using Dexterous Fingers with Tactile Sensing.</strong> 2024, arXiv <a href="https://arxiv.org/abs/2403.12676" target="_blank" rel="noopener noreferrer">2403.12676</a>. LEAP + GelSight Mini × 2.</li>
+<li><strong>FingerEye: Learning Dexterous Manipulation with Continuous Vision-Tactile Sensing.</strong> 2026, arXiv <a href="https://arxiv.org/abs/2604.20689" target="_blank" rel="noopener noreferrer">2604.20689</a>. LEAP.</li>
+<li><strong>DIGIT: A Novel Design for a Low-Cost Compact High-Resolution Tactile Sensor with Application to In-Hand Manipulation.</strong> Lambeta et al. 2020, RA-L, arXiv <a href="https://arxiv.org/abs/2005.14679" target="_blank" rel="noopener noreferrer">2005.14679</a>.</li>
+<li><strong>Digitizing Touch with an Artificial Multimodal Fingertip (Digit 360).</strong> Lambeta et al. 2024, arXiv <a href="https://arxiv.org/abs/2411.02479" target="_blank" rel="noopener noreferrer">2411.02479</a>.</li>
+</ol>
+<hr>
+</div></details><details id="claude-chapter-7" ><summary>7. Policy Input and Tactile Representations</summary><div class="archive-body"><p>기초부터 정리한다. tactile을 policy에 넣는 방법은 크게 네 가지다.</p>
+<ol>
+<li><strong>Flatten + MLP.</strong> 예를 들어 PaXini 8개 × 15 taxel × 3 = 360 dim을 펴서 넣는다. 가장 단순하다. 3DTacDex 저자들은 저차원일 때는 이 방식이 유효하지만 coverage가 커지면 비효율적이라고 정리했다. AdapTac의 비교군 &quot;3DTacDex-P&quot;(단순 concat 계열)는 40%에 그쳤다. 반면 force-guided fusion은 93%였다. 표현과 fusion 방식이 센서만큼 중요하다는 뜻이다.</li>
+<li><strong>Tactile image + CNN.</strong> 3-axis를 RGB 3채널에 매핑해 2D 이미지로 만든다. T-DEX 계열이 여기에 속한다. vision backbone을 재사용할 수 있지만, 서로 다른 센서 간 공간 관계는 잃는다(3DTacDex의 비판).</li>
+<li><strong>Graph/point-set.</strong> taxel마다 [sensor pose(6), 정규화 위치(3), force(3)] 12D node를 만들고 GNN/GraphMAE로 인코딩한다. 3DTacDex 방식이며, <strong>LEAP처럼 링크마다 센서가 흩어진 손에 가장 자연스럽다.</strong></li>
+<li><strong>Pretrained embedding.</strong> Sparsh-skin(XELA Allegro)은 tactile+kinematics 이력을 받아 latent를 출력한다. PTLD는 privileged tactile latent를 distillation한다.</li>
+</ol>
+<p><strong>sim-to-real(PPO 등) 관점의 실무 권고</strong></p>
+<ul>
+<li><strong>1단계, sim에서 쓰는 tactile은 단순화한다.</strong> Blind Grasping(44-ch binary), Science Robotics 논문(binary), AURORA(FSR contact)가 보여주듯, LEAP에서 RL policy를 real로 옮긴 사례는 대부분 <strong>binary 또는 thresholded contact</strong>를 썼다. 3-axis force array를 사더라도 RL 관측에는 taxel별 |F| threshold나 sensor별 net force만 넣는 것이 안전하다.</li>
+<li><strong>2단계, real에서는 full 3-axis를 쓴다.</strong> imitation(Diffusion Policy/ACT), residual RL, tactile encoder fine-tuning에서 사용한다. XELA 기준 T_t ∈ R^{368×3}, PaXini 기준 R^{120×3}이다.</li>
+<li><strong>정규화.</strong> 무접촉 baseline을 빼는 것이 기본이다(PTLD). magnetic 센서는 온도와 주변 자기장에 따라 drift가 생기므로 에피소드 시작마다 re-zero한다. WowSkin GUI의 Reset 버튼도 같은 목적이다.</li>
+<li><strong>주파수 맞추기.</strong> policy가 5–10 Hz(3DTacDex 5 Hz, FingerEye 10 Hz)라면 센서 100–220 Hz 신호를 window 통계(평균, 최대, 미분)로 요약해 넣는다. 그래야 slip 같은 고주파 정보를 잃지 않는다.</li>
+<li><strong>Vision-based tactile은 T_t ∈ R^{H×W×3}이다.</strong> RL sim에서 렌더링 비용이 크고 sim2real gap도 크다. 이 프로젝트에서는 imitation 전용 보조 입력으로 한정한다.</li>
+</ul>
+<hr>
+</div></details><details id="claude-chapter-8" ><summary>8. Practical LEAP Integration</summary><div class="archive-body"><ul>
+<li><strong>Fingertip.</strong><ul>
+<li>XELA는 곡면 fingertip 교체형(uSCu ALHA 계열)이다.</li>
+<li>PaXini는 fingertip용 모듈과 custom holder가 필요하다.</li>
+<li>AnySkin/WowSkin은 fingertip PCB 위에 skin을 씌운다.</li>
+<li>vision-based는 fingertip 전체를 교체한다.</li>
+<li>LEAP fingertip은 곡면이다. 평평한 센서(FSR 등)는 off-center 하중을 놓친다(preprints.org 논문). AURORA는 contact coverage를 위해 distal link를 연장했다. <strong>fingertip 형상 변경은 kinematics와 sim 모델(URDF/MJCF)을 함께 바꾼다는 뜻</strong>이니 CAD와 URDF를 동시에 수정해야 한다.</li>
+</ul>
+</li>
+<li><strong>Finger pad / phalange.</strong> 여기에 3-axis를 넣은 LEAP 구성은 XELA(uSPa 16 taxel × 11)와 PaXini(pad 3×5 × 4) 두 가지뿐이다. in-hand rotation과 power grasp에서는 phalange 접촉이 흔하므로 이 부위 coverage가 policy 성능을 좌우할 수 있다.</li>
+<li><strong>Palm.</strong> XELA LEAP 구성(72 taxel)이 유일한 상용 옵션이다. DexSkin도 LEAP palm 적용을 시연했지만 연구용이다.</li>
+<li><strong>Wiring.</strong><ul>
+<li>LEAP은 Dynamixel 버스를 쓴다.</li>
+<li>XELA는 손 전체를 CAN 2선로로 처리한다(제조사).</li>
+<li>PaXini는 모듈별 신호선과 통신보드가 필요하다.</li>
+<li>Blind Grasping의 TwinTac은 센서마다 Seeed XIAO를 붙여 USB로 바꿨는데, 저자들은 이것이 &quot;simplifies wiring and reduces cable interference with finger motion&quot;이라고 썼다.</li>
+<li>케이블은 MCP 관절의 abduction 축을 지나므로 slack과 strain relief를 CAD 단계에서 설계해야 한다.</li>
+</ul>
+</li>
+<li><strong>Communication.</strong> XELA는 CAN2USB와 websocket server를 거치며, 변화분만 전송해 주파수를 유지한다(제조사). PaXini는 USB serial(리셀러 정보)이다. AnySkin은 USB serial이다.</li>
+<li><strong>Compute.</strong> magnetic과 force array는 수백 dim 수준이라 CPU만으로 충분하다. vision-based 4개(각 640×480 @60)는 USB 3 대역폭과 GPU encoder가 필요하다.</li>
+<li><strong>자기 간섭.</strong> Dynamixel 모터 속 영구자석, 금속 물체, 인접 skin끼리의 상호 간섭 가능성이 있다. 구매 후 <strong>첫 실험은 손가락 관절을 움직이며 무접촉 신호가 흔들리는지 측정하는 것</strong>이어야 한다.</li>
+</ul>
+<hr>
+</div></details><details id="claude-chapter-9" ><summary>9. Cost and Procurement</summary><div class="archive-body"><div class="table-wrap" tabindex="0" role="region" aria-label="비교 표 · 좌우 스크롤 가능"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>단가</th>
+<th>LEAP 구성 수량</th>
+<th>합계</th>
+<th>비고</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LEAP Hand v1 본체</td>
+<td>2000 USD(원 논문 RSS 2023: &quot;can be assembled in under 4 hours at a cost of 2000 USD&quot;)</td>
+<td>1</td>
+<td>2000 USD</td>
+<td>XELA 통합 주문 시 &quot;at the cost of the parts&quot;로 제공</td>
+</tr>
+<tr>
+<td>XELA uSkin For LEAP</td>
+<td>Quote required / not publicly disclosed</td>
+<td>368 taxel 전신</td>
+<td>견적 필요</td>
+<td>individual calibration은 유료 옵션. 일본(도쿄) 본사, distributor 목록 있음</td>
+</tr>
+<tr>
+<td>PaXini PX-6AX 모듈</td>
+<td>$55.96–$70.25 (리셀러 AIFITLAB, 변형별)</td>
+<td>8(fingertip 4 + pad 4)</td>
+<td>모듈만 약 $450–$560</td>
+<td>통신보드 가격 미확인. 공식몰, AliExpress, Amazon flagship. 한국 전용 distributor 미확인(paxini.com/kr 존재)</td>
+</tr>
+<tr>
+<td>WowSkin</td>
+<td>€180 net / €214.20 VAT 포함(Eckstein)</td>
+<td>4(fingertip)</td>
+<td>약 €720 net</td>
+<td>LeapHand 구조 부품은 판매처 문의</td>
+</tr>
+<tr>
+<td>AnySkin 자작</td>
+<td>재료비(공식가 없음)</td>
+<td>4</td>
+<td>—</td>
+<td>pulse magnetizer 접근성이 병목</td>
+</tr>
+<tr>
+<td>eFlesh 자작</td>
+<td>magnet &lt;$5 + magnetometer board</td>
+<td>4 이상</td>
+<td>—</td>
+<td>3D 프린터 필요</td>
+</tr>
+<tr>
+<td>GelSight Mini / DIGIT / Tac3D / Digit 360</td>
+<td>GelSight Mini System $510.00(GelSight 공식 스토어, 리드타임 약 4주; 출시 발표가 $499). DIGIT은 리드타임 4–6주(가격 미확인). Tac3D·Digit 360은 가격 미확인</td>
+<td>2–4</td>
+<td>—</td>
+<td>fingertip 교체 mount를 별도 제작</td>
+</tr>
+</tbody></table></div>
+<ul>
+<li>한국 조달: PaXini는 AliExpress와 Amazon 공식 스토어로 개인·연구실 구매가 가능해 보인다(ZDNet Korea 2025-12-04 보도). XELA는 일본 본사나 distributor를 통한 견적이 필요하다. 학술 할인 여부는 두 회사 모두 공개되지 않았다.</li>
+</ul>
+<hr>
+</div></details><details id="claude-chapter-10" ><summary>10. Final Top 3 Recommendation</summary><div class="archive-body"><h3>#1 PaXini PX-6AX: LEAP 문헌 근거 1위</h3>
+<ul>
+<li><strong>왜 Top 3인가.</strong> 조사 범위 안에서 LEAP 위 3-axis array로 policy를 학습하고 ablation까지 보인 유일한 상용 센서다.</li>
+<li><strong>가장 강한 근거.</strong> 3DTacDex(78%, ablation)와 AdapTac(93% 대 vision-only 73%)이다. 두 논문 모두 methods/setup 섹션에서 &quot;Leap Hand … PaXini tactile sensors … 3×5 array of taxels … tri-axial forces&quot;를 확인했다.</li>
+<li><strong>LEAP 통합 근거.</strong> Level A다. 다만 공식 kit는 없고, PKU도 &quot;customized&quot; LEAP를 썼다.</li>
+<li><strong>sensing 장점.</strong> taxel별 3D force로 shear와 net force를 직접 얻는다. fingertip과 pad를 모두 덮는다.</li>
+<li><strong>한계.</strong><ul>
+<li>두 논문이 같은 그룹(PKU Hao Dong lab)에서 나왔다. 독립 재현은 없다.</li>
+<li>모델과 세대를 밝히지 않았다.</li>
+<li>출력 주파수 사양이 1000 Hz, 83.3 Hz, 약 91 Hz로 서로 다르다.</li>
+<li>ROS와 SDK가 약하다.</li>
+</ul>
+</li>
+<li><strong>가능해지는 실험.</strong> 3DTacDex/AdapTac를 LEAP에서 재현하고 baseline을 확보하기. 그 위에 RL/AMP 기반 in-hand rotation과 force-aware grasp stabilization 얹기.</li>
+</ul>
+<h3>#2 XELA uSkin For LEAP Hand: 공식 통합 + 문헌 성숙도 1위 (high-end 1순위)</h3>
+<ul>
+<li><strong>왜 Top 3인가.</strong> 제조사가 LEAP 전신 368 taxel 통합과 hand 제공을 공식 판매한다(Level B). 같은 센서의 Allegro 문헌(T-DEX, TAVI, Sparsh-skin, PTLD)이 tactile representation과 policy learning 분야에서 가장 두텁다. Sparsh-skin 같은 pretrained encoder도 활용할 여지가 있다. Allegro와 LEAP은 둘 다 16-DoF 4-finger이고 taxel 구성(fingertip 30, phalange 16)도 같다. 다만 이식 가능성은 검증되지 않았다.</li>
+<li><strong>한계.</strong><ul>
+<li>LEAP 위 논문이 0편이다(서브에이전트 검색으로도 확인).</li>
+<li>가격은 견적제다.</li>
+<li>raw 신호의 hysteresis와 lag(PTLD).</li>
+<li>자기 간섭.</li>
+</ul>
+</li>
+<li><strong>가능해지는 실험.</strong> palm·phalange를 포함한 whole-hand contact-state estimation. slip onset 검출(shear). Sparsh-skin 방식 tactile SSL을 LEAP으로 옮기기. <strong>&quot;XELA-LEAP 첫 policy 논문&quot;이라는 포지셔닝.</strong></li>
+</ul>
+<h3>#3 AnySkin / WowSkin: 빠른 시작 + 교체 일관성</h3>
+<ul>
+<li><strong>왜 Top 3인가.</strong> LEAP 장착 시연이 있고(Level A-lite), 판매처가 LeapHand 부품을 판다(Level B, 판매처 주장). 전부 오픈소스이고, instance 간 일관성이 정량적으로 검증됐다.</li>
+<li><strong>한계.</strong> 해상도가 낮다(5 point). uncalibrated다. LEAP policy 실험이 없다.</li>
+<li><strong>가능해지는 실험.</strong> fingertip slip detection. 교체 가능한 skin 위에서의 tactile representation transfer. eFlesh로 넘어가기 전의 magnetic pipeline 구축.</li>
+</ul>
+<p><strong>실행 권고.</strong> XELA 견적(LEAP 전신 구성, lead time, raw access, ROS2)을 즉시 요청한다. 동시에 WowSkin 4개나 PaXini 8개를 사서 2–4주 안에 pipeline을 구축한다. 견적과 납기가 수용 가능하면 주력은 XELA, 아니면 PaXini로 간다. 어느 쪽이든 FSR binary baseline은 ablation용으로 유지한다.</p>
+<hr>
+</div></details><details id="claude-chapter-11" ><summary>11. High-End Recommendation</summary><div class="archive-body"><ol>
+<li><strong>XELA uSkin For LEAP Hand (전신 368 taxel, individual calibration 옵션 포함).</strong> 가장 완성된 구성이다. 전신 coverage, 3-axis, 온도 보상, CAN 저배선, ROS2를 갖췄다. 추가로 요청할 것: 개별 calibration, 자기 간섭 보상 옵션(2026 Q3 발표), CAN FD 버전(2026년 5월부터 출하 발표).</li>
+<li><strong>PaXini GEN3 (fingertip S2015-Elite급 + pad 모듈).</strong> 제조사 사양상 GEN3의 taxel 밀도와 force range(0–25 N / ±10 N)가 LEAP 논문에 쓰인 3×5 세대보다 높다. MIDAS Hand가 GEN3 조합을 실제로 썼다. 다만 LEAP mount는 직접 설계해야 한다.</li>
+<li><strong>Digit 360 (선택적 fingertip 보강).</strong> fingertip 1–2개에 multimodal 고해상도 정보가 꼭 필요할 때만 쓴다. GelSight와 Meta AI는 2024년 10월 31일 &quot;GelSight will manufacture and distribute Digit 360, targeting wide availability next year. Members of the research community can apply to Digit 360 call for proposals to gain early access&quot;라고 발표했다. 가격은 여전히 확인하지 못했다.</li>
+</ol>
+<hr>
+</div></details><details id="claude-chapter-12" ><summary>12. Custom Sensor / Research Extension</summary><div class="archive-body"><ul>
+<li><strong>eFlesh로 LEAP fingertip, phalange, palm을 통째로 센서화한다.</strong> LEAP 링크 CAD를 cut-cell microstructure로 변환하고 magnet과 magnetometer PCB를 넣는 구조다.<ul>
+<li>만들어야 할 것: PCB(다중 magnetometer), 3D 프린팅 microstructure, calibration rig(TacO가 공개하는 repeatability 테스트 키트 참고), 학습 기반 force 회귀.</li>
+<li>부담: 기계공학 학부생 기준 CAD와 프린팅은 강점이다. PCB와 calibration에 수 주에서 수 개월이 걸린다고 보는 게 현실적이다.</li>
+<li>연구 기회: (a) <strong>sim-friendly tactile 설계.</strong> microstructure 강성을 sim contact model과 맞춰 설계해 sim2real gap을 줄인다(tendon/compliant 설계 경험과 직결된다). (b) 교체 간 일관성과 representation transfer. (c) LEAP v2 hybrid rigid-soft 구조와 일체형 skin.</li>
+</ul>
+</li>
+<li><strong>AnySkin을 phalange와 palm으로 확장.</strong> mold와 PCB 형상만 바꾸면 된다. 난이도는 eFlesh보다 낮다.</li>
+<li><strong>SNU 로컬 이점.</strong> TacO 공저자에 SNU Yong-Lae Park 교수 그룹이 포함돼 있다. 교내에 soft sensor 제작 인프라와 benchmark 경험이 있다는 뜻이니 협업을 먼저 타진해 볼 가치가 있다.</li>
+<li><strong>권고.</strong> 1차 논문은 구매 센서로 manipulation 기여에 집중한다. custom skin은 2차 과제나 workshop 논문으로 병행한다. &quot;센서가 도구&quot;라는 기본 가정은 유지한다.</li>
+</ul>
+<hr>
+</div></details><details id="claude-chapter-13" ><summary>13. Open Questions</summary><div class="archive-body"><p>제조사에 직접 물어야 할 것들이다.</p>
+<p><strong>XELA</strong></p>
+<ul>
+<li>LEAP 구성의 학술가와 lead time.</li>
+<li>LEAP v1 전용인지, v2 대응 여부.</li>
+<li>220 Hz가 전신 368 taxel 동시 기준인지.</li>
+<li>raw 16-bit 값에 직접 접근 가능한지.</li>
+<li>ROS2 driver의 timestamp와 latency.</li>
+<li>Dynamixel 근처에서 자기 간섭을 실측한 데이터가 있는지.</li>
+<li>외피 교체 비용.</li>
+<li>individual calibration 가격.</li>
+<li>무게 증가량.</li>
+<li>한국 distributor.</li>
+</ul>
+<p><strong>PaXini</strong></p>
+<ul>
+<li>PKU 논문에 쓰인 3×5 모듈의 정확한 모델명과 세대, 현재 구매 가능 여부.</li>
+<li>GEN3 실제 출력 주파수. 1000 Hz, 83.3 Hz, 약 91 Hz 중 어느 조건의 값인지.</li>
+<li>모델별 taxel 수(S2015-Elite 52 / M2826-Omega 127은 MIDAS 논문 기준).</li>
+<li>Linux SDK와 ROS2 공식 지원 여부.</li>
+<li>LEAP mount 제공 여부.</li>
+<li>calibration 절차와 sensor 간 편차.</li>
+<li>학술 할인 여부.</li>
+</ul>
+<p><strong>WowSkin</strong></p>
+<ul>
+<li>LeapHand 구조 부품의 구체 형상과 호환 버전.</li>
+<li>skin 교체품 가격.</li>
+<li>샘플링 주파수.</li>
+<li>AnySkin 원본 대비 instance 일관성 데이터.</li>
+</ul>
+<p><strong>AnySkin/eFlesh 공통</strong></p>
+<ul>
+<li>LEAP 위 policy 성능 데이터가 있는지(저자 문의).</li>
+<li>인접 skin 간 자기 crosstalk.</li>
+</ul>
+<p><strong>Science Robotics 논문(Ye et al. 2026)</strong></p>
+<ul>
+<li>사용한 tactile 센서의 정확한 종류. 본문 접근이 막혀 확인하지 못했다.</li>
+</ul>
+<p><strong>LEAP 팀(Shaw/Pathak)</strong></p>
+<ul>
+<li>LEAP v2/v2 Advanced용 공식 tactile 로드맵이 있는지.</li>
+</ul>
+</div></details></section><section id="codex" class="archive-panel" role="tabpanel" aria-labelledby="tab-codex" hidden><p class="archive-intro">영문 · 앞선 조사 최종 답변 · 64,005 characters · 전체 보존</p><details id="codex-chapter-0" open><summary>원문 시작 · Executive overview</summary><div class="archive-body"><h1>Tactile Sensors for LEAP Hand Dexterous Manipulation</h1>
+</div></details><details id="codex-chapter-1" ><summary>1. Executive Summary</summary><div class="archive-body"><p><strong>For this project, I would prioritize PaXini distributed tactile sensors, XELA uSkin, and GelSight Mini—in that order under your evidence hierarchy.</strong> They serve different purposes:</p>
+<ul>
+<li><strong>PaXini:</strong> strongest direct evidence from LEAP tactile-conditioned policy learning.</li>
+<li><strong>XELA uSkin:</strong> strongest documented, integrated LEAP sensing package, with substantial learning research on Allegro.</li>
+<li><strong>GelSight Mini:</strong> strongest verified commercial optical option for LEAP contact-geometry research, with important speed and mechanical limitations.</li>
+</ul>
+<p><strong>The central procurement uncertainty is PaXini’s exact research configuration.</strong> The strongest LEAP papers identify PaXini and describe their arrays, but do not provide an unambiguous current orderable part number. A current PX-6AX product should not automatically be treated as identical to those research sensors.</p>
+<p>This survey followed three search passes: <strong>LEAP-first literature discovery; sensor-to-paper searches; and citation/project/repository follow-up</strong>. The principal Top-3 sources were subsequently reopened to verify hardware configurations. Sources and purchasing information were checked on <strong>25 September 2026</strong>.</p>
+<p>The evidence does <strong>not</strong> support a controlled, sensor-versus-sensor performance ranking. The recommendations below reflect research relevance and implementation evidence, not a meta-analysis of incomparable success rates.</p>
+<h3>Overall Top 3</h3>
+<div class="table-wrap" tabindex="0" role="region" aria-label="비교 표 · 좌우 스크롤 가능"><table>
+<thead>
+<tr>
+<th>Rank</th>
+<th>Candidate</th>
+<th>Strongest LEAP evidence</th>
+<th>Best fit for this project</th>
+<th>Principal reservation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>1</strong></td>
+<td><strong>PaXini distributed tri-axis sensors / PX-6AX family</strong></td>
+<td>Real LEAP policy learning in <strong>3DTacDex</strong>, <strong>AdapTac</strong>, and a newer cluttered-grasping study</td>
+<td>Distributed contact representation, tactile-conditioned imitation learning, force-aware manipulation</td>
+<td>Exact paper hardware versus current commercial SKU must be confirmed</td>
+</tr>
+<tr>
+<td><strong>2</strong></td>
+<td><strong>XELA uSkin LEAP package</strong></td>
+<td><strong>Official LEAP integration</strong>; strong Allegro tactile-learning literature</td>
+<td>Whole-hand contact sensing, grasp stabilization, tactile/proprioceptive policies</td>
+<td>I did <strong>not</strong> verify a LEAP algorithm paper using this package</td>
+</tr>
+<tr>
+<td><strong>3</strong></td>
+<td><strong>GelSight Mini</strong></td>
+<td>Real LEAP cable-following paper; additional LEAP imitation-learning thesis</td>
+<td>Contact geometry, deformation, tactile embeddings, slower precision manipulation</td>
+<td>Optical packaging and a reported <strong>&gt;70 ms depth-image delay</strong> in the LEAP implementation</td>
+</tr>
+</tbody></table></div>
+<p>Primary evidence: <a href="https://arxiv.org/html/2409.17549v2" target="_blank" rel="noopener noreferrer">3DTacDex</a>, <a href="https://arxiv.org/html/2505.13982v1" target="_blank" rel="noopener noreferrer">AdapTac</a>, <a href="https://xelarobotics.com/products/for-leap-hand/" target="_blank" rel="noopener noreferrer">XELA LEAP integration</a>, <a href="https://arxiv.org/html/2403.12676v2" target="_blank" rel="noopener noreferrer">LEAP cable following</a>.</p>
+<h3>High-End Shortlist</h3>
+<div class="table-wrap" tabindex="0" role="region" aria-label="비교 표 · 좌우 스크롤 가능"><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Why consider it without a budget constraint?</th>
+<th>Recommended purchasing approach</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>XELA uSkin, integrated LEAP configuration</strong></td>
+<td>Documented whole-hand integration and established software; minimizes sensor-development work</td>
+<td>Request an assembled package, individual calibration, replacement skins, and latency documentation</td>
+</tr>
+<tr>
+<td><strong>PaXini, research-matched LEAP configuration</strong></td>
+<td>Most relevant demonstrated LEAP learning infrastructure</td>
+<td>Obtain the exact sensor geometry, electronics, API, calibration, and mounts used by a reference research group</td>
+</tr>
+<tr>
+<td><strong>GelSight Mini as a complementary subsystem</strong></td>
+<td>Adds detailed local geometry that sparse force arrays do not directly provide</td>
+<td>Start with thumb/index sensing for a geometry-focused experiment</td>
+</tr>
+</tbody></table></div>
+<p><strong>My practical recommendation:</strong> contact PaXini and XELA in parallel. Prefer PaXini if the published LEAP configuration is reproducibly obtainable; prefer XELA if PaXini cannot resolve the hardware/API uncertainty. Add optical sensing only when contact geometry is central to the experiment.</p>
+<hr>
+</div></details><details id="codex-chapter-2" ><summary>2. What LEAP Hand Researchers Actually Use</summary><div class="archive-body"><h3>LEAP Hand + tactile sensing papers</h3>
+<p><strong>Evidence notation</strong></p>
+<ul>
+<li><strong>A—policy:</strong> real LEAP autonomous manipulation with tactile input.</li>
+<li><strong>A—control:</strong> real LEAP tactile-feedback control, without a learned policy.</li>
+<li><strong>A—demo:</strong> research mounting, teleoperation, or hardware demonstration; weaker evidence for autonomous policy learning.</li>
+<li><strong>B:</strong> official commercial LEAP integration.</li>
+<li><strong>NR:</strong> not reported or not confirmed in accessible primary material.</li>
+</ul>
+<p>“Original-form LEAP” below means the conventional four-finger, 16-DoF configuration; a precise hardware revision is often omitted.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="비교 표 · 좌우 스크롤 가능"><table>
+<thead>
+<tr>
+<th>Paper</th>
+<th>Year / venue</th>
+<th>LEAP version</th>
+<th>Tactile sensor</th>
+<th>Placement</th>
+<th>Sensors / taxels</th>
+<th>Task</th>
+<th>Tactile representation</th>
+<th>Policy/model</th>
+<th>Key result / evidence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://arxiv.org/html/2409.17549v2" target="_blank" rel="noopener noreferrer">Canonical Representation and Force-Based Pretraining… — 3DTacDex</a></td>
+<td>ICRA 2025</td>
+<td>Original-form, 16 DoF</td>
+<td>PaXini</td>
+<td>Tip and finger pad on every finger</td>
+<td><strong>8 modules; 120 tri-axis taxels</strong></td>
+<td>Box opening, reorientation, cap flipping, assembly</td>
+<td>Force plus canonical spatial features</td>
+<td>Pretrained graph encoder + diffusion policy</td>
+<td><strong>78% vs 53%</strong> vision-only average; A—policy</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/html/2505.13982v1" target="_blank" rel="noopener noreferrer">Adaptive Visuo-Tactile Fusion… — AdapTac</a></td>
+<td>IROS 2025</td>
+<td>Original-form, 16 DoF</td>
+<td>PaXini</td>
+<td>Tips and pads</td>
+<td><strong>8 × 15 taxels</strong></td>
+<td>Box opening, cup reorientation, sponge flipping</td>
+<td>Spatial force features and visual point clouds</td>
+<td>Force-guided attention + diffusion policy</td>
+<td><strong>93% vs 73%</strong> vision-only average; A—policy</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/html/2609.24068v1" target="_blank" rel="noopener noreferrer">When Does Touch Matter? Charting the Vision–Interaction Gap in Cluttered Dexterous Grasping</a></td>
+<td>September 2026 preprint</td>
+<td>16 DoF</td>
+<td>PaXini</td>
+<td>Four fingertips</td>
+<td><strong>508 tri-axis taxels total</strong></td>
+<td>Cluttered grasping</td>
+<td>Taxel positions/forces; separate estimated wrench observations</td>
+<td>Attention encoder + diffusion policy</td>
+<td>24/25 successes with combined signals vs 14/25 vision; A—policy, very recent</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/html/2403.12676v2" target="_blank" rel="noopener noreferrer">In-Hand Following of Deformable Linear Objects Using Dexterous Fingers with Tactile Sensing</a></td>
+<td>IROS 2024</td>
+<td>Original-form</td>
+<td>GelSight Mini</td>
+<td>Thumb and index</td>
+<td><strong>2 cameras/sensors</strong></td>
+<td>Following cables through the fingers</td>
+<td>Depth/contact geometry + forward kinematics</td>
+<td>Contact segmentation, line fitting, hybrid position/force control</td>
+<td>Real tactile closed-loop manipulation; A—control</td>
+</tr>
+<tr>
+<td><a href="https://pure.unileoben.ac.at/en/publications/a-dexterous-multi-finger-robotic-manipulator-framework-for-intuit/" target="_blank" rel="noopener noreferrer">A Dexterous Multi-Finger Robotic Manipulator Framework…</a></td>
+<td>2025 master’s thesis</td>
+<td>LEAP; revision NR</td>
+<td>GelSight Mini</td>
+<td>Exact count/placement not confirmed from accessible abstract</td>
+<td>NR</td>
+<td>Contact-rich imitation learning</td>
+<td>Learned visual/tactile features</td>
+<td>BYOL/MViTac/ResNet-based comparisons</td>
+<td>Institutional evidence of real LEAP learning; thesis-level</td>
+</tr>
+<tr>
+<td><a href="https://theses-dissertations.princeton.edu/entities/publication/270fe74d-920c-4efd-988f-675149fe98ae" target="_blank" rel="noopener noreferrer">Feeling the Future: Dexterous Bolt Manipulation in Robotics Using Optical Tactile Sensing</a></td>
+<td>2026 senior thesis</td>
+<td><strong>Three-finger redesign</strong></td>
+<td>DIGIT</td>
+<td>Two fingers</td>
+<td><strong>2 sensors</strong></td>
+<td>Bolt seeking/alignment</td>
+<td>Reduced contact features + robot state</td>
+<td>Demonstration learning; threading classifier</td>
+<td>Lower validation loss, not proof of fourfold real task success</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/html/2608.16572v1" target="_blank" rel="noopener noreferrer">ViHaTeleop: A Low-Cost, Lightweight Visual-Haptic Teleoperation System for Dexterous Manipulation Learning</a></td>
+<td>August 2026 preprint</td>
+<td>16 DoF</td>
+<td>9DTact</td>
+<td>Thumb, index, middle</td>
+<td><strong>3 sensors</strong></td>
+<td>Haptic teleoperation; manipulation demonstrations</td>
+<td>Deformation-derived feedback</td>
+<td>Retargeting + human haptic loop</td>
+<td>Real LEAP hardware; downstream learning comparisons are <strong>simulation</strong>, A—demo</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/html/2606.11767v1" target="_blank" rel="noopener noreferrer">Blind Dexterous Grasping via Real2Sim2Real Tactile Policy Learning</a></td>
+<td>June 2026 preprint</td>
+<td>LEAP</td>
+<td>Custom curved TwinTac + FSRs</td>
+<td>Four tips; links and palm</td>
+<td><strong>32 pressure channels + 12 FSRs</strong></td>
+<td>Vision-free grasping</td>
+<td><strong>44 binarized contact channels</strong></td>
+<td>RL experts distilled into diffusion policy</td>
+<td><strong>27% real success vs 6% without calibration</strong>; A—policy</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/html/2609.08493v1" target="_blank" rel="noopener noreferrer">AURORA: Active Uncertainty-Driven Re-Orientation for In-Hand Reconstruction</a></td>
+<td>September 2026 preprint</td>
+<td>Modified fingertips</td>
+<td>FSRs</td>
+<td>Tips, inner links, palm</td>
+<td><strong>16 scalar sensors</strong></td>
+<td>Reorientation for visual reconstruction</td>
+<td>Binary contacts</td>
+<td>Tactile/proprioceptive low-level RL</td>
+<td>Contact baseline; not rich distributed sensing</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/html/2506.19201v1" target="_blank" rel="noopener noreferrer">The MOTIF Hand…</a></td>
+<td>2025 preprint</td>
+<td>LEAP-derived</td>
+<td>Resistive tactile arrays plus other modalities</td>
+<td>Finger pads</td>
+<td><strong>6 × 6 per array</strong>; total count not independently confirmed</td>
+<td>Multimodal grasp observation</td>
+<td>Pressure maps, thermal and inertial signals</td>
+<td>Observation/estimation framework</td>
+<td>No isolated pressure-policy benefit established</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/html/2409.08276v3" target="_blank" rel="noopener noreferrer">AnySkin: Plug-and-play Skin Sensing for Robotic Touch</a></td>
+<td>ICRA 2025</td>
+<td>LEAP pictured in hardware demonstration</td>
+<td>AnySkin</td>
+<td>Custom skin mounting</td>
+<td>Benchmark configuration differs</td>
+<td>Hardware adaptability</td>
+<td>Raw magnetic readings</td>
+<td>Main learning experiments use grippers</td>
+<td><strong>LEAP fit evidence, not a LEAP policy benchmark</strong></td>
+</tr>
+<tr>
+<td><a href="https://williamalexanda.github.io/Bio-Skin/" target="_blank" rel="noopener noreferrer">Bio-Skin project</a></td>
+<td>Paper: IROS 2025; project updated separately</td>
+<td>LEAP demonstration</td>
+<td>Bio-Skin</td>
+<td>Four fingertips shown</td>
+<td>Multimodal fingertip modules</td>
+<td>Hardware demonstration</td>
+<td>Normal/shear/temperature signals</td>
+<td>LEAP policy details NR</td>
+<td>Paper experiments and later LEAP project demonstration must be distinguished</td>
+</tr>
+<tr>
+<td><a href="https://www.roboticsproceedings.org/rss21/p132.pdf" target="_blank" rel="noopener noreferrer">Demonstrating LEAP Hand v2…</a></td>
+<td>RSS 2025 demonstration</td>
+<td><strong>LEAP v2</strong></td>
+<td>FSR</td>
+<td>Fingers</td>
+<td>One scalar sensor per finger</td>
+<td>Low-cost tactile capability</td>
+<td>Scalar force-related readings</td>
+<td>Hardware demonstration</td>
+<td>Useful inexpensive baseline</td>
+</tr>
+</tbody></table></div>
+<p>Two additional leads should <strong>not</strong> be silently promoted into fully documented LEAP policy evidence:</p>
+<ul>
+<li><strong>DenseTact:</strong> a <a href="https://events.stanford.edu/event/won-kyung-do-phd-defense-improving-robotic-dexterity-with-optical-tactile-sensor-densetact" target="_blank" rel="noopener noreferrer">Stanford dissertation-defense description</a> explicitly mentions LEAP integration. However, I could not establish a complete paper-level LEAP configuration for the related TensorTouch system.</li>
+<li><strong>DexMani:</strong> its <a href="https://dexmani.github.io/" target="_blank" rel="noopener noreferrer">official project</a> describes LEAP rotation with TwinTac. Treat it as emerging project evidence until the full hardware and experimental record can be inspected.</li>
+</ul>
+<h3>Patterns in this literature</h3>
+<p><strong>Distributed force sensing currently has the clearest LEAP policy-learning evidence.</strong> The PaXini studies preserve spatial contact information rather than reducing touch to one contact bit per finger.</p>
+<p><strong>Most strong results are visuotactile.</strong> They do not directly establish performance for a policy restricted to:</p>
+<p>[
+o_t=[q_t,\dot q_t,T_t].
+]</p>
+<p>That is a useful research opportunity: evaluate tactile/proprioceptive manipulation after initial acquisition, with external vision removed from the policy.</p>
+<p><strong>Coverage and representation matter together.</strong> AdapTac reports that naïvely incorporating tactile features can underperform vision alone. More channels do not automatically produce a better policy. Its paper and project also report different unseen-object evaluations: the <a href="https://adaptac-dex.github.io/" target="_blank" rel="noopener noreferrer">updated project explicitly corrects that evaluation</a>. Those results should not be combined as one experiment.</p>
+<hr>
+</div></details><details id="codex-chapter-3" ><summary>3. Candidate Landscape</summary><div class="archive-body"><h3>Commercial / ready-to-buy</h3>
+<div class="table-wrap" tabindex="0" role="region" aria-label="비교 표 · 좌우 스크롤 가능"><table>
+<thead>
+<tr>
+<th>Candidate</th>
+<th>Assessment</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>XELA uSkin LEAP package</strong></td>
+<td>Most clearly documented integrated commercial LEAP option</td>
+</tr>
+<tr>
+<td><strong>PaXini PX-6AX family</strong></td>
+<td>Current commercial family with strong related LEAP research; research-matched package requires confirmation</td>
+</tr>
+<tr>
+<td><strong>GelSight Mini</strong></td>
+<td>Purchasable complete sensor; LEAP mounts still required</td>
+</tr>
+<tr>
+<td><strong>DIGIT</strong></td>
+<td>Purchasable complete optical sensor; established manipulation ecosystem</td>
+</tr>
+<tr>
+<td><strong>WowSkin</strong></td>
+<td>Commercial AnySkin-derived option; stock, package contents, and LEAP adapter availability need confirmation</td>
+</tr>
+</tbody></table></div>
+<p>“Ready-to-buy” does not mean “ready-to-run on LEAP.” Mounts, interfaces, calibration, and software synchronization remain part of the system.</p>
+<h3>Commercial + custom integration</h3>
+<ul>
+<li>PaXini, unless a complete matching LEAP package is supplied.</li>
+<li>Standalone uSkin modules outside the official LEAP package.</li>
+<li>GelSight Mini and DIGIT using custom fingertip adapters.</li>
+<li>Commercial resistive arrays, such as Tekscan, with custom coverings and electronics.</li>
+<li>BioTac-family sensors on a substantially redesigned fingertip; no verified LEAP integration found.</li>
+</ul>
+<h3>Fabrication required</h3>
+<ul>
+<li><strong>AnySkin</strong>, when assembled from its research design.</li>
+<li><strong>ReSkin</strong> and derivative palm/finger skins.</li>
+<li><strong>eFlesh</strong>.</li>
+<li><strong>TwinTac</strong>, <strong>Bio-Skin</strong>, and many DenseTact/TensorTouch configurations.</li>
+<li><strong>9DTact</strong>, if using the open fabrication route instead of a supplier-built unit.</li>
+</ul>
+<h3>Vision-based tactile</h3>
+<p>The important options are <strong>GelSight Mini, DIGIT, 9DTact, DenseTact, and TensorTouch</strong>.</p>
+<p>They provide local appearance and deformation observations from which geometry, force, or slip can be inferred. They do <strong>not</strong> intrinsically provide calibrated distributed pressure simply because their images have many pixels.</p>
+<p>For LEAP, their principal tradeoff is detailed local contact information versus <strong>fingertip volume, USB routing, image processing, and latency</strong>.</p>
+<hr>
+</div></details><details id="codex-chapter-4" ><summary>4. Detailed Sensor Comparison</summary><div class="archive-body"><p><strong>P = paper-reported; M = manufacturer-reported.</strong><br>“Not publicly specified” means no reliable configuration-specific value was confirmed. Rates refer to different stages and should not be compared as interchangeable measures of latency.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="비교 표 · 좌우 스크롤 가능"><table>
+<thead>
+<tr>
+<th>Sensor</th>
+<th>Principle</th>
+<th>Purchase / fabrication</th>
+<th>LEAP evidence</th>
+<th>Spatial sensing</th>
+<th>Shear</th>
+<th>Output</th>
+<th>Sampling rate</th>
+<th>Size</th>
+<th>Raw data</th>
+<th>SDK</th>
+<th>ROS</th>
+<th>Integration effort</th>
+<th>Price</th>
+<th>Representative papers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>PaXini PX-6AX family</strong></td>
+<td>Magnetic elastomer / distributed force estimation</td>
+<td>Commercial; custom integration or quoted package</td>
+<td><strong>A—policy</strong>; exact SKU unresolved</td>
+<td>15 taxels/module in two main LEAP studies; other configurations differ</td>
+<td>Tri-axis taxel force estimates</td>
+<td>(N\times3), optional derived wrench</td>
+<td>Current family advertises up to <strong>1,000 Hz output</strong> M; LEAP policies ran <strong>5 Hz</strong> P</td>
+<td>Model-dependent; research module envelope NR</td>
+<td>Per-taxel data used in research; underlying magnetic access NR</td>
+<td>Research acquisition exists; commercial API terms verify</td>
+<td>Maintained public package not confirmed</td>
+<td>Medium unless supplied integrated</td>
+<td><strong>Quote required</strong></td>
+<td>P1–P4</td>
+</tr>
+<tr>
+<td><strong>XELA uSkin LEAP</strong></td>
+<td>Magnetic distributed sensing</td>
+<td>Integrated commercial package</td>
+<td><strong>B</strong>; research on Allegro</td>
+<td><strong>368 taxels</strong>, fingertips/links/palm M</td>
+<td>Yes</td>
+<td>Tri-axis signals/forces; temperature</td>
+<td><strong>Up to 220 Hz full-hand</strong> M</td>
+<td>LEAP-specific curved tips and patches</td>
+<td>Raw and calibrated access advertised</td>
+<td>Python/C++; uAI</td>
+<td>ROS/ROS2 advertised</td>
+<td>Low–medium</td>
+<td><strong>Quote required</strong></td>
+<td>X1–X3</td>
+</tr>
+<tr>
+<td><strong>AnySkin</strong></td>
+<td>Magnetized elastomer over magnetometers</td>
+<td>Fabricate or purchase compatible components</td>
+<td><strong>A—demo</strong>, not LEAP learning benchmark</td>
+<td>Standard design: <strong>5 magnetometers / 15 values</strong></td>
+<td>Shear-sensitive magnetic signal; force needs calibration</td>
+<td>(5\times3) magnetic readings</td>
+<td><strong>100 Hz</strong> in learning studies P</td>
+<td>Approximately <strong>2 mm skin</strong>; total package depends on PCB/mount</td>
+<td>Yes</td>
+<td>Open Python/software</td>
+<td>Core ROS package not verified</td>
+<td>Medium</td>
+<td>Complete current system cost not established</td>
+<td>A1–A2</td>
+</tr>
+<tr>
+<td><strong>WowSkin</strong></td>
+<td>Commercial AnySkin-derived magnetic skin</td>
+<td>Commercial listing</td>
+<td><strong>B claim:</strong> vendor describes LEAP structural parts</td>
+<td>Exact purchased configuration verify</td>
+<td>Magnetic shear sensitivity; calibration verify</td>
+<td>Magnetic signals</td>
+<td>Configuration-specific rate not confirmed</td>
+<td>Variant-dependent</td>
+<td>Vendor software exposes readings; protocol completeness verify</td>
+<td>Public MIT-licensed software</td>
+<td>Not confirmed</td>
+<td>Potentially low; stock/adapter uncertainty</td>
+<td><strong>$128 displayed standard variant</strong>, availability ambiguous</td>
+<td>No independent WowSkin papers found</td>
+</tr>
+<tr>
+<td><strong>eFlesh</strong></td>
+<td>Magnets in printed compliant microstructures</td>
+<td>TPU printing, magnets, PCB</td>
+<td>No verified LEAP study</td>
+<td>Five-magnetometer research configuration; geometry customizable</td>
+<td>Shear-sensitive</td>
+<td>Raw magnetic features or learned estimates</td>
+<td><strong>100 Hz</strong> P</td>
+<td>Custom</td>
+<td>Yes</td>
+<td>Open design/code</td>
+<td>Not confirmed</td>
+<td>Medium–high</td>
+<td>Full BOM not established; <strong>“&lt;$5” is not a complete-sensor price</strong></td>
+<td>E1</td>
+</tr>
+<tr>
+<td><strong>ReSkin</strong></td>
+<td>Magnetic elastomer</td>
+<td>Casting, electronics, often pulse magnetization</td>
+<td>No verified LEAP manipulation paper</td>
+<td>Layout-dependent</td>
+<td>Yes, through magnetic response/calibration</td>
+<td>(N\times3) magnetic values</td>
+<td><strong>30 Hz D’Manus; 78 Hz palm study</strong> P</td>
+<td>Custom; examples use thin skins</td>
+<td>Yes</td>
+<td>Open</td>
+<td>Not uniform across projects</td>
+<td>High</td>
+<td>Configuration-specific BOM</td>
+<td>R1–R3</td>
+</tr>
+<tr>
+<td><strong>GelSight Mini</strong></td>
+<td>Camera images of illuminated elastomer</td>
+<td>Commercial sensor + adapter</td>
+<td><strong>A—control</strong>, additional thesis</td>
+<td>Dense contact images/depth</td>
+<td>Inferred through markers/deformation/model</td>
+<td>RGB; reconstructed depth/point cloud</td>
+<td><strong>25 FPS</strong> M; LEAP depth delay <strong>&gt;70 ms</strong> P</td>
+<td><strong>18.6 × 14.3 mm field of view</strong> M; not housing size</td>
+<td>Yes</td>
+<td><code>gsrobotics</code>, Python</td>
+<td>Integration support should be confirmed</td>
+<td>Medium</td>
+<td><strong>$510 system / $560 robotics package</strong></td>
+<td>G1–G3</td>
+</tr>
+<tr>
+<td><strong>DIGIT</strong></td>
+<td>Optical elastomer</td>
+<td>Commercial sensor + adapter</td>
+<td>LEAP redesign thesis; stronger Allegro evidence</td>
+<td>Dense images</td>
+<td>Inferred, not native calibrated taxel force</td>
+<td>RGB; learned depth/features</td>
+<td>Original paper: <strong>640×480 at 60 FPS</strong>; studies also use 30 Hz</td>
+<td>Original paper: <strong>20×27×18 mm</strong>, 20 g</td>
+<td>Yes</td>
+<td><code>digit-interface</code></td>
+<td>Wrappers exist; supported package verify</td>
+<td>Medium</td>
+<td><strong>$355</strong></td>
+<td>D1–D4</td>
+</tr>
+<tr>
+<td><strong>9DTact</strong></td>
+<td>Optical deformation/intensity</td>
+<td>DIY or supplier-built</td>
+<td><strong>A—demo</strong>, real LEAP teleoperation</td>
+<td>Dense image/depth</td>
+<td>Learned net 6D wrench; not independent shear per pixel</td>
+<td>Images, shape, estimated wrench</td>
+<td>LEAP system <strong>20 Hz</strong>; camera maximum not verified</td>
+<td>Not confirmed here</td>
+<td>Yes</td>
+<td>Open code</td>
+<td>Repository includes ROS shape/force code</td>
+<td>Medium–high</td>
+<td>Supplier quote / current price unverified</td>
+<td>N1–N2</td>
+</tr>
+<tr>
+<td><strong>TwinTac</strong></td>
+<td>MEMS pressure beneath elastomer</td>
+<td>PCB, molding, electronics</td>
+<td><strong>A—policy</strong></td>
+<td><strong>8 pressure channels per fingertip</strong></td>
+<td>No demonstrated calibrated distributed shear</td>
+<td>Pressure; binarized in LEAP policy</td>
+<td><strong>55 Hz</strong> original 8-channel sensor P</td>
+<td>Custom curved LEAP version</td>
+<td>Yes</td>
+<td>Research code</td>
+<td>Not confirmed</td>
+<td>High</td>
+<td>Complete system cost not established</td>
+<td>T1–T2</td>
+</tr>
+<tr>
+<td><strong>Bio-Skin</strong></td>
+<td>Hall, piezoresistive and thermal components</td>
+<td>Multilayer fabrication</td>
+<td>LEAP project demonstration; paper uses other hand</td>
+<td>Multimodal fingertip measurements</td>
+<td>Separate shear-sensitive elements</td>
+<td>Normal/shear/temperature</td>
+<td>Not confirmed for LEAP</td>
+<td>Custom</td>
+<td>Research design</td>
+<td>Research code/design</td>
+<td>Not confirmed</td>
+<td>High</td>
+<td>Complete LEAP BOM not established</td>
+<td>B1</td>
+</tr>
+<tr>
+<td><strong>DenseTact / TensorTouch</strong></td>
+<td>Curved optical elastomer</td>
+<td>Custom fabrication and calibration</td>
+<td>LEAP research mention; exact configuration unresolved</td>
+<td>Dense deformation/contact fields</td>
+<td>TensorTouch estimates stress components</td>
+<td>Images, geometry, learned stress</td>
+<td>Configuration-dependent</td>
+<td>Multiple distinct prototypes</td>
+<td>Yes in research</td>
+<td>Project code/design varies</td>
+<td>Configuration-dependent</td>
+<td>High–very high</td>
+<td>Complete procurement cost unavailable</td>
+<td>C1–C3</td>
+</tr>
+<tr>
+<td><strong>FSR baseline</strong></td>
+<td>Resistive scalar contact/force response</td>
+<td>Commercial components + wiring</td>
+<td>Multiple direct LEAP implementations</td>
+<td>One value per element</td>
+<td>No</td>
+<td>Scalar / binary contact</td>
+<td>Electronics-dependent</td>
+<td>Small, geometry-dependent</td>
+<td>Yes</td>
+<td>Simple acquisition</td>
+<td>Custom</td>
+<td>Low–medium</td>
+<td>Low component cost; see §9</td>
+<td>LEAP v2, AURORA</td>
+</tr>
+</tbody></table></div>
+<p>Primary hardware/software sources: <a href="https://www.paxini.com/news/ax/gen3" target="_blank" rel="noopener noreferrer">PaXini GEN3</a>, <a href="https://www.paxini.com/cn/ax/gen4" target="_blank" rel="noopener noreferrer">GEN4</a>, <a href="https://xelarobotics.com/products/for-leap-hand/" target="_blank" rel="noopener noreferrer">XELA LEAP</a>, <a href="https://xelarobotics.com/uai-software/" target="_blank" rel="noopener noreferrer">XELA uAI</a>, <a href="https://github.com/raunaqbhirangi/anyskin" target="_blank" rel="noopener noreferrer">AnySkin</a>, <a href="https://shop.wowrobo.com/products/enhanced-anyskin-premium-crafted-editionwowskin" target="_blank" rel="noopener noreferrer">WowSkin</a>, <a href="https://e-flesh.com/" target="_blank" rel="noopener noreferrer">eFlesh</a>, <a href="https://reskin.dev/" target="_blank" rel="noopener noreferrer">ReSkin</a>, <a href="https://www.gelsight.com/wp-content/uploads/productsheet/Mini/GS_Mini_4.3.24.pdf" target="_blank" rel="noopener noreferrer">Mini specification sheet</a>, <a href="https://www.gelsight.com/online-store/" target="_blank" rel="noopener noreferrer">GelSight store</a>, <a href="https://github.com/linchangyi1/9DTact" target="_blank" rel="noopener noreferrer">9DTact repository</a>.</p>
+<hr>
+</div></details><details id="codex-chapter-5" ><summary>5. Sensor-by-Sensor Analysis</summary><div class="archive-body"><h3>PaXini: strongest direct LEAP learning evidence</h3>
+<p>The important evidence is <strong>not</strong> its advertised sensitivity. It is that multiple researchers have used spatial tri-axis observations on LEAP for real manipulation.</p>
+<p>Its main advantage is a representation naturally suited to contact-state learning: contact location, force direction, and interactions between fingers. The 3DTacDex and AdapTac implementations provide particularly relevant starting points, including <a href="https://github.com/tianhaowuhz/3dtacdex" target="_blank" rel="noopener noreferrer">policy code</a> and <a href="https://github.com/kingchou007/adaptac-dex" target="_blank" rel="noopener noreferrer">AdapTac code</a>.</p>
+<p><strong>Limitations</strong></p>
+<ul>
+<li>Research modules and current generations cannot yet be matched confidently.</li>
+<li>Maximum output frequency is not a verified synchronized full-LEAP rate.</li>
+<li>Manufacturer “spatial resolution” should not be interpreted as taxel pitch.</li>
+<li>Magnetic/elastomer responses need calibration and can exhibit coupling.</li>
+</ul>
+<p>An independent insertion paper documents nonuniformity, cross-instance differences, and spurious shear in an <strong>older GEN1 model</strong>. That is useful negative evidence, but not proof that current models have identical errors. <a href="https://arxiv.org/html/2505.02915v2" target="_blank" rel="noopener noreferrer">P4</a></p>
+<p>Current manufacturer pages advertise different sensitivity thresholds—<strong>0.01 N for GEN3 versus 0.005 N for GEN4</strong>—and laboratory durability/range claims. These are generation-specific specifications, not independently established performance on LEAP. <a href="https://www.paxini.com/news/ax/gen3" target="_blank" rel="noopener noreferrer">GEN3</a>, <a href="https://www.paxini.com/cn/ax/gen4" target="_blank" rel="noopener noreferrer">GEN4</a></p>
+<h3>XELA uSkin: strongest integrated infrastructure option</h3>
+<p>XELA’s appeal is a coherent hand-level system rather than a loose set of sensing modules. Its official package covers fingertips, intermediate contact surfaces, and palm.</p>
+<p>The research ecosystem is also directly relevant: representation pretraining, residual reinforcement learning, and spatial/temporal tactile encoders have all been demonstrated using uSkin on Allegro.</p>
+<p><strong>Limitations</strong></p>
+<ul>
+<li>Those Allegro results do not constitute LEAP policy validation.</li>
+<li>Calibration and magnetic compensation matter.</li>
+<li>A tactile array’s mechanical compliance changes contact behavior.</li>
+<li>“Shear sensing” does not mean a validated incipient-slip classifier is included.</li>
+</ul>
+<p>The current software page lists slip detection as <strong>“Coming Soon.”</strong> Buy the sensing capability on its documented merits; do not budget around an already delivered turnkey slip classifier. <a href="https://xelarobotics.com/uai-software/" target="_blank" rel="noopener noreferrer">XELA software</a></p>
+<h3>GelSight Mini: best-supported LEAP optical choice</h3>
+<p>Mini is attractive when the research depends on <strong>local geometry, cable orientation, contact shape, or deformation</strong>, rather than only force direction.</p>
+<p>The LEAP cable-following project provides a concrete starting point, including <a href="https://github.com/Mingrui-Yu/DLO_following" target="_blank" rel="noopener noreferrer">hardware/code resources</a>. Its geometry-driven feedback is useful evidence even though it is not a learned dexterous policy.</p>
+<p><strong>Limitations</strong></p>
+<ul>
+<li>The LEAP paper reports depth-image arrival delays above 70 ms on its implementation.</li>
+<li>Camera housing and adapters alter fingertip geometry.</li>
+<li>Gel wear and surface condition change observations.</li>
+<li>Depth reconstruction is not calibrated pressure or shear force.</li>
+</ul>
+<p>The official software documentation also states that Mini is not a metrology instrument with a quantified universal measurement accuracy. <a href="https://github.com/gelsightinc/gsrobotics" target="_blank" rel="noopener noreferrer">Mini software and FAQ</a></p>
+<h3>AnySkin: strong low-dimensional learning platform, weaker LEAP validation</h3>
+<p>AnySkin offers open raw signals and replaceable sensing material. Its demonstrated strength is learning directly from uncalibrated magnetic observations while reducing sensitivity to skin replacement.</p>
+<p>However, the distinction matters:</p>
+<p><strong>The paper shows LEAP adaptability; the substantive learning benchmarks use grippers.</strong></p>
+<p>It is therefore a strong prototype or secondary option, but not better supported than PaXini or XELA for this specific hand.</p>
+<p>Known concerns include magnetic interference, remaining skin-to-skin variation, and the difference between raw magnetic features and physical force measurements. <a href="https://arxiv.org/html/2409.08276v3" target="_blank" rel="noopener noreferrer">AnySkin paper</a></p>
+<h3>WowSkin: potentially convenient, evidence currently vendor-led</h3>
+<p>WowSkin may reduce AnySkin fabrication burden. The vendor describes LEAP structural integration, and software is <a href="https://github.com/WowRobo-Robotics/WowSkin" target="_blank" rel="noopener noreferrer">publicly available</a>.</p>
+<p>I did not find independent papers establishing that a purchased WowSkin unit reproduces AnySkin’s reported learning or replacement-transfer results. <strong>AnySkin papers should not be listed as direct WowSkin adoption.</strong></p>
+<p>The product page also presents ambiguous availability signals. Treat it as a procurement lead requiring confirmation, not an assured immediately available LEAP kit.</p>
+<h3>eFlesh: particularly interesting for a hardware extension</h3>
+<p>eFlesh replaces cast magnetic skin with printed compliant structures and inserted magnets. This makes geometry and mechanical response part of the design space.</p>
+<p>It is attractive for testing how fingertip compliance or internal structure affects tactile representations. It is less attractive when the objective is to avoid hardware development.</p>
+<p>Its paper demonstrates real gripper manipulation and slip-related learning, but I found no verified LEAP implementation. The frequently repeated <strong>“&lt;$5” concerns magnets, not the complete sensor</strong>. <a href="https://arxiv.org/html/2506.09994v1" target="_blank" rel="noopener noreferrer">eFlesh paper</a></p>
+<h3>ReSkin: flexible research platform with substantial engineering burden</h3>
+<p>ReSkin is well suited to large or unusual sensing surfaces, including the palm. Its strongest relevance here is the Allegro study that learns in-hand translation using both normal and shear-related information.</p>
+<p>The cost is fabrication and system identification: elastomer processing, magnetization, PCB layout, attachment, calibration, and replacement consistency.</p>
+<p>The translation study also changes surface friction with a thin PET layer to make manipulation mechanically feasible. That is a useful reminder that <strong>skin mechanics can dominate the learning problem</strong>. <a href="https://arxiv.org/html/2407.07885v1" target="_blank" rel="noopener noreferrer">In-hand translation paper</a></p>
+<h3>DIGIT: substantial dexterous-manipulation ecosystem, less direct LEAP evidence</h3>
+<p>DIGIT has persuasive Allegro evidence for tactile dynamics and object-state estimation, plus a major software/representation ecosystem.</p>
+<p>The verified LEAP evidence found here is a thesis using a <strong>three-finger redesign</strong>, not a standard four-finger deployment with a mature public benchmark. Its lower purchase price does not erase that integration distinction.</p>
+<p>Also distinguish <strong>DIGIT from DIGIT360</strong>: they are different hardware platforms. Results using DIGIT360 should not be attributed to the purchasable original DIGIT.</p>
+<h3>9DTact: promising direct LEAP mounting evidence</h3>
+<p>9DTact offers open construction, shape reconstruction, and learned wrench estimation. ViHaTeleop strengthens its LEAP relevance through a three-fingertip real deployment.</p>
+<p>However, that paper’s downstream policy comparisons are simulated. It does not yet provide the same autonomous real-LEAP learning evidence as PaXini.</p>
+<h3>TwinTac and Bio-Skin: useful custom-system candidates</h3>
+<p><strong>TwinTac</strong> has direct LEAP policy use, but its signals were binarized. The result supports its utility for contact coverage and calibrated simulation, not a claim of rich force-vector perception.</p>
+<p><strong>Bio-Skin</strong> combines modalities that could be valuable for material interaction, but requires custom fabrication. Its later LEAP demonstration should be distinguished from its paper’s main robot experiments.</p>
+<h3>DenseTact / TensorTouch: high-value research, high engineering commitment</h3>
+<p>This family addresses curved contact coverage and dense deformation/stress estimation. TensorTouch is especially relevant if recovering distributed shear becomes a secondary contribution.</p>
+<p>Its calibration workflow uses substantial instrumentation and modeling. It is not a practical substitute for ordering a supported sensor when manipulation learning is the main research contribution. <a href="https://arxiv.org/html/2506.08291v1" target="_blank" rel="noopener noreferrer">TensorTouch</a></p>
+<hr>
+</div></details><details id="codex-chapter-6" ><summary>6. Representative Papers</summary><div class="archive-body"><p>The entries below distinguish <strong>actual sensor adoption</strong> from related-family work. Where fewer than three qualifying papers were found, that is stated rather than filling the list with weak matches.</p>
+<h3>PaXini — four relevant papers</h3>
+<p><strong>P1. Canonical Representation and Force-Based Pretraining of 3D Tactile for Dexterous Visuo-Tactile Policy Learning.</strong><br>Tianhao Wu, Jinzhou Li, Jiyao Zhang, Mingdong Wu, Hao Dong. <strong>ICRA 2025.</strong> <a href="https://arxiv.org/html/2409.17549v2" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Real LEAP/JAKA setup; tip/pad arrays. Graph-based force pretraining feeds a visuotactile diffusion policy. Matched vision-only and representation ablations demonstrate benefit; ten trials per task limit precision. See §2 for configuration and results.</p>
+<p><strong>P2. Adaptive Visuo-Tactile Fusion with Predictive Force Attention for Dexterous Manipulation.</strong><br>Jinzhou Li, Tianhao Wu, Jiyao Zhang, Zeyuan Chen, Haotian Jin, Mingdong Wu, Yujun Shen, Yaodong Yang, Hao Dong. <strong>IROS 2025.</strong> <a href="https://arxiv.org/html/2505.13982v1" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Real LEAP/Flexiv system. Predictive force features guide fusion with visual point clouds. Both modality and fusion comparisons are provided. A naïve tactile-concatenation baseline achieves only 40% average success, illustrating that tactile observations require suitable modeling.</p>
+<p><strong>P3. When Does Touch Matter? Charting the Vision–Interaction Gap in Cluttered Dexterous Grasping.</strong><br>Hao Jiang, Luis Dominguez, Daniel Seita. <strong>2026 arXiv preprint.</strong> <a href="https://arxiv.org/html/2609.24068v1" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Real LEAP/xArm7, four high-density tactile fingertips. An attention encoder processes position/force tokens for diffusion learning. Vision, taxels, estimated wrenches, and combinations are compared: 14/25, 18/25, and 24/25 successes for vision, vision-plus-taxels, and the combined system respectively. Very recent and small-scale.</p>
+<p><strong>P4. Zero-shot Sim2Real Transfer for Magnet-Based Tactile Sensor on Insertion Tasks.</strong><br>Beining Han, Abhishek Joshi, Jia Deng. <strong>2025 preprint; updated 2026.</strong> <a href="https://arxiv.org/html/2505.02915v2" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p><strong>Not LEAP:</strong> FR3 with two custom gripper fingers and <strong>PX6AX-GEN1-PAP-L4629</strong> pads. CNN tactile histories support asymmetric SAC transfer. Real insertion averages 80%, versus 15% without tactile and 33% with binarized tactile. Particularly useful for its sensor-error analysis and continuous-versus-binary comparison.</p>
+<h3>XELA uSkin — three strong dexterous-learning papers</h3>
+<p><strong>X1. Dexterity from Touch: Self-Supervised Pre-Training of Tactile Representations with Robotic Play.</strong><br>Irmak Guzey, Ben Evans, Soumith Chintala, Lerrel Pinto. <strong>CoRL 2023.</strong> <a href="https://proceedings.mlr.press/v229/guzey23a.html" target="_blank" rel="noopener noreferrer">Proceedings</a>, <a href="https://arxiv.org/html/2303.12076v1" target="_blank" rel="noopener noreferrer">paper</a></p>
+<p>Real Allegro with fifteen 4×4 tri-axis pads. Signals become a padded tactile image for BYOL pretraining and nearest-neighbor imitation. Demonstrates downstream benefit from tactile play representations; explicitly discusses uncalibrated sensing, hysteresis, and magnetic interference.</p>
+<p><strong>X2. See to Touch: Learning Tactile Dexterity through Visual Incentives.</strong><br>Irmak Guzey, Yinlong Dai, Ben Evans, Soumith Chintala, Lerrel Pinto. <strong>ICRA 2024.</strong> <a href="https://arxiv.org/html/2309.12300v1" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Real Allegro/Jaco, fifteen uSkin pads. A pretrained tactile encoder supports residual reinforcement learning, with visual imitation rewards. Includes tactile-related comparisons across dexterous tasks. This is evidence for tactile-conditioned learning on another hand, not direct LEAP validation.</p>
+<p><strong>X3. Self-supervised Perception for Tactile Skin Covered Dexterous Hands.</strong><br>Akash Sharma, Carolina Higuera, Chaithanya Krishna Bodduluri, Zixi Liu, Taosha Fan, Tess Hellebrekers, Mike Lambeta, Byron Boots, Michael Kaess, Tingfan Wu, Francois Robert Hogan, Mustafa Mukadam. <strong>CoRL 2025.</strong> <a href="https://proceedings.mlr.press/v305/sharma25a.html" target="_blank" rel="noopener noreferrer">Proceedings</a>, <a href="https://arxiv.org/html/2505.11420v1" target="_blank" rel="noopener noreferrer">paper</a></p>
+<p>Real Allegro/Franka with eighteen pads totaling 368 taxels. A spatial/temporal transformer uses magnetic histories and taxel positions. Evaluates perception and downstream insertion learning. Especially relevant to full-hand representations rather than flattening all channels.</p>
+<h3>GelSight Mini — three directly relevant sources</h3>
+<p><strong>G1. In-Hand Following of Deformable Linear Objects Using Dexterous Fingers with Tactile Sensing.</strong><br>Mingrui Yu, Boyuan Liang, Xiang Zhang, Xinghao Zhu, Lingfeng Sun, Changhao Wang, Shiji Song, Xiang Li, Masayoshi Tomizuka. <strong>IROS 2024.</strong> <a href="https://arxiv.org/html/2403.12676v2" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Real LEAP/FANUC system. Two Mini sensors provide geometry for cable-following control. Comparison with a parallel-gripper approach is informative, but not a clean learned-policy tactile/no-tactile ablation. Its latency and kinematic limitations are unusually relevant to integration.</p>
+<p><strong>G2. A Dexterous Multi-Finger Robotic Manipulator Framework for Intuitive Teleoperation and Contact-Rich Imitation Learning.</strong><br>Clemens Fritze. <strong>2025 master’s thesis, Montanuniversität Leoben.</strong> <a href="https://pure.unileoben.ac.at/en/publications/a-dexterous-multi-finger-robotic-manipulator-framework-for-intuit/" target="_blank" rel="noopener noreferrer">Institutional record</a></p>
+<p>Real LEAP, Franka Panda, Mini sensing, and Quest-based teleoperation. Compares representation approaches for contact-rich imitation. The accessible institutional abstract supports the system identification; exact sensor count and detailed ablations were not independently recoverable. Treat as weaker evidence than G1.</p>
+<p><strong>G3. Sparsh: Self-supervised Touch Representations for Vision-Based Tactile Sensing.</strong><br>Carolina Higuera, Akash Sharma, Chaithanya Krishna Bodduluri, Taosha Fan, Patrick Lancaster, Mrinal Kalakrishnan, Michael Kaess, Byron Boots, Mike Lambeta, Tingfan Wu, Mustafa Mukadam. <strong>CoRL 2024.</strong> <a href="https://openreview.net/forum?id=xYJn2e1uu8" target="_blank" rel="noopener noreferrer">Paper</a>, <a href="https://github.com/facebookresearch/sparsh" target="_blank" rel="noopener noreferrer">repository</a></p>
+<p>Uses multiple optical sensor datasets, including Mini and DIGIT. Self-supervised encoders support force, slip, and other tactile tasks. Mini force/slip data and inference examples are available. This supports representation infrastructure; it is not a Mini-on-LEAP policy demonstration.</p>
+<p>A foundational reference is <strong>GelSight: High-Resolution Robot Tactile Sensors for Estimating Geometry and Force</strong>, Wenzhen Yuan, Siyuan Dong, Edward H. Adelson, <strong>Sensors 2017</strong>. It describes the broader technology, not adoption of the later commercial Mini. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5751610/" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<h3>AnySkin — two verified core papers</h3>
+<p><strong>A1. AnySkin: Plug-and-play Skin Sensing for Robotic Touch.</strong><br>Raunaq Bhirangi, Venkatesh Pattabiraman, Enes Erciyes, Yifeng Cao, Tess Hellebrekers, Lerrel Pinto. <strong>ICRA 2025.</strong> <a href="https://arxiv.org/html/2409.08276v3" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Real gripper experiments use five magnetometers and replaceable skin. Temporal magnetic features support slip detection; learned policies are tested across skin changes. The LEAP illustration establishes adaptability, not an autonomous LEAP benchmark.</p>
+<p><strong>A2. Learning Precise, Contact-Rich Manipulation through Uncalibrated Tactile Skins.</strong><br>Venkatesh Pattabiraman, Yifeng Cao, Siddhant Haldar, Lerrel Pinto, Raunaq Bhirangi. <strong>2024 arXiv preprint.</strong> <a href="https://arxiv.org/html/2410.17246v1" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Real xArm7 gripper, one AnySkin-equipped finger. Raw 15-dimensional tactile observations become tokens in a transformer imitation policy. Four contact-rich tasks show an average <strong>27.5 percentage-point</strong> improvement over vision-only learning. This is strong policy-input evidence, but not dexterous-hand evidence.</p>
+<p><strong>WowSkin:</strong> no independent research-adoption papers were verified. A1–A2 concern AnySkin, not automatically WowSkin.</p>
+<h3>eFlesh — one verified core paper</h3>
+<p><strong>E1. eFlesh: Highly Customizable Magnetic Touch Sensing Using Cut-Cell Microstructures.</strong><br>Venkatesh Pattabiraman, Zizhou Huang, Daniele Panozzo, Denis Zorin, Lerrel Pinto, Raunaq Bhirangi. <strong>2025 arXiv preprint.</strong> <a href="https://arxiv.org/html/2506.09994v1" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Printed magnetic tactile structures on real grippers support transformer-based contact-rich imitation and slip-related learning. Raw magnetic input is used rather than requiring a universally calibrated force map. Demonstrated learning benefits justify investigation, but neither LEAP deployment nor a mature multi-paper adoption record was established.</p>
+<h3>ReSkin and derivatives — three papers</h3>
+<p><strong>R1. ReSkin: Versatile, Replaceable, Lasting Tactile Skins.</strong><br>Raunaq Bhirangi, Tess Hellebrekers, Carmel Majidi, Abhinav Gupta. <strong>CoRL 2021; proceedings published 2022.</strong> <a href="https://proceedings.mlr.press/v164/bhirangi22a.html" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Foundational replaceable magnetic-skin work. Bench and robot experiments study sensing, calibration, and replacement. Relevant to transferable tactile representations, but not direct LEAP policy learning.</p>
+<p><strong>R2. All the Feels: A Dexterous Hand with Large Area Sensing.</strong><br>Raunaq Bhirangi, Abigail DeFranco, Jacob Adkins, Carmel Majidi, Abhinav Gupta, Tess Hellebrekers, Vikash Kumar. <strong>RA-L 2023.</strong> <a href="https://arxiv.org/html/2210.15658v1" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>D’Manus three-finger hand with 56 magnetometers across fingers and palm. MLP/LSTM models classify properties and support real sorting demonstrations. Establishes large-area sensing feasibility; does not establish learned LEAP in-hand manipulation.</p>
+<p><strong>R3. Learning In-Hand Translation Using Tactile Skin With Shear and Normal Force Sensing.</strong><br>Jessica Yin, Haozhi Qi, Jitendra Malik, James Pikul, Mark Yim, Tess Hellebrekers. <strong>ICRA 2025.</strong> <a href="https://arxiv.org/html/2407.07885v1" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Allegro with a sixteen-magnetometer palm skin. PPO-based training and teacher–student transfer use discretized normal/shear observations plus proprioceptive history. Real comparisons against reduced tactile modalities make this one of the most relevant studies for your tactile/proprioceptive objective.</p>
+<h3>DIGIT — four relevant papers/sources</h3>
+<p><strong>D1. DIGIT: A Novel Design for a Low-Cost Compact High-Resolution Tactile Sensor with Application to In-Hand Manipulation.</strong><br>Mike Lambeta, Po-Wei Chou, Stephen Tian, Brian Yang, B. Maloon, Victoria Rose Most, Dave Stroud, Raymond Santos, Ahmad Byagowi, Gregg Kammerer, Dinesh Jayaraman, Roberto Calandra. <strong>RA-L 2020.</strong> <a href="https://www.seas.upenn.edu/~dineshj/publication/lambeta-2020-digit/lambeta-2020-digit.pdf" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Real Allegro fingertip manipulation of a marble. A learned tactile dynamics model supports control. Foundational direct dexterous-manipulation evidence; original bulk-manufacturing BOM estimates should not be confused with current retail pricing.</p>
+<p><strong>D2. NeuralFeels with Neural Fields: Visuotactile Perception for In-Hand Manipulation.</strong><br>Sudharshan Suresh, Haozhi Qi, Tingfan Wu, Taosha Fan, Luis Pineda, Mike Lambeta, Jitendra Malik, Mrinal Kalakrishnan, Roberto Calandra, Michael Kaess, Joseph Ortiz, Mustafa Mukadam. <strong>Science Robotics 2024.</strong> <a href="https://arxiv.org/html/2312.13469v1" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Real Allegro/Panda with four DIGIT fingertips. Tactile depth and vision feed neural-field object reconstruction and tracking. <strong>The manipulation policy is proprioceptive:</strong> this paper demonstrates tactile perception benefit, not tactile-conditioned policy improvement.</p>
+<p><strong>D3. Sparsh: Self-supervised Touch Representations for Vision-Based Tactile Sensing.</strong><br>Higuera and colleagues, full author list under G3. <strong>CoRL 2024.</strong> <a href="https://openreview.net/forum?id=xYJn2e1uu8" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Includes DIGIT datasets and dexterous-hand perception tasks. Useful pretrained encoders and benchmarks; distinguish encoder evaluation from closed-loop manipulation success.</p>
+<p><strong>D4. Feeling the Future: Dexterous Bolt Manipulation in Robotics Using Optical Tactile Sensing.</strong><br>Catherine M. Ruiz. <strong>2026 senior thesis, Princeton University.</strong> <a href="https://theses-dissertations.princeton.edu/entities/publication/270fe74d-920c-4efd-988f-675149fe98ae" target="_blank" rel="noopener noreferrer">Institutional record</a></p>
+<p>Real three-finger LEAP redesign with two DIGIT sensors and FR3. Uses tactile contact features for bolt-related learning. The abstract reports reduced validation loss and a threading classifier; the restricted full text prevents a complete independent hardware/ablation audit.</p>
+<p><strong>Separate platform:</strong> <em>Tactile Beyond Pixels: Multisensory Touch Representations for Robot Manipulation</em>, Carolina Higuera, Akash Sharma, Taosha Fan, Chaithanya Krishna Bodduluri, Byron Boots, Michael Kaess, Mike Lambeta, Tingfan Wu, Zixi Liu, Francois Robert Hogan, Mustafa Mukadam, <strong>CoRL 2025</strong>, uses <strong>DIGIT360</strong> on Allegro. It is relevant multimodal research, but not evidence about original DIGIT hardware. <a href="https://proceedings.mlr.press/v305/higuera25a.html" target="_blank" rel="noopener noreferrer">Proceedings</a></p>
+<h3>9DTact — two papers</h3>
+<p><strong>N1. 9DTact: A Compact Vision-Based Tactile Sensor for Accurate 3D Shape Reconstruction and Generalizable 6D Force Estimation.</strong><br>Changyi Lin, Han Zhang, Jikai Xu, Lei Wu, Huazhe Xu. <strong>RA-L 2023 / ICRA 2024 presentation.</strong> <a href="https://arxiv.org/abs/2308.14277" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Sensor characterization and learning from tactile images; shape recovery and a learned six-dimensional wrench estimator. This is sensor capability evidence, not a LEAP policy result.</p>
+<p><strong>N2. ViHaTeleop: A Low-Cost, Lightweight Visual-Haptic Teleoperation System for Dexterous Manipulation Learning.</strong><br>Fucai Zhu, Yanhou Lai, Paul Maestre, Koichi Hashimoto. <strong>2026 arXiv preprint.</strong> <a href="https://arxiv.org/html/2608.16572v1" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Real LEAP/FR3, three tactile fingertips, deformation-driven human haptic feedback. Two study tasks are real and four simulated. The downstream imitation-learning improvements are simulated and should not be reported as real autonomous LEAP success.</p>
+<h3>TwinTac — two papers</h3>
+<p><strong>T1. TwinTac: A Wide-Range, Highly Sensitive Tactile Sensor with Real-to-Sim Digital Twin Sensor Model.</strong><br>Xiyan Huang, Zhe Xu, Chenxi Xiao. <strong>IROS 2025.</strong> <a href="https://arxiv.org/html/2509.10063v1" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Eight embedded MEMS pressure sensors, molded elastomer, and a finite-element digital twin. Characterization and recognition experiments establish the sensor model; not a dexterous policy comparison.</p>
+<p><strong>T2. Blind Dexterous Grasping via Real2Sim2Real Tactile Policy Learning.</strong><br>Shengcheng Luo, Xiyan Huang, Zhe Xu, Wanlin Li, Ziyuan Jiao, Chenxi Xiao. <strong>2026 arXiv preprint.</strong> <a href="https://arxiv.org/html/2606.11767v1" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Real LEAP with four curved TwinTac tips plus FSR coverage. Binary contact observations drive a distilled diffusion policy. Calibration ablation is persuasive, but absolute real success remains modest and distributed shear is not used.</p>
+<h3>Bio-Skin — one paper plus a later LEAP demonstration</h3>
+<p><strong>B1. Bio-Skin: A Cost-Effective Thermostatic Tactile Sensor with Multi-Modal Force and Temperature Detection.</strong><br>Haoran Guo, Haoyang Wang, Zhengxiong Li, Lingfeng Tao. <strong>IROS 2025.</strong> <a href="https://williamalexanda.github.io/Bio-Skin/" target="_blank" rel="noopener noreferrer">Project and paper links</a></p>
+<p>Real Allegro experiments use combined magnetic, piezoresistive, and thermal sensing. The project separately shows LEAP mounting. No verified LEAP tactile-conditioned policy ablation was found.</p>
+<h3>DenseTact / TensorTouch — three related, distinct systems</h3>
+<p><strong>C1. DenseTact-Mini: An Optical Tactile Sensor for Grasping Multi-Scale Objects From Flat Surfaces.</strong><br>Won Kyung Do, Ankush Kundan Dhawan, Mathilda Kitzmann, Monroe Kennedy III. <strong>ICRA 2024.</strong> <a href="https://arxiv.org/html/2309.08860v1" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Real Allegro small-object grasping with specialized tactile tips and nail-assisted strategies. Image-based contact checks support a state machine; this is not a learned LEAP policy benchmark.</p>
+<p><strong>C2. Inter-finger Small Object Manipulation with DenseTact Optical Tactile Sensor.</strong><br>Won Kyung Do, Bianca Aumann, Camille Chungyoun, Monroe Kennedy III. <strong>RA-L 2024, published online 2023.</strong> <a href="https://arxiv.org/html/2308.16480v1" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Custom two-finger rolling gripper, DenseTact 2.0 tips, tactile point clouds, geometric control, and classification. Real manipulation demonstrates curved optical sensing utility on a different mechanism.</p>
+<p><strong>C3. TensorTouch: Calibration of Tactile Sensors for High Resolution Stress Tensor and Deformation for Dexterous Manipulation.</strong><br>Won Kyung Do, Matthew Strong, Aiden Swann, Boshu Lei, Monroe Kennedy III. <strong>2025 preprint; author website lists T-RO 2026.</strong> <a href="https://arxiv.org/html/2506.08291v1" target="_blank" rel="noopener noreferrer">Paper</a></p>
+<p>Custom optical tips, instrumented calibration, finite-element modeling, and a learned deformation/stress estimator support real contact-rich control. The paper text inspected does not establish an exact LEAP model/configuration, so it is not counted as a fully verified LEAP deployment.</p>
+<h3>Additional candidates discovered from the literature</h3>
+<ul>
+<li><strong>Tekscan pressure arrays:</strong> <em>Learning Controlled Separation of Small Objects Between Two Fingers with a Tactile Skin</em>, Ulf Kasolowsky and Berthold Bäuml, <strong>2026 preprint</strong>. A DLR Hand II uses a 4×4 normal-pressure array with PPO and proprioception for separating small objects. Useful normal-only comparison, but no LEAP evidence. <a href="https://arxiv.org/html/2605.31486v1" target="_blank" rel="noopener noreferrer">Paper</a></li>
+<li><strong>BioTac SP:</strong> <em>GradTac: Spatio-Temporal Gradient Based Tactile Sensing</em>, Kanishka Ganguly, Pavan Mantripragada, Chethan M. Parameshwara, Cornelia Fermüller, Nitin J. Sanket, Yiannis Aloimonos, <strong>2022 preprint</strong>. Shadow-hand tactile gradients support slip/contact analysis. Relevant historical infrastructure, but insufficient LEAP support to outrank the shortlist. <a href="https://arxiv.org/abs/2203.07290" target="_blank" rel="noopener noreferrer">Paper</a></li>
+</ul>
+<hr>
+</div></details><details id="codex-chapter-7" ><summary>7. Policy Input and Tactile Representations</summary><div class="archive-body"><h3>Distributed force arrays: PaXini and calibrated uSkin</h3>
+<p>A natural observation is:</p>
+<p>[
+T_t={(p_i(q_t), f_{i,t},m_i)}_{i=1}^{N},
+]</p>
+<p>where (p_i) is taxel position, (f_i) the measured/estimated tri-axis force, and (m_i) an optional validity or contact mask.</p>
+<p>Useful encoders include:</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="비교 표 · 좌우 스크롤 가능"><table>
+<thead>
+<tr>
+<th>Representation</th>
+<th>Suitable model</th>
+<th>Main advantage</th>
+<th>Main risk</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Flattened force vector</td>
+<td>MLP</td>
+<td>Simple, fast baseline</td>
+<td>Tied to a fixed layout</td>
+</tr>
+<tr>
+<td>Per-pad force map</td>
+<td>CNN</td>
+<td>Local spatial structure</td>
+<td>Artificial adjacency when pads are packed into one image</td>
+</tr>
+<tr>
+<td>Position/force tokens</td>
+<td>Transformer or graph network</td>
+<td>Preserves hand geometry</td>
+<td>Requires reliable spatial calibration and adequate data</td>
+</tr>
+<tr>
+<td>Temporal taxel tokens</td>
+<td>Temporal transformer / recurrent encoder</td>
+<td>Captures loading, relaxation, and slip-related changes</td>
+<td>Timestamp and latency errors become consequential</td>
+</tr>
+<tr>
+<td>Learned tactile embedding</td>
+<td>Pretrained encoder + policy</td>
+<td>Data efficiency</td>
+<td>Pretraining distribution may mismatch the task</td>
+</tr>
+</tbody></table></div>
+<p>3DTacDex, AdapTac, and the uSkin representation papers provide concrete implementations of these choices.</p>
+<h3>Magnetic skins: AnySkin, ReSkin, eFlesh</h3>
+<p>Their native signal is generally:</p>
+<p>[
+B_t\in\mathbb{R}^{N_m\times3},
+]</p>
+<p><strong>not automatically force in newtons.</strong></p>
+<p>A useful policy can consume baseline-subtracted magnetic readings and a short history without explicit force calibration. ViSk demonstrates this strategy. For interpretable force control or cross-hardware comparison, calibration becomes much more important.</p>
+<p>Preserve:</p>
+<ul>
+<li>Raw magnetic values.</li>
+<li>Baseline and temperature information where available.</li>
+<li>Skin identity and replacement history.</li>
+<li>Sensor-frame geometry.</li>
+<li>Acquisition timestamps.</li>
+</ul>
+<h3>Optical tactile sensing</h3>
+<p>A typical pipeline is:</p>
+<p>[
+I_t \rightarrow
+\begin{cases}
+z_t &amp; \text{learned embedding}\
+D_t &amp; \text{contact depth/geometry}\
+\hat f_t,\hat s_t &amp; \text{learned force/slip estimates}
+\end{cases}
+\rightarrow \pi(q_t,\dot q_t,\cdot).
+]</p>
+<p>Use raw images when representation learning is central. Use geometry or compact features when the task has clear structure, such as cable orientation. Sparsh provides an existing representation starting point; NeuralFeels illustrates tactile geometry for object-state estimation.</p>
+<p><strong>Do not equate an optical sensor’s pixel count with independent force measurements.</strong> Likewise, a learned six-axis wrench is one net force/torque estimate, not six measurements at every contact location.</p>
+<h3>Recommended experimental design</h3>
+<p>For your project, compare the following using the <strong>same hardware and controller</strong>:</p>
+<ol>
+<li>Proprioception only.</li>
+<li>Proprioception plus binary contact.</li>
+<li>Proprioception plus normal-related sensing.</li>
+<li>Proprioception plus full tri-axis tactile information.</li>
+<li>The same signals with spatial and temporal encoding.</li>
+</ol>
+<p>Then test held-out objects, different days, replacement skins, altered friction, and partial sensor dropout.</p>
+<p>This isolates the contribution of tactile information and representation more convincingly than comparing unrelated sensor systems.</p>
+<hr>
+</div></details><details id="codex-chapter-8" ><summary>8. Practical LEAP Integration</summary><div class="archive-body"><h3>Fingertips</h3>
+<p>Begin with fingertips when the task is precision grasping, reorientation, or slip recovery. Check the complete fingertip envelope, not only the active sensing surface.</p>
+<p>A mount must preserve opposing-finger contact and avoid collisions through the full joint range. Added thickness changes reachable grasps and the correspondence between simulated and real contact geometry.</p>
+<h3>Finger pads and phalanges</h3>
+<p>Pad coverage is especially valuable when objects roll or transfer contact away from the tip. A fingertip-only configuration can become effectively blind during these transitions.</p>
+<p>PaXini’s tip-plus-pad research configuration is a useful precedent. XELA provides broader documented coverage, while custom skins offer more freedom at greater engineering cost.</p>
+<h3>Palm</h3>
+<p>Palm sensing matters for enveloping grasps and palm-supported translation. The ReSkin-derived Allegro translation work makes this particularly relevant to tactile/proprioceptive research.</p>
+<p>Do not add palm sensing solely to maximize channel count: first establish that the planned tasks make meaningful palm contact.</p>
+<h3>Wiring and communication</h3>
+<p>XELA documents consolidated hand-level wiring. For custom magnetic arrays, account for bus addressing, multiplexing, acquisition scheduling, and strain relief. Multiple USB optical sensors require practical testing of controller bandwidth, power, cable movement, and dropped frames.</p>
+<p>For all systems, measure <strong>contact-to-policy latency and jitter</strong>. A nominal sampling rate does not answer that question.</p>
+<h3>Compute</h3>
+<p>Compact magnetic/force arrays can support inexpensive low-latency encoders. Optical sensing may require several image streams plus reconstruction or feature extraction. Benchmark the complete pipeline on the intended computer before choosing the control rate.</p>
+<p>Record tactile and joint signals independently at their useful acquisition rates, then synchronize explicitly. Do not discard high-rate observations merely because the initial policy runs slowly.</p>
+<h3>Fast prototype candidates</h3>
+<div class="table-wrap" tabindex="0" role="region" aria-label="비교 표 · 좌우 스크롤 가능"><table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Why it can be quick</th>
+<th>Qualification</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Factory-integrated XELA LEAP</strong></td>
+<td>Existing geometry, wiring, and supported acquisition</td>
+<td>Lead time and package details require a quote</td>
+</tr>
+<tr>
+<td><strong>Two GelSight Minis using the cable-following hardware as a reference</strong></td>
+<td>Purchasable sensors and published implementation</td>
+<td>Best for slower geometry/contact experiments</td>
+</tr>
+<tr>
+<td><strong>Research-matched PaXini package</strong></td>
+<td>Closest path to reproducing published LEAP learning</td>
+<td>Quick only if exact mounts/electronics/API are available</td>
+</tr>
+<tr>
+<td><strong>Purchased AnySkin-compatible/WowSkin kit</strong></td>
+<td>Small raw observation space and open software</td>
+<td>Verify stock and LEAP adapter; do not assume vendor equivalence to research hardware</td>
+</tr>
+</tbody></table></div>
+<p>For an AnySkin prototype, four fingertip modules would provide <strong>60 raw magnetic channels</strong> with five three-axis magnetometers each. That is a proposed configuration, not a published LEAP benchmark.</p>
+<hr>
+</div></details><details id="codex-chapter-9" ><summary>9. Cost and Procurement</summary><div class="archive-body"><p>Prices below are public listings or explicitly identified historical figures, excluding tax, shipping, host computer, robot arm, and custom engineering.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="비교 표 · 좌우 스크롤 가능"><table>
+<thead>
+<tr>
+<th>Candidate</th>
+<th>Per-sensor / package information</th>
+<th>Reasonable LEAP configuration</th>
+<th>Reliable system-level estimate</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>XELA uSkin</strong></td>
+<td>Quote required</td>
+<td>Integrated full hand or partial coverage</td>
+<td><strong>Quote required / not publicly disclosed</strong></td>
+</tr>
+<tr>
+<td><strong>PaXini</strong></td>
+<td>Quote required for current research-matched modules</td>
+<td>Eight modules for the tip/pad precedent, or a qualified alternative</td>
+<td><strong>Quote required / not publicly disclosed</strong></td>
+</tr>
+<tr>
+<td><strong>GelSight Mini system</strong></td>
+<td><strong>$510</strong> listed</td>
+<td>Two or four sensors</td>
+<td><strong>$1,020 / $2,040</strong>, before adapters and USB infrastructure</td>
+</tr>
+<tr>
+<td><strong>GelSight Mini robotics package</strong></td>
+<td><strong>$560</strong> listed</td>
+<td>Two or four sensors</td>
+<td><strong>$1,120 / $2,240</strong>, before adapters and USB infrastructure</td>
+</tr>
+<tr>
+<td><strong>DIGIT</strong></td>
+<td><strong>$355</strong> listed</td>
+<td>Two-sensor pilot or four fingertips</td>
+<td><strong>$710 / $1,420</strong>, before mounts and USB infrastructure</td>
+</tr>
+<tr>
+<td><strong>WowSkin</strong></td>
+<td>Standard variant displays <strong>$128</strong>; other collection prices start lower</td>
+<td>Four modules plus adapters/interface</td>
+<td>Complete usable configuration and availability not confirmed</td>
+</tr>
+<tr>
+<td><strong>AnySkin / ReSkin</strong></td>
+<td>Components and fabrication vary</td>
+<td>Four tips; optional pads/palm</td>
+<td>No defensible complete current quote established</td>
+</tr>
+<tr>
+<td><strong>eFlesh</strong></td>
+<td>Magnets are inexpensive; PCB/printing/labor additional</td>
+<td>Four printed tips or custom coverage</td>
+<td>Full cost not established</td>
+</tr>
+<tr>
+<td><strong>9DTact</strong></td>
+<td>DIY or supplier-built</td>
+<td>Three or four fingertips</td>
+<td>Supplier quote / current price not verified</td>
+</tr>
+<tr>
+<td><strong>TwinTac / Bio-Skin / TensorTouch</strong></td>
+<td>Custom builds</td>
+<td>Design-dependent</td>
+<td>BOM alone would omit substantial integration/calibration work</td>
+</tr>
+</tbody></table></div>
+<p>The <a href="https://www.gelsight.com/online-store/" target="_blank" rel="noopener noreferrer">GelSight store</a> lists Mini replacement gels at <strong>$57 standard / $70 marked</strong>, and DIGIT replacement gels at <strong>$42</strong>. The <a href="https://www.gelsight.com/product/gelsight-mini-robotics-package/" target="_blank" rel="noopener noreferrer">Mini robotics package</a> includes standard and marked gels and lists an estimated four-week lead time.</p>
+<p><strong>Source conflicts and misleading prices</strong></p>
+<ul>
+<li>The Mini repository FAQ contains older two-unit prices that differ from the current store. The estimates above use the current transactional listings.</li>
+<li>WowSkin’s <a href="https://shop.wowrobo.com/collections/sensors-touch" target="_blank" rel="noopener noreferrer">collection page</a> shows “from” pricing that should not be read as the price of a complete LEAP-ready sensor.</li>
+<li>P4 reports roughly <strong>$200 per older PaXini pad</strong>. That is historical research context, not a current quote for the LEAP modules.</li>
+<li>Original DIGIT bulk BOM figures and eFlesh magnet costs are not complete retail-system prices.</li>
+<li>The LEAP v2 demonstration reports inexpensive FSR components—approximately <strong>$2 per sensor plus a $20 board</strong>—but these provide a baseline rather than the rich sensing sought here. <a href="https://www.roboticsproceedings.org/rss21/p132.pdf" target="_blank" rel="noopener noreferrer">LEAP v2 demonstration</a></li>
+</ul>
+<p>Budget for spare contact surfaces, at least one spare module, mounting revisions, calibration fixtures, and synchronized acquisition. These can matter more operationally than a small difference in sensor purchase price.</p>
+<hr>
+</div></details><details id="codex-chapter-10" ><summary>10. Final Top 3 Recommendation</summary><div class="archive-body"><h3>1. PaXini distributed tri-axis tactile sensing</h3>
+<p><strong>Why it ranks first:</strong> it best satisfies your primary criterion—actual LEAP manipulation research in which rich tactile observations enter the learned policy.</p>
+<p><strong>Strongest evidence:</strong> 3DTacDex and AdapTac, reinforced by the newer cluttered-grasping study.</p>
+<p><strong>What it enables</strong></p>
+<ul>
+<li>Contact-aware diffusion policies.</li>
+<li>Spatial tactile representation learning.</li>
+<li>Force-conditioned manipulation and grasp stabilization.</li>
+<li>Continuous-versus-binary tactile ablations.</li>
+<li>Studies combining local taxels with proprioceptive or estimated-wrench information.</li>
+</ul>
+<p><strong>Practical limitation:</strong> the research configuration must become an identifiable, purchasable system. Do not order a nominally similar PX-6AX model before verifying geometry, taxel layout, calibration outputs, communications, and mounting.</p>
+<p><strong>Decision:</strong> first choice if the published configuration can be reproduced with supported current hardware.</p>
+<h3>2. XELA uSkin LEAP package</h3>
+<p><strong>Why it ranks second:</strong> it combines explicit LEAP support with strong adjacent-hand evidence for exactly the kinds of learning methods you want to study.</p>
+<p><strong>Strongest evidence:</strong> official integration plus T-DEX, See to Touch, and PercepSkin.</p>
+<p><strong>What it enables</strong></p>
+<ul>
+<li>Whole-hand contact-state estimation.</li>
+<li>Policies that exploit rolling and migrating contacts.</li>
+<li>Tactile play datasets and spatial/temporal pretraining.</li>
+<li>Normal-versus-shear and fingertip-versus-full-hand comparisons.</li>
+</ul>
+<p><strong>Practical limitation:</strong> direct LEAP algorithm validation remains a gap in the literature reviewed.</p>
+<p><strong>Decision:</strong> the strongest choice when minimizing hardware-development uncertainty is more important than reproducing a particular LEAP paper.</p>
+<h3>3. GelSight Mini</h3>
+<p><strong>Why it ranks third:</strong> it combines direct peer-reviewed LEAP manipulation evidence, current procurement, public software, and detailed local tactile geometry.</p>
+<p><strong>Strongest evidence:</strong> the LEAP cable-following implementation; additional support from the LEAP thesis and broader optical representation ecosystem.</p>
+<p><strong>What it enables</strong></p>
+<ul>
+<li>Contact geometry and deformation estimation.</li>
+<li>Tactile-conditioned precision manipulation.</li>
+<li>Optical tactile representation learning.</li>
+<li>Object/contact-state tracking under external visual occlusion.</li>
+</ul>
+<p><strong>Practical limitation:</strong> the observed latency and physical packaging make it a weaker default for fast whole-hand stabilization.</p>
+<p><strong>Decision:</strong> select it when geometry is central; do not choose it merely because images contain more dimensions than force arrays.</p>
+<h3>Second-pass verification of the Top 3</h3>
+<div class="table-wrap" tabindex="0" role="region" aria-label="비교 표 · 좌우 스크롤 가능"><table>
+<thead>
+<tr>
+<th>Check</th>
+<th>PaXini</th>
+<th>XELA uSkin</th>
+<th>GelSight Mini</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Current product family exists</td>
+<td>Confirmed on current GEN3/GEN4 pages</td>
+<td>Confirmed</td>
+<td>Confirmed</td>
+</tr>
+<tr>
+<td>Purchase or quote route</td>
+<td>Sales/quote route</td>
+<td>Quote route</td>
+<td>Public purchase listing</td>
+</tr>
+<tr>
+<td>Strongest LEAP claim reopened</td>
+<td>Original 3DTacDex hardware section</td>
+<td>Official LEAP integration page</td>
+<td>Original cable-following paper</td>
+</tr>
+<tr>
+<td>Configuration verified</td>
+<td>Eight modules, 15 tri-axis taxels each</td>
+<td>Documented full-hand configuration</td>
+<td>Two sensors, thumb/index</td>
+</tr>
+<tr>
+<td>Representative research actually uses sensor</td>
+<td>Confirmed</td>
+<td>Confirmed on Allegro; no LEAP paper claimed</td>
+<td>Confirmed</td>
+</tr>
+<tr>
+<td>Remaining material uncertainty</td>
+<td>Exact current SKU matching research</td>
+<td>Independent LEAP learning validation</td>
+<td>End-to-end performance on your compute/mount</td>
+</tr>
+</tbody></table></div>
+<hr>
+</div></details><details id="codex-chapter-11" ><summary>11. High-End Recommendation</summary><div class="archive-body"><p><strong>If cost is ignored and the sensor is infrastructure, my first procurement conversation would be with XELA about an integrated, individually calibrated LEAP system.</strong> That recommendation concerns implementation risk and support; it does not reverse the literature-first ranking.</p>
+<p>In parallel, ask PaXini to supply a package matching an established LEAP research configuration. If it can provide equivalent integration, stable raw/per-taxel access, repeatable calibration, and replacement support, its direct research evidence makes it especially compelling.</p>
+<p>For geometry-intensive work, maintain a <strong>separate Mini-equipped fingertip configuration</strong>. A modular arrangement is preferable to committing every finger to optical housings before validating range of motion and latency.</p>
+<p>There is insufficient evidence here to recommend BioTac, DIGIT360, or another premium sensor over these options merely because it is expensive or technically sophisticated.</p>
+<hr>
+</div></details><details id="codex-chapter-12" ><summary>12. Custom Sensor / Research Extension</summary><div class="archive-body"><p>Custom sensing is most worthwhile when it tests a specific hypothesis that purchased hardware cannot address.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="비교 표 · 좌우 스크롤 가능"><table>
+<thead>
+<tr>
+<th>Candidate</th>
+<th>What must be built</th>
+<th>Engineering burden</th>
+<th>Plausible secondary contribution</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>AnySkin</strong></td>
+<td>Molded/magnetized skin, alignment features, mounts, electronics integration</td>
+<td>Medium–high</td>
+<td>Policy transfer across replacement skins and finger geometries</td>
+</tr>
+<tr>
+<td><strong>ReSkin</strong></td>
+<td>Custom magnetic elastomer, PCB layout, magnetization, calibration</td>
+<td>High</td>
+<td>Palm/finger coverage and normal/shear representations</td>
+</tr>
+<tr>
+<td><strong>eFlesh</strong></td>
+<td>Printed compliant structures, magnet placement, PCB/mount</td>
+<td>Medium–high</td>
+<td>Mechanical structure co-designed with tactile representation</td>
+</tr>
+<tr>
+<td><strong>TwinTac</strong></td>
+<td>PCB, embedded pressure sensors, mold/casting, acquisition</td>
+<td>High</td>
+<td>Calibrated digital twins and contact-aware sim-to-real</td>
+</tr>
+<tr>
+<td><strong>Bio-Skin</strong></td>
+<td>Multimodal layers, thermal components, calibration</td>
+<td>High</td>
+<td>Force/temperature interaction for material-sensitive manipulation</td>
+</tr>
+<tr>
+<td><strong>DenseTact / TensorTouch</strong></td>
+<td>Optical housing, illumination, gel, calibration instrumentation and models</td>
+<td>Very high</td>
+<td>Dense stress/deformation estimation for dexterous control</td>
+</tr>
+</tbody></table></div>
+<p>Three research directions are particularly credible:</p>
+<ol>
+<li><strong>Morphology-aware tactile representations:</strong> learn representations that transfer across pad locations and hand configurations.</li>
+<li><strong>Replaceable-skin policy robustness:</strong> evaluate performance after skin replacement, wear, and changes in compliance.</li>
+<li><strong>Task-driven coverage:</strong> determine when palm or phalange sensing adds information beyond fingertips.</li>
+</ol>
+<p>For the initial project, I would avoid making fabrication a prerequisite for the first manipulation result. Establish a commercial-sensor baseline, then introduce custom hardware only when it tests a clearly motivated limitation.</p>
+<hr>
+</div></details><details id="codex-chapter-13" ><summary>13. Open Questions</summary><div class="archive-body"><h3>Questions for PaXini</h3>
+<ul>
+<li>Which current part numbers match the modules used in 3DTacDex and AdapTac?</li>
+<li>Can the exact LEAP mounts, controllers, and acquisition software be supplied?</li>
+<li>Are per-taxel outputs raw magnetic measurements, calibrated force estimates, or both?</li>
+<li>What is the sustained synchronized rate and measured latency for eight modules?</li>
+<li>Do quoted ranges apply per taxel, per module, or to a derived wrench?</li>
+<li>How are cross-talk, temperature drift, magnetic interference, and replacement skins handled?</li>
+<li>What are SDK licensing, operating-system support, ROS support, and academic pricing?</li>
+</ul>
+<h3>Questions for XELA</h3>
+<ul>
+<li>What is included in the LEAP package: hand, mounts, controllers, calibration, and replacement surfaces?</li>
+<li>What latency and jitter accompany the advertised full-hand rate?</li>
+<li>What improvement does individual calibration provide over the universal model?</li>
+<li>Which compensation options are included versus additional?</li>
+<li>What is the current delivery status of slip-detection software?</li>
+<li>Can partial coverage be expanded without replacing acquisition hardware?</li>
+<li>Are there unpublished or newly published LEAP manipulation references?</li>
+</ul>
+<h3>Questions for GelSight</h3>
+<ul>
+<li>What is measured acquisition-to-image and acquisition-to-depth latency on supported hardware?</li>
+<li>Which multi-camera USB configurations are supported?</li>
+<li>What changed with the newer Mini gel formulation, and what durability data apply to it?</li>
+<li>Are maintained LEAP mounts and ROS packages available?</li>
+<li>What calibration is required after gel replacement?</li>
+<li>What force/shear estimates are supported and validated, rather than merely demonstrated in example code?</li>
+</ul>
+<h3>Questions for WowSkin and custom-platform suppliers</h3>
+<ul>
+<li>Is the complete sensor currently in stock?</li>
+<li>Which listing includes the PCB, skin, controller, cables, and LEAP adapter?</li>
+<li>Is the hardware equivalent to the configuration evaluated in AnySkin?</li>
+<li>Are calibration data, raw protocols, replacement skins, and manufacturing tolerances available?</li>
+<li>Can several units be synchronized and replaced without retraining?</li>
+</ul>
+<p><strong>Recommended next action:</strong> request a research-matched PaXini quote and an integrated XELA quote using the same requirements: distributed tri-axis access, timestamps, calibration documentation, LEAP CAD, replacement parts, and a demonstrated full-hand data stream. Those responses should resolve the most important remaining uncertainty before purchase.</p>
+</div></details></section><footer class="footer">두 조사 보고서의 내용을 보존하고, 추가 1차 자료 검증을 반영했습니다.<br>주요 결론은 판단 기준과 근거의 범위 안에서 읽어 주세요. · 2026.09.27</footer></main><a class="backtop" href="#top" aria-label="맨 위로">↑ 맨 위</a><script>
+document.querySelector('.mobile-menu')?.addEventListener('click',()=>{let s=document.querySelector('.sidebar');s.classList.toggle('mobile-open');document.querySelector('.mobile-menu').setAttribute('aria-expanded',s.classList.contains('mobile-open'))});
+document.querySelectorAll('.sidebar a').forEach(a=>a.addEventListener('click',()=>document.querySelector('.sidebar').classList.remove('mobile-open')));
+const prog=document.querySelector('.progress');function progress(){let h=document.documentElement;let v=h.scrollHeight-h.clientHeight;prog.style.width=(v>0?h.scrollTop/v*(innerWidth-parseInt(getComputedStyle(document.documentElement).getPropertyValue('--side'))):0)+'px'}addEventListener('scroll',progress,{passive:true});addEventListener('resize',progress);
+const sections=[...document.querySelectorAll('section[id]')];if('IntersectionObserver' in window){new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting){document.querySelectorAll('.toc a').forEach(a=>a.classList.toggle('current',a.getAttribute('href')==='#'+e.target.id))}}, {rootMargin:'-10% 0px -65% 0px'}).observe && (()=>{let ob=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting)document.querySelectorAll('.toc a').forEach(a=>a.classList.toggle('current',a.getAttribute('href')==='#'+e.target.id))},{rootMargin:'-10% 0px -65% 0px'});sections.forEach(s=>ob.observe(s))})()}
+let prior=[];addEventListener('beforeprint',()=>{prior=[...document.querySelectorAll('details:not([open])')];prior.forEach(d=>d.open=true)});addEventListener('afterprint',()=>prior.forEach(d=>d.open=false));
+const input=document.querySelector('#paper-search'),select=document.querySelector('#paper-filter');function filterPapers(){if(!input)return;let q=input.value.toLowerCase().trim(),f=select.value,n=0;document.querySelectorAll('.paper').forEach(p=>{let yes=(!q||p.textContent.toLowerCase().includes(q))&&(!f||p.dataset.tags.split('|').includes(f));p.hidden=!yes;if(yes)n++});document.querySelector('#paper-count').textContent=n+'편 표시';document.querySelector('#empty').hidden=n>0}input?.addEventListener('input',filterPapers);select?.addEventListener('change',filterPapers);filterPapers();
+document.querySelectorAll('[data-archive]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-archive]').forEach(x=>{x.classList.toggle('active',x===b);x.setAttribute('aria-selected',x===b)});document.querySelectorAll('.archive-panel').forEach(x=>x.hidden=x.id!==b.dataset.archive)}));
+document.querySelectorAll('[data-expand]').forEach(b=>b.addEventListener('click',()=>document.querySelectorAll('.archive-panel:not([hidden]) details').forEach(d=>d.open=b.dataset.expand==='true')));
+</script></body></html>
