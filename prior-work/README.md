@@ -12,6 +12,7 @@
 - [Sparsh: Self-supervised touch representations for vision-based tactile sensing](<Sparsh(2024 CoRL).md>) - multi sensor datase and pretrained encoder. compare different types of SSL mechanism
 - [AnyTouch: Learning Unified Static-Dynamic Representation across Multiple Visuo-tactile Sensors](<AnyTouch(2025 ICLR).md>) - multi modal multi sensor dataset and pretrained encoder. propose MAE modeling and alignment
 - [RoboPack: Learning Tactile-Informed Dynamics Models for Dense Packing](<RoboPack(2024 RSS).md>) - learning "dynamics model" using tactile sensing
-- [Tactile-VLA: Unlocking Vision-Language-Action Model's Physical Knowledge for Tactile Generalization](<Tactile-VLA(2025 arXiv).md>) - VLA에 tactile sensing 통합. tactile 정보와 VLM의 prior knowledge, semantic understanding 이용. 
+- [Tactile-VLA: Unlocking Vision-Language-Action Model's Physical Knowledge for Tactile Generalization](<Tactile-VLA(2025 arXiv).md>) - VLA에 tactile sensing 통합. tactile 정보와 VLM의 prior knowledge, semantic understanding 이용.
+- [VLA-Touch: Enhancing Vision-Language-Action Models with Dual-Level Tactile Feedback](<VLA-touch(2026 RA-L).md>) - dual level로 tactile 이용. planning과 refinement controller. 
 
 
