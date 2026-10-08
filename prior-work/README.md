@@ -16,3 +16,13 @@
 - [VLA-Touch: Enhancing Vision-Language-Action Models with Dual-Level Tactile Feedback](<VLA-touch(2026 RA-L).md>) - dual level로 tactile 이용. planning과 refinement controller. 
 
 
+## VLA & Foundation Models on Dexterous Hands (팔 + 다지 핸드) — 신지우
+
+- [DexVerse: A Modular Benchmark for Multi-Task, Multi-Embodied Dexterous Manipulation](<DexVerse(2026 arXiv).md>) - 3개 팔과 6개 다지 핸드(LEAP Hand 포함) 지원. $\pi_{0.5}$를 다지 핸드에 파인튜닝/벤치마킹한 대표 연구
+- [VisForce: Visual Grounding of Current and Desired Forces for Goal-Conditioned Dexterous Manipulation](<VisForce(2026 arXiv).md>) - UR10 팔 + Inspire 5지 핸드 조합. $\pi_{0.5}$에 손가락 끝 3축 힘 정보를 시각적 큐로 주입하여 섬세한 힘 제어 파지 성공
+- [GR00T N1: An Open Foundation Model for Generalist Humanoid Robots](<GR00T-N1(2025 arXiv).md>) - NVIDIA의 휴머노이드 VLA 모델. Sharpa Wave 5지 촉각 핸드(22 DoF) 등 다지 핸드 네이티브 지원 및 50Hz 실시간 제어
+
+
+## Teleoperation & Data Collection Pipeline (데이터 수집) — 신지우
+
+- [ROBOTIS OMY + LEAP Hand 텔레오퍼레이션 및 데이터 수집 파이프라인 검토](teleoperation_pipeline_review.md) - 리더암(OMY-L100) 손목 체결 + 마누스 글러브, IK 방식 비교 및 촉각(PaXini)/LeRobot 동기화 아키텍처

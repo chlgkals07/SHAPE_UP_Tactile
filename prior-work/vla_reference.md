@@ -32,4 +32,15 @@ Canonical Representation and Force-Based Pretraining of 3D Tactile for Dexterous
 
 <br> 
 
-위 논문 3개는 다 읽어도 좋을 것 같고, tactile을 이런 식으로 기존 모델에 추가하는구나, 이런 식으로 tactile 정보를 처리할 수 있구나 참고하면 좋을듯. 
+**Finetuning VLA on Arm + Dexterous Hand (팔 + 손 조합)**
+
+<br>
+
+- [DexVerse (arXiv:2607.08751)](<DexVerse(2026 arXiv).md>) : 3개 팔과 6개 다지 핸드(**LEAP Hand 포함**)를 지원하는 벤치마크. $\pi_{0.5}$를 다지 핸드 환경에 직접 파인튜닝/평가한 핵심 레퍼런스.
+- [VisForce (arXiv:2609.25785)](<VisForce(2026 arXiv).md>) : **UR10 팔 + Inspire 5지 핸드** 조합. $\pi_{0.5}$에 손가락 끝 3축 힘 정보를 카메라 영상에 시각적으로 그라운딩(Visual Grounding)하여 섬세한 파지(계란, 치약) 및 페그 삽입 성공.
+- [GR00T N1 (arXiv:2503.14734)](<GR00T-N1(2025 arXiv).md>) : NVIDIA의 휴머노이드 VLA 파운데이션 모델. **22-DoF Sharpa Wave 다지 촉각 핸드**, Shadow Hand, Allegro Hand 등 다지 핸드를 네이티브 지원하며 DiT 기반 실시간(50Hz) 액션 생성.
+- **실무 파인튜닝 파이프라인 (OpenPI + 우리 팀 구성: ROBOTIS OMY + LEAP Hand)**:
+  - **우리 팀 하드웨어 구성**: **ROBOTIS OMY (6 DoF 팔)** + **LEAP Hand (16 DoF 다지 핸드)** = **총 22 DoF 액션 공간**.
+  - **생태계 시너지**: OMY(DYNAMIXEL-Y)와 LEAP Hand(DYNAMIXEL XC330)가 모두 **DYNAMIXEL 프로토콜**을 기반으로 하므로, 제어 인터페이스(DYNAMIXEL SDK / `ros2_control`) 통합 및 동기화가 매우 용이함.
+  - **OpenPI 매핑**: OpenPI의 기본 최대 액션 차원(32차원)에 22차원(OMY 6 + LEAP 16)이 네트워크 구조 변경 없이 제로 패딩(10차원)으로 즉시 매핑 가능.
+  - **데이터 수집 및 배포**: OMY의 ROS 2 Jazzy (`ros2_control`, 최대 400Hz) 인터페이스와 LEAP Hand의 텔레오퍼레이션(RIO/LeRobot) 파이프라인을 연동하여 $\pi_{0.5}$ 파인튜닝 데이터 구축에 유리.
