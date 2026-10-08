@@ -75,6 +75,12 @@ class Ros2LeaderSource(Source):
         with self._lock:
             return self._latest
 
+    @property
+    def stop_requested(self) -> bool:
+        # rclpy's own SIGINT handler shuts the context down instead of (or before) raising
+        # KeyboardInterrupt; treat that as a stop request so Ctrl+C always ends the loop.
+        return not self._rclpy.ok()
+
     def close(self) -> None:
         self._executor.shutdown()
         self._node.destroy_node()

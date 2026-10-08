@@ -73,6 +73,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "`python3 -m leap_teleop.tools.calibrate_motors` first; "
                 "refusing to use nominal zeros."
             )
+        if not args.dry_run and args.motor_calibration_file.name.endswith(".example.yaml"):
+            raise ValueError(
+                f"{args.motor_calibration_file} is the nominal template, not a measurement. "
+                "Run `python3 -m leap_teleop.tools.calibrate_motors` and use its output."
+            )
         guard = StaleGuard(open_pose, args.stale_timeout, args.release_timeout)
         retarget = ScalarPostureRetargeter(open_pose, fist_pose)
         driver = build_driver(args)

@@ -61,3 +61,11 @@ def test_dry_run_starts_and_closes_the_log_driver(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "[dry-run] start" in out
     assert "[dry-run] close" in out
+
+
+def test_hardware_mode_refuses_the_nominal_example_calibration(capsys, monkeypatch):
+    monkeypatch.setattr(cli, "build_source", lambda args: pytest.fail("touched the terminal"))
+    example = CONFIG_DIR / "hardware_motors.example.yaml"
+    code = cli.main(BASE + ["--motor-calibration-file", str(example)])
+    assert code == 2
+    assert "calibrate_motors" in capsys.readouterr().err
