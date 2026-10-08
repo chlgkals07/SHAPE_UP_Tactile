@@ -98,15 +98,15 @@ SHAPE_UP_Tactile/
 │   │   │   └── scalar_posture.py    # open↔fist 보간
 │   │   ├── safety.py                # stale 감시 + fallback
 │   │   ├── config.py                # yaml 로딩
+│   │   ├── tools/                   # 실물 bring-up 도구 (이식), python -m leap_teleop.tools.<name>
+│   │   │   ├── check_hardware.py
+│   │   │   ├── calibrate_motors.py
+│   │   │   └── joint_test.py
 │   │   └── app.py                   # source→retarget→safety→driver 루프
 │   ├── config/
 │   │   ├── postures.yaml            # open / fist (추적됨)
 │   │   ├── leader_gripper.yaml      # leader 값 min/max (추적됨)
 │   │   └── hardware_motors.example.yaml   # 실제 hardware_motors.yaml은 gitignore
-│   ├── scripts/                     # 실물 bring-up 도구 (이식)
-│   │   ├── check_hardware.py
-│   │   ├── calibrate_motors.py
-│   │   └── joint_test.py
 │   └── tests/
 ├── docs/superpowers/specs/
 ├── prior-work/  research/           # 기존
@@ -136,9 +136,9 @@ omy-leap-bringup/                    # ROS 2 패키지 (overlay 방식, ROBOTIS 
 | `hand/leap_v1.py` | `leap_hand_hardware_controller.py` | LEAP v1 제어, 안전 한계, Torque OFF 보장 |
 | `hand/calibration.py` | `hardware_calibration.py` | 모터별 영점/방향 |
 | `hand/joints.py` | `hand_angles.py`의 `ANGLE_NAMES`만 | 관절 순서 (MediaPipe 계산 코드는 가져오지 않음) |
-| `scripts/check_hardware.py` | `leap_hand_hardware_check.py` | Torque OFF 진단 |
-| `scripts/calibrate_motors.py` | `leap_hand_motor_calibration.py` | 영점 기록 |
-| `scripts/joint_test.py` | `leap_hand_joint_test.py` | 단일 관절 ±5° 시험 |
+| `tools/check_hardware.py` | `leap_hand_hardware_check.py` | Torque OFF 진단 |
+| `tools/calibrate_motors.py` | `leap_hand_motor_calibration.py` | 영점 기록 |
+| `tools/joint_test.py` | `leap_hand_joint_test.py` | 단일 관절 ±5° 시험 |
 | `config/postures.yaml`의 fist 초기값 | `leap_hand_hardware_finger_test.py`의 `FINGER_TARGETS_DEGREES` | 손가락 굽힘 목표 |
 
 fist 초기값은 손가락 테스트의 **보수적 값**을 쓴다 (검지/중지/약지 MCP 55° · PIP 60° · DIP 40°, 엄지 CMC 35° · MCP 40° · IP 35°). `rps/postures.py`의 rock(75/85/65)은 더 깊어서 1차에서는 쓰지 않는다. 값은 코드가 아닌 yaml로 둔다.
