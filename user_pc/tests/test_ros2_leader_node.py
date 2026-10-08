@@ -43,7 +43,7 @@ class FakeExecutor:
 @pytest.fixture
 def fake_rclpy(monkeypatch):
     events = []
-    state = {"ok": False, "node": None}
+    state = {"ok": False, "node": None, "shutdown_raises": False}
 
     rclpy = types.ModuleType("rclpy")
     rclpy.ok = lambda: state["ok"]
@@ -54,6 +54,8 @@ def fake_rclpy(monkeypatch):
     def shutdown():
         events.append("rclpy_shutdown")
         state["ok"] = False
+        if state["shutdown_raises"]:
+            raise RuntimeError("rcl_shutdown already called on the given context")
 
     def create_node(name):
         state["node"] = FakeNode(events)
@@ -111,4 +113,11 @@ def test_incoming_message_becomes_a_timestamped_reading(fake_rclpy):
 def test_close_shuts_down_executor_before_destroying_node_and_context(fake_rclpy):
     source = make_source(fake_rclpy)
     source.close()
+    assert fake_rclpy.events == ["executor_shutdown", "destroy_node", "rclpy_shutdown"]
+
+
+def test_close_survives_rclpy_having_already_shut_down_after_sigint(fake_rclpy):
+    source = make_source(fake_rclpy)
+    fake_rclpy.state["shutdown_raises"] = True
+    source.close()  # must not raise; the hand driver still has to be closed afterwards
     assert fake_rclpy.events == ["executor_shutdown", "destroy_node", "rclpy_shutdown"]

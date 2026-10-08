@@ -82,8 +82,14 @@ class Ros2LeaderSource(Source):
         return not self._rclpy.ok()
 
     def close(self) -> None:
-        self._executor.shutdown()
-        self._node.destroy_node()
-        if self._owns_context and self._rclpy.ok():
-            self._rclpy.shutdown()
+        # rclpy's own SIGINT handler may already have shut the context down (seen with
+        # rmw_zenoh), so each teardown step must tolerate that and never stop the others.
+        steps = [self._executor.shutdown, self._node.destroy_node]
+        if self._owns_context:
+            steps.append(self._rclpy.shutdown)
+        for step in steps:
+            try:
+                step()
+            except Exception:  # noqa: BLE001 - best-effort teardown
+                pass
         self._thread.join(timeout=1.0)

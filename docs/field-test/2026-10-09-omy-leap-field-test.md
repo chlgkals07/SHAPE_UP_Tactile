@@ -23,6 +23,14 @@
 ## 0. 사전 준비 (User PC, 시작 전)
 
 ```bash
+# 코드 받기 (브랜치 feat/leap-teleop). 서브모듈은 참고용이라 받지 않아도 된다
+git clone -b feat/leap-teleop https://github.com/chlgkals07/SHAPE_UP_Tactile.git
+git clone https://github.com/chlgkals07/OMY_Tactile_Robot_PC.git      # 3-2에서 복사할 때만 필요 (private)
+
+# 의존성 (Ubuntu 24.04 + ROS 2 Jazzy 가정). 이미 있으면 건너뛴다
+python3 -c "import numpy, yaml, dynamixel_sdk, pytest" || \
+  sudo apt install python3-numpy python3-yaml python3-pytest ros-jazzy-dynamixel-sdk
+
 # zenoh RMW 설치 (apt에서 설치 가능 확인함: 0.2.11)
 sudo apt install ros-jazzy-rmw-zenoh-cpp
 
@@ -173,7 +181,7 @@ ros2 daemon stop                         # 공식 트러블슈팅: 오래된 dae
 ros2 topic list                          # /leader/joint_trajectory, /joint_states 가 보여야 함
 ros2 topic echo /leader/joint_trajectory --field points
 ```
-> 공식 예시는 `transport/shared_memory/enabled=true;`도 포함한다. 다른 PC 사이에서는 효과가 없어 뺐다 [우리].
+> 공식 예시는 `transport/shared_memory/enabled=true;`도 포함한다. 다른 PC 사이에서는 필요 없어 뺐다. docker 시험에서는 shm을 켜면 `Failed to create POSIX SHM provider`로 초기화가 실패했다 [우리].
 
 측정값을 입력 (3-3에서 적은 값):
 ```bash
@@ -188,7 +196,7 @@ python3 -m leap_teleop.cli --source leader             # 실물
 - `Ctrl+C`로 종료하면 손이 힘을 뺀다.
 - (선택) `--dry-run` 중 이더넷을 잠깐 뽑으면 0.5초 뒤 `hold`, 3초 뒤 `release`가 로그에 찍힌다.
 
-> [미검증] 우리 코드(`rclpy`, best-effort QoS)가 `rmw_zenoh`로 실제 토픽을 받는 것. 로컬 DDS에서만 확인했다.
+> [검증됨, 시뮬레이션] docker 컨테이너 2개(`zenohd`+가짜 leader / client 모드 User PC)로 재현: `ros2 topic list`·`echo`에서 토픽이 보이고, `leap_teleop --source leader --dry-run`이 `waiting → live`(손 목표 30° = 0.5)로 동작하며 Ctrl+C로 정상 종료. 실제 Robot PC와의 연결은 [미검증].
 > 토픽이 안 보이면: IP, 포트 7447, `RMW_IMPLEMENTATION`, `ZENOH_CONFIG_OVERRIDE`, Robot PC `zenohd` 실행 여부 순으로 확인 [공식 체크리스트].
 
 ✅ 통과: (a)와 (b) 모두 동작 → **전체 성공.**
