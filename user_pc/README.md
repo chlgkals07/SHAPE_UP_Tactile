@@ -41,9 +41,9 @@ python3 -m pytest -q             # 하드웨어 없이 전부 통과해야 한�
    source /opt/ros/jazzy/setup.bash
    export ROS_DOMAIN_ID=30
    export PYTHONPATH="src:$PYTHONPATH"
-   ros2 topic echo /leader/joint_trajectory --field points[0].positions
+   ros2 topic echo /leader/joint_trajectory --field points
    ```
-2. leader 그리퍼를 편 상태와 쥔 상태에서 7번째 값(`rh_r1_joint`)을 읽어 `config/leader_gripper.yaml`의 `open_value` / `closed_value`에 넣는다. (현재 값은 임시값 0.0 / 1.0이다.)
+2. leader 그리퍼를 편 상태와 쥔 상태에서 `points` 안의 7번째 값(`rh_r1_joint`)을 읽어 `config/leader_gripper.yaml`의 `open_value` / `closed_value`에 넣는다. (현재 값은 임시값 0.0 / 1.0이다.)
 3. 먼저 `--dry-run`으로 확인한 뒤 실물로 실행
    ```bash
    python3 -m leap_teleop.cli --source leader --dry-run
