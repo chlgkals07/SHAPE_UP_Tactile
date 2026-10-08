@@ -29,13 +29,15 @@ class FakeSource(Source):
         self._silent_after = silent_after
         self._stop_at = stop_at
         self._now = 0.0
+        self._latest = None
         self.closed = False
 
     def poll(self, now):
+        # Source contract: return the latest reading (even if old); None only before the first.
         self._now = now
-        if self._silent_after is not None and now >= self._silent_after:
-            return None
-        return Reading(timestamp=now, grasp=self._grasp_at(now))
+        if self._silent_after is None or now < self._silent_after:
+            self._latest = Reading(timestamp=now, grasp=self._grasp_at(now))
+        return self._latest
 
     @property
     def stop_requested(self):
