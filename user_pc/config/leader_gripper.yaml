@@ -1,0 +1,9 @@
+# Robot PC 의 leader 가 publish 하는 토픽과 그리퍼 관절.
+# open_value / closed_value 는 leader 그리퍼를 폈을 때와 쥐었을 때
+# `ros2 topic echo /leader/joint_trajectory` 로 읽은 rh_r1_joint 값이다.
+# 이 토픽 값에는 reverse_joints 와 offset(0.2)이 이미 적용돼 있다.
+# 아래 두 값은 실측 전 임시값이므로 첫 실물 시험에서 반드시 측정해 바꾼다.
+topic: /leader/joint_trajectory
+joint_name: rh_r1_joint
+open_value: 0.0
+closed_value: 1.0

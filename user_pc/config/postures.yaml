@@ -1,0 +1,17 @@
+# 단위: 도. 0 = 편 손. 이름은 leap_teleop.hand.joints.ANGLE_NAMES 와 같아야 한다.
+# fist 는 leap-hand@ddfabaa 의 손가락 테스트(leap_hand_hardware_finger_test.py)에서 쓰던
+# 보수적인 굽힘 목표다. 실물에서 충분히 닫히지 않으면 조금씩 늘린다.
+open: {}
+fist:
+  index_mcp_flex: 55.0
+  index_pip_flex: 60.0
+  index_dip_flex: 40.0
+  middle_mcp_flex: 55.0
+  middle_pip_flex: 60.0
+  middle_dip_flex: 40.0
+  ring_mcp_flex: 55.0
+  ring_pip_flex: 60.0
+  ring_dip_flex: 40.0
+  thumb_cmc_flex: 35.0
+  thumb_mcp_flex: 40.0
+  thumb_ip_flex: 35.0
