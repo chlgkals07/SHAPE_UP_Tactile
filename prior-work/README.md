@@ -13,7 +13,22 @@
 - [AnyTouch: Learning Unified Static-Dynamic Representation across Multiple Visuo-tactile Sensors](<AnyTouch(2025 ICLR).md>) - multi modal multi sensor dataset and pretrained encoder. propose MAE modeling and alignment
 - [RoboPack: Learning Tactile-Informed Dynamics Models for Dense Packing](<RoboPack(2024 RSS).md>) - learning "dynamics model" using tactile sensing
 - [Tactile-VLA: Unlocking Vision-Language-Action Model's Physical Knowledge for Tactile Generalization](<Tactile-VLA(2025 arXiv).md>) - VLA에 tactile sensing 통합. tactile 정보와 VLM의 prior knowledge, semantic understanding 이용.
-- [VLA-Touch: Enhancing Vision-Language-Action Models with Dual-Level Tactile Feedback](<VLA-touch(2026 RA-L).md>) - dual level로 tactile 이용. planning과 refinement controller. 
+- [VLA-Touch: Enhancing Vision-Language-Action Models with Dual-Level Tactile Feedback](<VLA-touch(2026 RA-L).md>) - dual level로 tactile 이용. planning과 refinement controller.
+
+
+- Canonical Representation and Force-Based Pretraining of 3D Tactile for Dexterous Visuo-Tactile Policy Learning(2025 ICRA) - LEAP hand + Paxini. Paxini tactile sensor representation 연구 
+- Adaptive Visuo-Tactile Fusion with Predictive Force Attention for Dexterous Manipulation(2025 IROS) - vision과 tactile의 attention을 어떻게 할까에 대한 연구
+- FTP-1: A Generalist Foundation Tactile Policy Across Tactile Sensors for Contact-Rich Manipulation(2026 CoRL) - pi05 + Tactile Expert. Pretraining Tactile VLA policy이고 최근 추세로는 tactile VLA 연구에서 baseline으로 많이 사용. 
+- OmniVTLA: Vision-Tactile-Language-Action Models With Semantic-Aligned Tactile Sensing(2026 RA-L) - clip처럼 tactile도 align해서 encoder 만들고 vla에 사용.
+
+  
+기록용(전부 읽진 못한 논문들. abstract, figure 등은 확인. ) 
+- TacForcing: Streaming Action Generation with Execution‑Time Tactile Feedback(2026.09 arXiv) - high frequency tactile input에 대해서 temporal alignment하기 위해서 action expert의 denoising 및 chunking을 streaming 방식으로 변형. 
+- TouchWorld: A Predictive and Reactive Tactile Foundation Model for Dexterous Manipulation(2026.07 arXiv) - WAM + Future Tactile Prediction 
+- DexTac: Learning Contact-aware Visuotactile Policies via Hand-by-hand Teaching(2026 IEEE T-SE) - 손가락에서도 어느 부위에 접촉하는지 그 local한 작은 영역을 따서 policy를 학습하는 느낌? VLA는 아니고, 좀 더 HW, dexterity, physics에 가까운 논문인듯.  
+- FARM: Tactile-Conditioned Diffusion Policy for Force-Aware Robotic Manipulation(2026 ICRA) - Policy가 gripper의 force도 예측. 
+- N0-VTLA: Scaling Vision–Tactile–Language–Action Model with Latent Tactile Tokens(2026.07 arXiv) - predictive tactile latent를 예측하고 그것을 action expert가 사용. LeJEPA 스타일과 비슷하다고 함. 
+- Contact-Grounded Policy: Dexterous Visuotactile Policy with Generative Contact Grounding(2026 RSS) - future tactile과 robot state를 예측하고, 그것으로 실제 contact이 어떻게 될 지 매핑해서 최종적인 predicted target robot state를 예측(계산). 흥미로워 보임.  
 
 
 ## VLA & Foundation Models on Dexterous Hands (팔 + 다지 핸드) — 신지우
