@@ -1,0 +1,4 @@
+[submodule "third_party/open_manipulator"]
+	path = third_party/open_manipulator
+	url = https://github.com/ROBOTIS-GIT/open_manipulator
+	branch = jazzy
