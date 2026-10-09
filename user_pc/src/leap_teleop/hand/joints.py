@@ -1,0 +1,20 @@
+"""LEAP Hand v1 joint order shared by every module (0 degrees = open hand)."""
+
+ANGLE_NAMES = (
+    "index_mcp_side",
+    "index_mcp_flex",
+    "index_pip_flex",
+    "index_dip_flex",
+    "middle_mcp_side",
+    "middle_mcp_flex",
+    "middle_pip_flex",
+    "middle_dip_flex",
+    "ring_mcp_side",
+    "ring_mcp_flex",
+    "ring_pip_flex",
+    "ring_dip_flex",
+    "thumb_cmc_side",
+    "thumb_cmc_flex",
+    "thumb_mcp_flex",
+    "thumb_ip_flex",
+)

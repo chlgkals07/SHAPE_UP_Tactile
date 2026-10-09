@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "leap-teleop"
+version = "0.1.0"
+description = "LEAP Hand v1 teleoperation from keyboard or OMY leader gripper"
+requires-python = ">=3.10"
+dependencies = ["numpy", "PyYAML"]
+
+[project.optional-dependencies]
+hardware = ["dynamixel-sdk"]
+dev = ["pytest"]
+
+[project.scripts]
+leap-teleop = "leap_teleop.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
