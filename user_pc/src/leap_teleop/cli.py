@@ -31,6 +31,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stale-timeout", type=float, default=0.5)
     parser.add_argument("--release-timeout", type=float, default=3.0)
     parser.add_argument("--current-limit", type=int, default=300, help="motor current limit in mA")
+    parser.add_argument(
+        "--safe-pose",
+        choices=("open", "fist"),
+        default="open",
+        help="pose while waiting for the first input and after the input is lost",
+    )
     parser.add_argument("--dry-run", action="store_true", help="log targets, do not touch hardware")
     return parser
 
@@ -78,7 +84,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f"{args.motor_calibration_file} is the nominal template, not a measurement. "
                 "Run `python3 -m leap_teleop.tools.calibrate_motors` and use its output."
             )
-        guard = StaleGuard(open_pose, args.stale_timeout, args.release_timeout)
+        safe_pose = fist_pose if args.safe_pose == "fist" else open_pose
+        guard = StaleGuard(safe_pose, args.stale_timeout, args.release_timeout)
         retarget = ScalarPostureRetargeter(open_pose, fist_pose)
         driver = build_driver(args)
         source = build_source(args)

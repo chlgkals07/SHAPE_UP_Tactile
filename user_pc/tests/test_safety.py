@@ -54,3 +54,12 @@ def test_outputs_are_copies():
 def test_invalid_timeouts_are_rejected(stale, release):
     with pytest.raises(ValueError):
         StaleGuard(OPEN, stale_timeout=stale, release_timeout=release)
+
+
+def test_fist_safe_pose_is_used_while_waiting_and_after_release():
+    guard = StaleGuard(FIST, stale_timeout=0.5, release_timeout=3.0)
+    np.testing.assert_array_equal(guard.resolve(0.0, None, None), FIST)
+    assert guard.mode == "waiting"
+    guard.resolve(1.0, OPEN, 1.0)  # live, hand open
+    np.testing.assert_array_equal(guard.resolve(4.1, OPEN, 1.0), FIST)
+    assert guard.mode == "release"

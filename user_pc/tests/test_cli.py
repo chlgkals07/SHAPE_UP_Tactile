@@ -1,9 +1,11 @@
 import io
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from leap_teleop import cli
+from leap_teleop.config import load_postures
 from leap_teleop.sources.base import Source
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
@@ -69,3 +71,17 @@ def test_hardware_mode_refuses_the_nominal_example_calibration(capsys, monkeypat
     code = cli.main(BASE + ["--motor-calibration-file", str(example)])
     assert code == 2
     assert "calibrate_motors" in capsys.readouterr().err
+
+
+def test_safe_pose_defaults_to_open():
+    assert cli.build_parser().parse_args([]).safe_pose == "open"
+
+
+def test_safe_pose_fist_closes_the_hand_while_waiting(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "build_source", lambda args: StoppedSource())
+    commands = []
+    monkeypatch.setattr(cli, "run_teleop", lambda source, retarget, guard, driver, **kw: commands.append(guard.resolve(0.0, None, None)))
+    code = cli.main(BASE + ["--dry-run", "--safe-pose", "fist"])
+    assert code == 0
+    _, fist_pose = load_postures(CONFIG_DIR / "postures.yaml")
+    np.testing.assert_array_equal(commands[0], fist_pose)

@@ -49,7 +49,7 @@ python3 -m pytest -q             # 하드웨어 없이 전부 통과해야 한�
    python3 -m leap_teleop.cli --source leader --dry-run
    python3 -m leap_teleop.cli --source leader
    ```
-   토픽이 0.5초 끊기면 마지막 자세를 유지하고, 3초 끊기면 손이 열린다. `Ctrl+C`로 종료하면 Torque OFF 후 종료한다.
+   토픽이 0.5초 끊기면 마지막 자세를 유지하고, 3초 끊기면 안전 자세로 간다. 안전 자세는 첫 입력 전(`waiting`)에도 쓰며 기본은 편 손이다. 팔이 움직이는 동안 손을 쥐고 있어야 하면 `--safe-pose fist`를 붙인다. `Ctrl+C`로 종료하면 Torque OFF 후 종료한다.
 
 ## 문제 해결
 - `error: ... not found. Run calibrate_motors`: 3단계를 먼저 한다 (공칭 영점으로 움직이지 않는다).
