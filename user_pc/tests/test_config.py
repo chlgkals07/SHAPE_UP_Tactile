@@ -41,14 +41,14 @@ def test_load_postures_requires_both_keys(tmp_path):
         load_postures(path)
 
 
-def test_default_postures_are_the_conservative_finger_test_values():
+def test_default_postures_are_the_full_fist_values():
     open_pose, fist_pose = load_postures(CONFIG_DIR / "postures.yaml")
     assert not open_pose.any()
     expected = {
-        "index_mcp_flex": 55.0, "index_pip_flex": 60.0, "index_dip_flex": 40.0,
-        "middle_mcp_flex": 55.0, "middle_pip_flex": 60.0, "middle_dip_flex": 40.0,
-        "ring_mcp_flex": 55.0, "ring_pip_flex": 60.0, "ring_dip_flex": 40.0,
-        "thumb_cmc_flex": 35.0, "thumb_mcp_flex": 40.0, "thumb_ip_flex": 35.0,
+        "index_mcp_flex": 90.0, "index_pip_flex": 100.0, "index_dip_flex": 80.0,
+        "middle_mcp_flex": 90.0, "middle_pip_flex": 100.0, "middle_dip_flex": 80.0,
+        "ring_mcp_flex": 90.0, "ring_pip_flex": 100.0, "ring_dip_flex": 80.0,
+        "thumb_cmc_flex": 60.0, "thumb_mcp_flex": 75.0, "thumb_ip_flex": 70.0,
     }
     np.testing.assert_array_equal(fist_pose, make_posture(expected))
     for side in ("index_mcp_side", "middle_mcp_side", "ring_mcp_side", "thumb_cmc_side"):
