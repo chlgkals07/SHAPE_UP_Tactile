@@ -8,3 +8,4 @@ LEAP Hand를 기반으로 adaptive grasping과 tactile/proprioceptive manipulati
 - [선행연구 정리](prior-work/README.md)
 
 - [`user_pc/`](user_pc/README.md): LEAP Hand 텔레옵 구현 (키보드 / OMY leader 그리퍼)
+- [HX5-D20 × OMY 촉각 보조 텔레옵 준비](docs/hx5-d20-omy-teleop.md)

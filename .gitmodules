@@ -2,3 +2,7 @@
 	path = third_party/open_manipulator
 	url = https://github.com/ROBOTIS-GIT/open_manipulator
 	branch = jazzy
+[submodule "third_party/robotis_hand"]
+	path = third_party/robotis_hand
+	url = https://github.com/ROBOTIS-GIT/robotis_hand.git
+	branch = jazzy

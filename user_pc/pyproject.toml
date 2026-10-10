@@ -12,6 +12,7 @@ dependencies = ["numpy", "PyYAML"]
 [project.optional-dependencies]
 hardware = ["dynamixel-sdk"]
 dev = ["pytest"]
+sim = ["mujoco>=3.2,<4"]
 
 [project.scripts]
 leap-teleop = "leap_teleop.cli:main"

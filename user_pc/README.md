@@ -3,6 +3,8 @@
 LEAP Hand v1을 키보드 또는 OMY leader 그리퍼로 구동한다.
 설계: `../docs/superpowers/specs/2026-10-08-leap-omy-teleop-design.md`
 
+HX5-D20 **왼손** 텔레옵은 별도 [`hx5_teleop`](src/hx5_teleop/) 경로에 있다. 기존 LEAP 16관절 드라이버 대신 공식 HX5 ROS 2 20관절 토픽을 쓰며, 동일한 `rh_r1_joint` 방아쇠 정규화 함수를 재사용한다. 촉각 입력은 손가락별 닫힘을 제한·미세 보정한다. 공식 Docker image에서 실행하는 [`run_hx5_docker.sh`](run_hx5_docker.sh)는 `--leader-open`과 `--leader-closed`의 실측값을 요구한다. 실물 연결 전의 실행 순서와 미검증 항목은 [HX5 × OMY 준비 문서](../docs/hx5-d20-omy-teleop.md)에 있다.
+
 ## 준비
 이 PC(Ubuntu 24.04 + ROS 2 Jazzy)에서 `dynamixel-sdk`는 `ros-jazzy-dynamixel-sdk`라서 **ROS를 source 해야** 시스템 `python3`에서 import 된다.
 source 하지 않은 셸에서는 `ModuleNotFoundError: dynamixel_sdk`가 난다. 둘 중 하나로 실행한다.
