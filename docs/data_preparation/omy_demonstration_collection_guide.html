@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>OMY 텔레오퍼레이션 데모 데이터 수집 가이드</title>
+  <style>
+    :root{--ink:#192a32;--muted:#5b6d75;--line:#dce6e8;--paper:#f6f9f8;--white:#fff;--teal:#087c78;--teal-dark:#075b59;--mint:#e7f5f0;--amber:#b56a18;--amber-bg:#fff5e6;--red:#a33739;--red-bg:#fff0ef;--nav:#0f2c34;--code:#142b33;--shadow:0 16px 45px rgba(15,44,52,.08)}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:var(--paper);font-family:system-ui,-apple-system,"Segoe UI","Noto Sans KR",sans-serif;line-height:1.68}a{color:var(--teal-dark);text-underline-offset:3px}button{font:inherit}code,pre{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}code{font-size:.9em;background:#eaf1f1;padding:.12em .34em;border-radius:4px;overflow-wrap:anywhere}pre code{padding:0;background:transparent;color:inherit;font-size:inherit}pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--code);color:#e6f6f3;border-radius:10px;padding:18px 19px;font-size:.86rem;line-height:1.6}h1,h2,h3{line-height:1.25;letter-spacing:-.03em}h2{font-size:1.8rem;margin:0 0 18px}h3{font-size:1.13rem;margin:27px 0 10px}p{margin:0 0 14px}ul,ol{padding-left:1.35rem;margin:10px 0 17px}li{margin:.32rem 0}small,.small{font-size:.84rem;color:var(--muted)}.top{background:var(--nav);color:white;padding:14px max(22px,calc((100vw - 1260px)/2));display:flex;align-items:center;justify-content:space-between;gap:18px}.brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:.08em;font-size:.79rem}.mark{width:22px;height:22px;border:5px solid #70d2c2;border-radius:50%;display:inline-block}.top a{color:#def5ef;text-decoration:none;font-size:.84rem}.hero{background:linear-gradient(130deg,#102e36 0%,#17444a 55%,#087c78 100%);color:white;padding:60px max(22px,calc((100vw - 1260px)/2)) 68px}.eyebrow{text-transform:uppercase;letter-spacing:.15em;color:#a9e5d7;font-size:.75rem;font-weight:800}.hero h1{font-size:clamp(2.1rem,5vw,3.65rem);max-width:900px;margin:15px 0 18px}.hero p{font-size:1.08rem;max-width:790px;color:#d8e9e8}.hero-meta{display:flex;flex-wrap:wrap;gap:9px;margin-top:25px}.hero-meta span{border:1px solid #71b4b0;border-radius:999px;padding:5px 12px;font-size:.78rem;color:#e4f8f3}.layout{max-width:1320px;margin:auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:44px;padding:32px 30px 95px}.sidebar{align-self:start;position:sticky;top:20px;background:var(--white);border:1px solid var(--line);border-radius:14px;padding:19px;box-shadow:var(--shadow)}.sidebar strong{display:block;font-size:.75rem;color:var(--muted);letter-spacing:.11em;margin:0 0 12px}.sidebar a{display:block;text-decoration:none;color:#3c555d;padding:6px 10px;border-radius:6px;font-size:.88rem}.sidebar a:hover{background:var(--mint);color:var(--teal-dark)}.progress{height:5px;background:#dce8e5;border-radius:9px;overflow:hidden;margin:19px 0 6px}.progress>span{display:block;height:100%;width:0;background:var(--teal)}.content{min-width:0}.section{background:var(--white);border:1px solid var(--line);border-radius:18px;padding:34px clamp(21px,4vw,43px);box-shadow:var(--shadow);margin-bottom:22px;scroll-margin-top:20px}.step{font-size:.75rem;letter-spacing:.12em;font-weight:800;color:var(--teal);margin-bottom:10px;text-transform:uppercase}.lead{font-size:1.04rem;color:#405860}.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin:26px 0 8px}.flow div{background:var(--mint);border:1px solid #c8e7dd;padding:15px 13px;border-radius:10px;font-size:.84rem;font-weight:750}.flow b{display:block;color:var(--teal);font-size:.72rem;margin-bottom:5px}.callout{border-left:4px solid var(--teal);background:var(--mint);padding:15px 18px;border-radius:0 9px 9px 0;margin:17px 0}.callout.warn{border-color:var(--amber);background:var(--amber-bg)}.callout.danger{border-color:var(--red);background:var(--red-bg)}.callout strong{display:block;margin-bottom:3px}.source{font-size:.82rem;color:var(--muted);border-top:1px solid var(--line);padding-top:15px;margin-top:25px}.source a{font-weight:650}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}.card{border:1px solid var(--line);background:#fbfdfd;border-radius:11px;padding:16px 18px}.card h3{margin:0 0 7px}.card p:last-child{margin-bottom:0}.tablewrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:.91rem;min-width:530px}th,td{text-align:left;vertical-align:top;border-bottom:1px solid var(--line);padding:10px 11px}th{background:#eff6f4;color:#274750;font-size:.81rem}td:first-child{font-weight:650}.cmd{margin:12px 0 19px}.cmdhead{display:flex;align-items:center;justify-content:space-between;padding:7px 11px 7px 15px;background:#244149;color:#d7eeea;border-radius:9px 9px 0 0;font-size:.74rem;font-weight:750}.cmdhead button{border:1px solid #59817e;color:white;background:transparent;border-radius:5px;padding:2px 9px;cursor:pointer}.cmdhead button:hover{background:#42605e}.cmd pre{border-radius:0 0 9px 9px}.checklist{list-style:none;padding:0;margin:8px 0 18px}.checklist li{margin:0;border-bottom:1px solid var(--line)}.checklist label{display:flex;gap:12px;align-items:flex-start;padding:9px 1px;cursor:pointer}.checklist input{accent-color:var(--teal);width:18px;height:18px;flex:none;margin-top:4px}.checklist input:checked+span{text-decoration:line-through;color:#6d8486}.numbered{counter-reset:item;list-style:none;padding:0}.numbered li{counter-increment:item;position:relative;padding:0 0 14px 38px;border-left:1px solid #cbded8;margin-left:13px}.numbered li::before{content:counter(item);position:absolute;left:-15px;top:0;width:29px;height:29px;border-radius:50%;background:var(--teal);color:#fff;display:grid;place-items:center;font-size:.83rem;font-weight:800}.numbered li:last-child{border-left-color:transparent}.tag{display:inline-block;color:var(--teal-dark);background:var(--mint);border-radius:5px;padding:2px 6px;font-size:.76rem;font-weight:750}.note{color:var(--muted);font-size:.88rem}.footer{max-width:1260px;margin:0 auto 50px;padding:0 30px;color:var(--muted);font-size:.82rem}.footer a{margin-right:14px}.print{background:#fff;border:1px solid #8ecdc1;color:var(--teal-dark);border-radius:7px;padding:6px 12px;cursor:pointer}@media(max-width:920px){.layout{display:block;padding:20px 15px 65px}.sidebar{position:static;margin-bottom:18px}.sidebar nav{display:grid;grid-template-columns:repeat(2,1fr)}.flow{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){.grid2,.flow{grid-template-columns:1fr}.hero{padding:43px 21px 49px}.section{padding:24px 19px}.top{padding:12px 20px}.top a{display:none}.sidebar nav{grid-template-columns:1fr 1fr}.sidebar a{font-size:.8rem}}@media print{body{background:#fff}.top,.sidebar,.print,.cmdhead button{display:none!important}.hero{padding:25px 0;color:#111;background:none}.hero p,.hero-meta span,.eyebrow{color:#444}.hero-meta span{border-color:#bbb}.layout{display:block;padding:0}.section{box-shadow:none;break-inside:avoid;border:0;border-top:1px solid #ccc;border-radius:0;padding:22px 0}.cmd pre{background:#eee;color:#111}.cmdhead{background:#ddd;color:#111}.footer{padding:0}.callout{print-color-adjust:exact}}
+  </style>
+</head>
+<body>
+  <header class="top"><div class="brand"><i class="mark" aria-hidden="true"></i> OMY FIELD GUIDE</div><span>ROBOTIS 문서 기반 실습 절차</span></header>
+  <div class="hero">
+    <div class="eyebrow">Demonstration collection · Teleoperation → LeRobot</div>
+    <h1>OMY 조작 시연 데이터<br>수집 가이드</h1>
+    <p>OMY 리더·팔로워 텔레오퍼레이션으로 VLA 학습용 시연을 기록하는 전체 흐름. 장비 연결부터 카메라 토픽, Cyclo Intelligence 녹화, 에피소드 검수와 변환까지 한 문서에서 따라갑니다.</p>
+    <div class="hero-meta"><span>기준: ROBOTIS 공식 문서</span><span>확인일: 2026-10-12</span><span>대상: OMY-F3M 팔로워 + OMY-L100 리더</span><span>독립 실행형 HTML</span></div>
+  </div>
+  <div class="layout">
+    <aside class="sidebar" aria-label="목차"><strong>CONTENTS</strong><nav>
+      <a href="#overview">00 · 전체 흐름</a><a href="#prereq">01 · 장비와 역할</a><a href="#robot">02 · 로봇·네트워크</a><a href="#camera">03 · 기본 카메라</a><a href="#d435i">03B · D435i 두 대 추가</a><a href="#cyclo">04 · Cyclo Intelligence</a><a href="#preflight">05 · 녹화 전 확인</a><a href="#record">06 · 에피소드 녹화</a><a href="#review">07 · 검수·변환</a><a href="#quality">08 · VLA 수집 원칙</a><a href="#trouble">09 · 문제 해결</a><a href="#references">참고 문서</a>
+    </nav><div class="progress"><span id="progressbar"></span></div><small id="progresslabel">체크리스트 0% 완료</small><p style="margin:15px 0 0"><button class="print" onclick="window.print()">인쇄 / PDF 저장</button></p></aside>
+    <main class="content">
+      <section id="overview" class="section"><div class="step">00 · 경로 선택</div><h2>이 문서의 수집 경로</h2>
+        <p class="lead">ROBOTIS는 새 모방학습 작업에 <strong>Cyclo Intelligence</strong>를 권장합니다. 이전 <code>Physical AI Tools</code>는 레거시 경로입니다. 여기서는 OMY 텔레오퍼레이션으로 시연하고 Cyclo Intelligence의 <code>Record</code>와 <code>Data Tools</code>를 사용합니다.</p>
+        <div class="flow"><div><b>01 · 연결</b>리더·팔로워, USER PC, 카메라</div><div><b>02 · 실행</b>Zenoh, 로봇, 카메라 노드</div><div><b>03 · 수집</b>토픽 확인 후 rosbag2 에피소드</div><div><b>04 · 정리</b>재생·선별·LeRobot 변환</div></div>
+        <div class="callout"><strong>사용 전 가정</strong>실제 장비 프로파일은 OMY-F3M 팔로워와 OMY-L100 리더이며, USER PC는 Linux와 Docker를 사용합니다. 제품 구성이나 소프트웨어 버전이 다르면 기종별 설정 및 토픽 이름을 먼저 확인하세요.</div>
+        <p class="source">출처: <a href="https://docs.robotis.com/docs/systems/omy/imitation_learning/overview/" target="_blank" rel="noopener">Imitation Learning Overview</a>, <a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/operation_guide/teleoperation/" target="_blank" rel="noopener">Teleoperation</a></p>
+      </section>
+
+      <section id="prereq" class="section"><div class="step">01 · 준비물과 배치</div><h2>장비와 실행 위치를 먼저 고정</h2>
+        <div class="tablewrap"><table><thead><tr><th>장치</th><th>역할</th><th>여기서 실행할 것</th></tr></thead><tbody><tr><td>OMY ROBOT PC</td><td>팔로워 하드웨어에 연결된 컴퓨터</td><td>OpenMANIPULATOR Docker 컨테이너, Zenoh 데몬, 리더·팔로워 launch</td></tr><tr><td>USER PC</td><td>카메라 USB와 수집 저장소가 있는 Linux PC</td><td>OpenMANIPULATOR 카메라 노드, Cyclo Intelligence 컨테이너·웹 UI</td></tr><tr><td>OMY-F3M / OMY-L100</td><td>실제 동작 팔로워 / 손으로 움직이는 리더</td><td>작업영역을 비운 뒤 동기화해 시연</td></tr><tr><td>카메라 3대</td><td>OMY 손목 <code>cam_wrist</code> + 추가 D435i 2대(<code>cam_front</code>, <code>cam_side</code>)</td><td>각각 USER PC에 연결해 서로 다른 영상 토픽 발행</td></tr></tbody></table></div>
+        <h3>USER PC 요구 사항</h3><ul><li>Docker 24 이상과 Compose, Git, 사용 가능한 디스크 <strong>최소 35 GB</strong>, 비어 있는 TCP <code>7080</code> 포트.</li><li>기록과 Data Tools는 GPU 없이 가능. 학습된 모델의 실행에는 NVIDIA GPU와 컨테이너 런타임이 필요합니다.</li><li>전원·네트워크·카메라 케이블을 로봇 가동 범위와 그리퍼에서 벗어나게 배치합니다.</li></ul>
+        <div class="cmd"><div class="cmdhead"><span>USER PC · 요구 사항 점검</span><button type="button" class="copy">복사</button></div><pre><code>docker compose version
+git --version
+df -h ~
+ss -ltn 'sport = :7080'</code></pre></div>
+        <p class="note">마지막 명령에서 출력이 없으면 기본 UI 포트 7080이 비어 있다는 뜻입니다.</p>
+        <p class="source">출처: <a href="https://docs.robotis.com/docs/systems/omy/imitation_learning/setup/" target="_blank" rel="noopener">Cyclo Intelligence Setup</a>, <a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/setup_guide/" target="_blank" rel="noopener">OMY Setup Guide</a></p>
+      </section>
+
+      <section id="robot" class="section"><div class="step">02 · 로봇과 통신</div><h2>Zenoh를 올린 뒤 텔레오퍼레이션</h2>
+        <ol class="numbered"><li><strong>로봇과 USER PC를 같은 접근 가능한 네트워크에 둡니다.</strong> OMY 전원을 켜고 본체 일련번호에 따른 호스트 이름 또는 실제 IP를 확인합니다. ROBOTIS 예시는 <code>omy-SNPR44B9999.local</code>입니다.</li><li><strong>ROBOT PC의 OpenMANIPULATOR 컨테이너에 들어갑니다.</strong> 초기 설정이 필요한 장비는 공식 Setup Guide의 하드웨어·전원·unpacking 절차를 먼저 완료합니다.</li><li><strong>Zenoh 데몬을 시작합니다.</strong> 네트워크에 최소 하나가 실행되어야 ROS 2 노드들이 서로 발견됩니다. 권장 위치는 로봇 측 컨테이너입니다.</li><li><strong>로봇 작업영역을 비우고 리더·팔로워 launch를 시작합니다.</strong> 이 명령은 팔로워를 초기 위치로 움직이고, 리더 중력 보상을 시작한 다음 두 팔을 동기화합니다.</li></ol>
+        <div class="cmd"><div class="cmdhead"><span>ROBOT PC 호스트 · SSH 및 컨테이너 진입 예시</span><button type="button" class="copy">복사</button></div><pre><code>ssh root@omy-SNPR44B9999.local
+cd /data/docker/open_manipulator
+./docker/container.sh start
+./docker/container.sh enter</code></pre></div>
+        <p class="note">호스트 이름은 실제 일련번호로 바꾸세요. 설치된 로봇 이미지와 계정 구성이 다르면 해당 장비의 접속 정보를 따릅니다.</p>
+        <div class="cmd"><div class="cmdhead"><span>ROBOT PC · OpenMANIPULATOR 컨테이너 · 터미널 A</span><button type="button" class="copy">복사</button></div><pre><code>zenohd</code></pre></div>
+        <div class="cmd"><div class="cmdhead"><span>ROBOT PC · 같은 컨테이너의 별도 터미널 B</span><button type="button" class="copy">복사</button></div><pre><code>ros2 launch open_manipulator_bringup omy_ai.launch.py</code></pre></div>
+        <div class="callout danger"><strong>즉시 움직일 수 있음</strong><code>omy_ai.launch.py</code> 실행 시 팔로워가 바로 움직일 수 있습니다. 주변 사람·물체를 치우고 비상 정지 수단을 확인한 뒤 시작하세요. 리더·팔로워 조작 중에 추론용 팔로워 bringup을 동시에 실행하지 마세요.</div>
+        <h3>USER PC의 Zenoh 연결</h3><p>카메라 노드를 실행할 USER PC의 OpenMANIPULATOR 컨테이너를 로봇 측 Zenoh 데몬에 클라이언트로 연결합니다. IP 예시 <code>192.168.0.42</code>를 실제 ROBOT PC 주소로 바꾸세요. 모든 관련 터미널·컨테이너에서 <code>ROS_DOMAIN_ID</code>를 일치시킵니다.</p>
+        <div class="cmd"><div class="cmdhead"><span>USER PC · OpenMANIPULATOR 컨테이너</span><button type="button" class="copy">복사</button></div><pre><code>export ZENOH_CONFIG_OVERRIDE='transport/shared_memory/enabled=true;mode="client";connect/endpoints=["tcp/192.168.0.42:7447"]'
+export RMW_IMPLEMENTATION=rmw_zenoh_cpp
+echo $ROS_DOMAIN_ID
+ros2 topic list</code></pre></div>
+        <p class="note">Cyclo Manager로 시작하는 경우에는 System 화면에서 Zenoh Daemon을 먼저 켜고 OMY 프로파일의 Robot Bringup을 시작합니다. 이 문서의 터미널 절차와 별도의 실행 경로이므로 같은 로봇 스택을 중복 실행하지 않습니다.</p>
+        <p class="source">출처: <a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/zenoh_communication/" target="_blank" rel="noopener">Zenoh Communication</a>, <a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/operation_guide/teleoperation/" target="_blank" rel="noopener">Teleoperation</a>, <a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/operation_guide/cyclo_manager/bringup/" target="_blank" rel="noopener">Cyclo Manager Bringup</a></p>
+      </section>
+
+      <section id="camera" class="section"><div class="step">03 · 카메라</div><h2>카메라 노드와 기록 설정을 연결</h2>
+        <p>표준 OMY 구성에서 카메라는 <strong>USER PC</strong>에 연결됩니다. OMY의 <code>Camera</code> 포트를 USB-C ↔ USB-A 케이블로 USER PC에 연결하고, USER PC의 OpenMANIPULATOR 컨테이너 안에서 카메라 노드를 실행합니다.</p>
+        <div class="cmd"><div class="cmdhead"><span>USER PC · OpenMANIPULATOR 컨테이너 · 손목 RealSense 한 대만 연결했을 때</span><button type="button" class="copy">복사</button></div><pre><code>ros2 launch realsense2_camera rs_launch.py camera_name:='cam_wrist'</code></pre></div>
+        <p class="note">D435i 두 대를 함께 연결하면 일련번호가 없는 이 기본 명령은 의도하지 않은 카메라를 선택할 수 있습니다. 세 대를 동시에 쓸 때는 아래 <a href="#d435i">D435i 두 대 추가 절차</a>처럼 손목 카메라까지 일련번호로 고정하세요.</p>
+        <p>영상 토픽이 네트워크에 보이는지 확인하세요. Cyclo Intelligence <code>Record</code> 화면의 <code>Camera Views</code>에서 실제 화면을 보고, <code>Topic Monitor</code>에서 토픽 수신과 측정 Hz를 확인합니다.</p>
+        <div class="cmd"><div class="cmdhead"><span>카메라 노드가 있는 컨테이너 · 토픽 확인</span><button type="button" class="copy">복사</button></div><pre><code>ros2 topic list
+# 위 목록에서 실제 영상 토픽을 찾은 뒤 실행
+ros2 topic hz &lt;actual_image_topic&gt;</code></pre></div>
+        <p class="note">카메라 네임스페이스와 압축 토픽의 실제 이름은 장치 설정에 따라 달라집니다. <code>&lt;actual_image_topic&gt;</code>을 실제 발행 토픽으로 바꾸세요.</p>
+        <h3>추가 카메라가 있을 때</h3><p>ROBOTIS 문서는 ZED2 및 USB 카메라도 허용합니다. 추가 뷰는 카메라 노드 실행과 로봇 설정 파일의 기록 대상 등록이 <strong>둘 다</strong> 필요합니다. Cyclo Intelligence는 로봇 설정 파일에 적힌 토픽만 기록합니다. 아래는 일반 예시이며, 이어지는 <a href="#d435i">D435i 두 대 전용 절차</a>에서는 실제 OMY-F3M 설정 파일을 기준으로 설명합니다.</p>
+        <div class="cmd"><div class="cmdhead"><span>USER PC · Cyclo Intelligence 호스트 · 설정 파일 찾기</span><button type="button" class="copy">복사</button></div><pre><code>cd ~/cyclo_intelligence/shared/shared/robot_configs
+ls
+nano &lt;your_robot&gt;_config.yaml</code></pre></div>
+        <div class="cmd"><div class="cmdhead"><span>설정 예시 · 실제 토픽으로 교체</span><button type="button" class="copy">복사</button></div><pre><code>observation:
+  images:
+    camera1:
+      topic: /camera1/image_raw/compressed
+      msg_type: sensor_msgs/msg/CompressedImage
+    camera2:
+      topic: /camera2/image_raw/compressed
+      msg_type: sensor_msgs/msg/CompressedImage
+      rotation_deg: 270</code></pre></div>
+        <p><code>camera2</code>는 변환 데이터셋의 observation 키가 됩니다. <code>rotation_deg</code>는 선택 사항이며 허용 값은 <code>0</code>, <code>90</code>, <code>180</code>, <code>270</code>입니다. USB 장치의 <code>/dev/videoN</code> 번호는 재연결 때 바뀔 수 있으므로 매번 확인합니다.</p>
+        <div class="cmd"><div class="cmdhead"><span>USER PC · 추가 카메라 장치와 노드 예시</span><button type="button" class="copy">복사</button></div><pre><code>v4l2-ctl --list-devices
+ros2 run usb_cam usb_cam_node_exe --ros-args --remap __node:=camera2 -p video_device:=/dev/video6 -r image_raw:=camera2/image_raw -r image_raw/compressed:=camera2/image_raw/compressed -r camera_info:=camera2/camera_info
+# RealSense를 추가한다면 위 USB 명령 대신:
+ros2 launch realsense2_camera rs_launch.py camera_name:=camera2</code></pre></div>
+        <p class="source">출처: <a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/setup_guide/" target="_blank" rel="noopener">OMY Camera Connection</a>, <a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/operation_guide/teleoperation/" target="_blank" rel="noopener">Teleoperation Camera Node</a>, <a href="https://docs.robotis.com/docs/systems/omy/imitation_learning/data_recording/" target="_blank" rel="noopener">Data Recording: robot config</a></p>
+      </section>
+
+      <section id="d435i" class="section"><div class="step">03B · 추가 카메라 실습</div><h2>D435i 두 대를 USER PC에 연결하기</h2>
+        <p class="lead">아래 예시는 OMY 손목 카메라를 유지하고, 작업대 정면의 D435i를 <code>cam_front</code>, 측면의 D435i를 <code>cam_side</code>로 추가합니다. <strong>두 D435i 모두 OMY의 Camera 포트가 아닌 USER PC의 USB 3 포트</strong>에 직접 연결합니다.</p>
+        <div class="callout"><strong>실행 순서</strong>이 절의 <strong>1 → 2 → 3 → 4</strong>를 순서대로 진행합니다. 3번을 시작하기 전에는 앞의 <a href="#robot">02절에서 로봇 측 Zenoh 데몬</a>을 켜고 USER PC의 OpenMANIPULATOR 컨테이너가 그 데몬에 연결되도록 설정해야 합니다. 이후 <a href="#cyclo">04절에서 Cyclo Intelligence를 설치·실행</a>하고 이 절의 <strong>5 → 6 → 7</strong>을 마칩니다. 이미 Cyclo가 설치되어 있다면 04절 설치 부분은 건너뛸 수 있습니다.</div>
+        <div class="tablewrap"><table><thead><tr><th>물리 장치</th><th>USB 연결</th><th>ROS 이름</th><th>Cyclo 관측 키</th></tr></thead><tbody><tr><td>OMY 손목 카메라</td><td>OMY Camera 포트 → USER PC</td><td><code>cam_wrist</code></td><td><code>cam_wrist</code></td></tr><tr><td>D435i #1 · 정면/상단 고정</td><td>USB-C ↔ USB 3 포트 A</td><td><code>cam_front</code></td><td><code>cam_front</code></td></tr><tr><td>D435i #2 · 측면 고정</td><td>USB-C ↔ USB 3 포트 B</td><td><code>cam_side</code></td><td><code>cam_side</code></td></tr></tbody></table></div>
+        <h3>1. 기계·USB 배치</h3><ol><li>정면 카메라는 작업대와 목표 위치가 한 화면에 들어오게, 측면 카메라는 그리퍼의 접근·파지와 물체 높이가 보이게 단단히 고정합니다. 고정 후 카메라 위치가 바뀌면 새 데이터 수집 세션으로 관리합니다.</li><li>각 D435i를 품질이 좋은 짧은 USB 3 케이블로 USER PC에 연결합니다. 가능하면 서로 독립적인 USB 3 포트/컨트롤러를 사용하고, 허브가 필요하면 외부 전원이 있는 USB 3 허브를 사용합니다. PC의 포트 두 개가 내부적으로 같은 허브를 공유할 수 있습니다.</li><li>카메라와 케이블에 <code>front</code>/<code>side</code> 라벨을 붙이고, 관절·그리퍼 이동 범위와 접촉하지 않도록 고정합니다. USB 연결만으로 두 카메라가 하드웨어 동기화되는 것은 아닙니다.</li></ol>
+        <p class="note">RealSense 다중 카메라 가이드는 직접 연결이 높은 대역폭에서 유리하고, USB 전원·케이블 품질·호스트 처리 능력도 프레임 손실에 영향을 준다고 설명합니다. 이 구성에서는 우선 자유 실행 카메라의 타임스탬프로 기록을 시작하고, 깊이 프레임의 엄밀한 하드웨어 동기가 필요한 별도 연구에서는 RealSense 동기화 가이드를 적용하세요.</p>
+        <h3>2. 세 카메라의 일련번호와 USB 3 연결 확인</h3><p>USER PC 호스트에서 손목 카메라와 추가 D435i 두 대를 한 대씩 연결해 물리 위치와 일련번호를 대응시킵니다. <code>rs-enumerate-devices</code>가 설치되어 있으면 각 장치의 Serial Number와 USB Type Descriptor가 보여야 합니다. <code>lsusb -t</code>에서 D435i 두 장치의 SuperSpeed 경로도 확인합니다.</p>
+        <div class="cmd"><div class="cmdhead"><span>USER PC 호스트 · 장치 식별</span><button type="button" class="copy">복사</button></div><pre><code>rs-enumerate-devices -S
+lsusb -t</code></pre></div>
+        <div class="callout"><strong>세 대의 일련번호 대응표를 남기세요</strong>예: 손목 SN <code>111111111111</code>, 정면 SN <code>123456789012</code>, 측면 SN <code>987654321098</code>. 이 숫자는 모두 설명용입니다. 실제 기기의 일련번호로 바꾸지 않으면 아래 launch가 연결되지 않습니다. USB 장치 번호(<code>/dev/videoN</code>)보다 일련번호를 기준으로 고정하면 재연결 시 카메라 이름이 뒤바뀌는 일을 막을 수 있습니다.</div>
+        <p>카메라를 USER PC의 OpenMANIPULATOR 컨테이너에서 실행하므로 그 안에서도 두 장치가 보여야 합니다. ROBOTIS의 OpenMANIPULATOR 컨테이너 설정은 <code>/dev:/dev</code>를 매핑하지만, 실제 설치본의 장치 접근 권한과 매핑을 확인합니다. 호스트에서 보이고 컨테이너에서 보이지 않으면 카메라 노드를 시작하기 전에 컨테이너 장치 매핑·권한을 수정합니다.</p>
+        <div class="cmd"><div class="cmdhead"><span>USER PC · OpenMANIPULATOR 컨테이너 · 장치/패키지 확인</span><button type="button" class="copy">복사</button></div><pre><code>rs-enumerate-devices -S
+ros2 pkg prefix realsense2_camera
+ros2 pkg prefix compressed_image_transport</code></pre></div>
+        <p class="note"><code>rs-enumerate-devices</code>가 없다면 librealsense 유틸리티의 설치 상태를 확인하세요. <code>compressed_image_transport</code>가 없다면 압축 영상 토픽이 나오지 않을 수 있습니다. 카메라가 실제로 연결된 USER PC의 OpenMANIPULATOR 이미지에 해당 ROS 패키지를 설치·유지해야 합니다.</p>
+        <h3>3. 카메라별 노드 실행 · 터미널 세 개</h3><p>USER PC의 OpenMANIPULATOR 컨테이너에서 앞서 설정한 Zenoh 연결 환경을 적용하고, 손목·정면·측면 카메라에 <strong>서로 다른 터미널</strong>을 사용합니다. 기존의 일련번호 없는 손목 카메라 노드가 실행 중이면 먼저 종료합니다. <code>serial_no</code>에는 ROS 2 숫자 문자열 처리 때문에 RealSense 문서대로 일련번호 앞에 밑줄(<code>_</code>)을 붙입니다. 세 노드는 기본 <code>camera</code> 네임스페이스를 공유하지만 이름은 각각 달라야 합니다.</p>
+        <div class="cmd"><div class="cmdhead"><span>USER PC · OpenMANIPULATOR 컨테이너 · 터미널 B · 손목 카메라</span><button type="button" class="copy">복사</button></div><pre><code># 111111111111을 손목 카메라의 실제 SN으로 교체
+ros2 launch realsense2_camera rs_launch.py \
+  camera_namespace:=camera camera_name:=cam_wrist \
+  serial_no:=_111111111111</code></pre></div>
+        <div class="cmd"><div class="cmdhead"><span>USER PC · OpenMANIPULATOR 컨테이너 · 터미널 C · 정면 D435i</span><button type="button" class="copy">복사</button></div><pre><code># 123456789012를 정면 카메라의 실제 SN으로 교체
+ros2 launch realsense2_camera rs_launch.py \
+  camera_namespace:=camera camera_name:=cam_front \
+  serial_no:=_123456789012 \
+  enable_color:=true enable_depth:=true \
+  rgb_camera.color_profile:=640x480x30 \
+  depth_module.depth_profile:=640x480x30</code></pre></div>
+        <div class="cmd"><div class="cmdhead"><span>USER PC · OpenMANIPULATOR 컨테이너 · 터미널 D · 측면 D435i</span><button type="button" class="copy">복사</button></div><pre><code># 987654321098을 측면 카메라의 실제 SN으로 교체
+ros2 launch realsense2_camera rs_launch.py \
+  camera_namespace:=camera camera_name:=cam_side \
+  serial_no:=_987654321098 \
+  enable_color:=true enable_depth:=true \
+  rgb_camera.color_profile:=640x480x30 \
+  depth_module.depth_profile:=640x480x30</code></pre></div>
+        <p class="note"><code>640×480 @ 30 Hz</code>는 세 카메라를 함께 시험하기 위한 시작값입니다. 해당 D435i가 이 RGB·깊이 프로필을 지원하는지 <code>rs-enumerate-devices</code>와 launch 로그로 확인하세요. 프레임이 떨어지면 해상도·FPS·USB 구성을 조정합니다. 깊이 데이터가 전혀 필요하지 않다면 <code>enable_depth:=false</code>로 바꿔 USB와 CPU 부하를 줄일 수 있습니다. IMU는 기본적으로 비활성이고 이 VLA 영상 경로에 필요하지 않습니다.</p>
+        <h3>4. ROS 토픽 세 쌍을 확인</h3><p>다음 경로는 기본 <code>camera</code> 네임스페이스와 위 이름을 사용했을 때의 기대 형태입니다. RealSense ROS wrapper 버전에 따라 RGB 기본 토픽이 <code>image_raw</code> 또는 <code>image_rect_raw</code>일 수 있으므로, <strong>실제로 발행되는 <code>/compressed</code> 토픽을 확인해 다음 YAML에 그대로 적어야 합니다.</strong></p>
+        <div class="cmd"><div class="cmdhead"><span>USER PC · OpenMANIPULATOR 컨테이너 · 토픽 확인</span><button type="button" class="copy">복사</button></div><pre><code>ros2 node list | grep -E 'cam_wrist|cam_front|cam_side'
+ros2 topic list -t | grep -E 'cam_(wrist|front|side).*(color|depth|camera_info)'
+# 실제 압축 RGB 토픽으로 아래 예시를 수정해서 측정
+ros2 topic hz /camera/cam_front/color/image_raw/compressed
+ros2 topic hz /camera/cam_side/color/image_raw/compressed</code></pre></div>
+        <p>기대하는 깊이 토픽 형태는 <code>/camera/cam_front/depth/image_rect_raw</code>와 <code>/camera/cam_side/depth/image_rect_raw</code>이며 메시지 형식은 보통 <code>sensor_msgs/msg/Image</code>입니다. RGB 압축 토픽은 <code>sensor_msgs/msg/CompressedImage</code>여야 합니다. 토픽 이름·형식·실제 Hz를 <code>ros2 topic list -t</code>, <code>ros2 topic info</code>, Cyclo의 <code>Topic Monitor</code>에서 재확인하세요.</p>
+        <div class="cmd"><div class="cmdhead"><span>USER PC · 토픽 형식 점검 예시</span><button type="button" class="copy">복사</button></div><pre><code>ros2 topic info /camera/cam_front/color/image_raw/compressed
+ros2 topic info /camera/cam_side/color/image_raw/compressed
+ros2 topic info /camera/cam_front/depth/image_rect_raw
+ros2 topic info /camera/cam_side/depth/image_rect_raw</code></pre></div>
+        <h3>5. OMY-F3M 수집 설정에 RGB 뷰 두 개 등록</h3><p>먼저 아래 <a href="#cyclo">04절의 Cyclo Intelligence 설치</a>를 완료합니다. USER PC 호스트의 <code>~/cyclo_intelligence/shared/shared/robot_configs/omy_f3m_config.yaml</code>을 복사해 백업한 뒤 수정합니다. 실제 파일의 최상위 구조는 <code>orchestrator → ros__parameters → omy_f3m</code>이며, 기존 <code>cam_wrist</code>와 관절·행동 항목은 유지합니다. 아래는 <code>observation.images</code>와 <code>recording.extra_topics</code>만 발췌한 예시입니다.</p>
+        <div class="cmd"><div class="cmdhead"><span>USER PC 호스트 · OMY-F3M 설정 백업과 편집</span><button type="button" class="copy">복사</button></div><pre><code>cd ~/cyclo_intelligence/shared/shared/robot_configs
+cp omy_f3m_config.yaml omy_f3m_config.yaml.bak
+nano omy_f3m_config.yaml</code></pre></div>
+        <div class="cmd"><div class="cmdhead"><span>YAML 발췌 · 실제 압축 토픽을 확인해 적용</span><button type="button" class="copy">복사</button></div><pre><code>orchestrator:
+  ros__parameters:
+    omy_f3m:
+      observation:
+        images:
+          cam_wrist:
+            topic: /camera/cam_wrist/color/image_rect_raw/compressed
+            msg_type: sensor_msgs/msg/CompressedImage
+          cam_front:
+            topic: /camera/cam_front/color/image_raw/compressed
+            msg_type: sensor_msgs/msg/CompressedImage
+          cam_side:
+            topic: /camera/cam_side/color/image_raw/compressed
+            msg_type: sensor_msgs/msg/CompressedImage
+      recording:
+        extra_topics:
+          - /tf
+          - /camera/cam_wrist/color/camera_info
+          - /camera/cam_front/color/camera_info
+          - /camera/cam_side/color/camera_info</code></pre></div>
+        <div class="callout warn"><strong>YAML 전체를 위 발췌본으로 덮어쓰지 마세요</strong>기존 파일의 <code>observation.state</code>, <code>action</code>, <code>urdf_path</code>를 반드시 보존합니다. <code>cam_front</code>/<code>cam_side</code>의 토픽이 시스템에서 <code>image_rect_raw/compressed</code>로 발행된다면 그 경로로 바꿉니다. <code>camera_info</code>도 실제 토픽을 확인해 넣으세요. ROBOTIS 설정 코드가 이를 카메라별 보정 스냅샷으로 연결합니다.</div>
+        <p>설정 변경 뒤 Cyclo Intelligence를 다시 시작하거나 로봇 유형을 다시 선택해 설정을 재읽도록 합니다. <code>Home</code>에서 <code>OMY F3M</code>을 선택하고 <code>Record → Camera Views</code>에 손목·정면·측면 세 화면이 모두 나타나는지 확인합니다. 첫 세 영상의 배치 순서는 YAML 입력 순서를 따르므로 위치가 헷갈리면 카메라 이름과 실제 장면을 함께 확인하세요.</p>
+        <h3>6. 깊이 데이터의 저장 범위 결정</h3><div class="callout warn"><strong>Depth 카메라 ≠ Depth 학습 데이터 자동 생성</strong>현재 ROBOTIS Cyclo Intelligence 설정 코드에서 LeRobot 변환·웹 영상 파이프라인이 지원하는 <code>observation.images</code> 형식은 <code>sensor_msgs/msg/CompressedImage</code>입니다. D435i의 원본 깊이 <code>sensor_msgs/msg/Image</code> 토픽을 <code>observation.images</code>에 넣어도 정상적인 깊이 VLA 관측으로 자동 변환된다고 볼 수 없습니다. 위 설정으로 수집되는 학습용 세 뷰는 RGB 영상입니다.</div>
+        <p>깊이 원본도 향후 연구를 위해 에피소드와 함께 보존하려면, 코드 스키마상 <code>recording.extra_topics</code>에 아래 두 원본 깊이 토픽을 추가해 MCAP 보조 토픽으로 기록할 수 있습니다. 이는 Cyclo 공식 문서의 기본 RGB 워크플로를 확장하는 방법이므로, <strong>짧은 시험 에피소드 후 MCAP 안에 깊이 메시지가 실제로 들어갔는지 반드시 검사</strong>하세요. LeRobot 변환 결과에는 별도 변환 코드가 없는 한 깊이 관측이 생기지 않습니다.</p>
+        <div class="cmd"><div class="cmdhead"><span>선택 사항 · 기존 recording.extra_topics 목록에 추가</span><button type="button" class="copy">복사</button></div><pre><code>          - /camera/cam_front/depth/image_rect_raw
+          - /camera/cam_front/depth/camera_info
+          - /camera/cam_side/depth/image_rect_raw
+          - /camera/cam_side/depth/camera_info</code></pre></div>
+        <div class="cmd"><div class="cmdhead"><span>USER PC · Cyclo Intelligence 컨테이너 · 시험 MCAP 확인</span><button type="button" class="copy">복사</button></div><pre><code># 아래 경로를 실제 데이터셋 이름과 에피소드 번호로 교체
+ros2 bag info /workspace/rosbag2/&lt;dataset_name&gt;/&lt;episode_index&gt;/</code></pre></div>
+        <p class="note"><code>ros2 bag info</code>에 두 깊이 토픽과 0보다 큰 메시지 수가 표시되는지 확인합니다. 기록 결과가 없다면 Cyclo 서비스를 재시작하고 설정 파일 경로, 발행 토픽, <code>Topic Monitor</code>를 다시 확인하세요.</p>
+        <p class="note">깊이 보존을 택하면 저장 용량이 크게 늘어납니다. 색·깊이의 픽셀 단위 정렬이 필요하면 RealSense의 <code>align_depth.enable</code>, 동일 카메라 내 프레임 결합이 필요하면 <code>enable_sync</code>를 검토하고 실제 출력 토픽과 타임스탬프를 별도로 검증하세요. 두 카메라 사이의 정밀 하드웨어 동기는 별도 배선·설정이 필요한 고급 구성입니다.</p>
+        <h3>7. 시험 에피소드의 합격 조건</h3><ul class="checklist"><li><label><input type="checkbox"><span>D435i 두 대가 USER PC 호스트와 OpenMANIPULATOR 컨테이너에서 서로 다른 SN으로 보인다.</span></label></li><li><label><input type="checkbox"><span><code>cam_front</code>, <code>cam_side</code> 노드와 각 압축 RGB 토픽이 발행되고 측정 Hz가 안정적이다.</span></label></li><li><label><input type="checkbox"><span>Cyclo Camera Views에서 손목·정면·측면 장면이 올바르게 대응한다.</span></label></li><li><label><input type="checkbox"><span>짧은 시험 에피소드를 저장·재생했을 때 세 영상과 관절 동작이 모두 보인다.</span></label></li><li><label><input type="checkbox"><span>깊이 보존을 선택했다면 시험 MCAP에서 두 원본 깊이 토픽과 메시지를 확인했다.</span></label></li></ul>
+        <p class="source">출처: <a href="https://dev.realsenseai.com/download/18385/" target="_blank" rel="noopener">RealSense D400 Multi-Camera Guide</a>, <a href="https://github.com/realsenseai/librealsense/blob/master/tools/enumerate-devices/readme.md" target="_blank" rel="noopener">rs-enumerate-devices</a>, <a href="https://github.com/realsenseai/realsense-ros/blob/ros2-master/README.md" target="_blank" rel="noopener">RealSense ROS 2 wrapper</a>, <a href="https://github.com/ROBOTIS-GIT/cyclo_intelligence/blob/main/shared/shared/robot_configs/omy_f3m_config.yaml" target="_blank" rel="noopener">OMY-F3M robot config</a>, <a href="https://github.com/ROBOTIS-GIT/cyclo_intelligence/blob/main/shared/shared/robot_configs/schema.py" target="_blank" rel="noopener">Cyclo config schema</a></p>
+      </section>
+
+      <section id="cyclo" class="section"><div class="step">04 · 수집 소프트웨어</div><h2>Cyclo Intelligence 설치·연결</h2>
+        <p>USER PC에서 설치 스크립트는 <code>~/cyclo_intelligence</code>에 저장소와 서브모듈을 가져옵니다. 이후 메인 컨테이너를 시작하고 그 안에서 Zenoh 주소를 설정합니다. 이미 설치되어 있다면 재설치 대신 공식 문서의 <code>git pull</code> 및 서브모듈 갱신 절차를 사용하세요.</p>
+        <div class="cmd"><div class="cmdhead"><span>USER PC 호스트 · 최초 설치</span><button type="button" class="copy">복사</button></div><pre><code>curl -fsSL https://raw.githubusercontent.com/ROBOTIS-GIT/cyclo_intelligence/main/install.sh | bash
+cd ~/cyclo_intelligence
+./docker/container.sh start
+./docker/container.sh enter</code></pre></div>
+        <div class="callout warn"><strong>실행 범위 확인</strong>설치 명령은 원격 스크립트를 바로 실행합니다. 운영 환경에서는 조직의 검토 절차에 맞춰 스크립트 내용을 확인한 뒤 실행하세요. 설치 프로그램은 Docker나 NVIDIA Container Toolkit을 대신 설치하지 않습니다.</div>
+        <p>Zenoh 데몬이 ROBOT PC에 있다면 Cyclo Intelligence 컨테이너도 같은 엔드포인트에 접속해야 합니다. 기존 <code>~/.bashrc</code>에 <code>ZENOH_CONFIG_OVERRIDE</code>가 있으면 중복 추가하지 말고 값을 수정합니다.</p>
+        <div class="cmd"><div class="cmdhead"><span>USER PC · Cyclo Intelligence 컨테이너 · 기존 설정 점검</span><button type="button" class="copy">복사</button></div><pre><code>grep ZENOH_CONFIG_OVERRIDE ~/.bashrc
+# 영구 설정이 필요하면 기존 줄을 편집하거나, 없을 때만 아래 export 줄을 ~/.bashrc에 추가
+nano ~/.bashrc</code></pre></div>
+        <p class="note">아래 <code>export</code> 줄의 IP를 실제 로봇 IP로 바꿔 현재 세션에서 먼저 연결을 확인하세요. 영구 설정은 같은 줄을 <code>~/.bashrc</code>에 넣은 뒤 <code>source ~/.bashrc</code>로 적용합니다.</p>
+        <div class="cmd"><div class="cmdhead"><span>USER PC · Cyclo Intelligence 컨테이너 · 현재 세션 연결</span><button type="button" class="copy">복사</button></div><pre><code>export ZENOH_CONFIG_OVERRIDE='transport/shared_memory/enabled=true;mode="client";connect/endpoints=["tcp/192.168.0.42:7447"]'
+ros2 topic list
+cyclo_intelligence</code></pre></div>
+        <p>브라우저에서 <code>http://localhost:7080/</code>을 엽니다. 다른 컴퓨터에서 접속하면 <code>localhost</code> 대신 Cyclo Intelligence가 실행 중인 USER PC의 IP를 사용합니다.</p>
+        <p class="source">출처: <a href="https://docs.robotis.com/docs/systems/omy/imitation_learning/setup/" target="_blank" rel="noopener">Cyclo Intelligence Setup</a></p>
+      </section>
+
+      <section id="preflight" class="section"><div class="step">05 · 녹화 전 점검</div><h2>첫 에피소드 전에 확인</h2>
+        <p>아래 항목을 실제 장비에서 확인합니다. 체크 상태는 이 브라우저에만 저장됩니다.</p>
+        <ul class="checklist"><li><label><input type="checkbox"><span>리더와 팔로워가 고정되어 있고 이동 범위에 사람, 장애물, 케이블이 없다.</span></label></li><li><label><input type="checkbox"><span>Zenoh 데몬이 실행 중이고 USER PC에서 로봇의 <code>/joint_states</code> 메시지를 볼 수 있다.</span></label></li><li><label><input type="checkbox"><span>OMY 리더·팔로워 동기화가 끝났고 작은 시험 동작에 팔로워가 예상대로 반응한다.</span></label></li><li><label><input type="checkbox"><span>카메라 화면에 그리퍼, 물체, 목표 위치가 필요한 만큼 보이며 가림·초점·노출 문제가 없다.</span></label></li><li><label><input type="checkbox"><span><code>Record → Camera Views</code>와 <code>Topic Monitor</code>에서 선택한 영상·관절 토픽이 실제로 수신된다.</span></label></li><li><label><input type="checkbox"><span>선택한 로봇 설정 파일의 <code>observation.images</code>와 실제 카메라 토픽 이름이 일치한다.</span></label></li><li><label><input type="checkbox"><span>작업 지시문, 성공 판정 기준, 시작·종료 장면, 에피소드 수와 변형 조건을 정했다.</span></label></li><li><label><input type="checkbox"><span>기록 디스크 공간이 충분하고 저장 위치에 쓰기 문제가 없다.</span></label></li></ul>
+        <div class="cmd"><div class="cmdhead"><span>USER PC · OpenMANIPULATOR 또는 Cyclo 컨테이너 · ROS 그래프 점검</span><button type="button" class="copy">복사</button></div><pre><code>echo $RMW_IMPLEMENTATION
+echo $ZENOH_CONFIG_OVERRIDE
+echo $ROS_DOMAIN_ID
+ros2 node list
+ros2 topic list
+ros2 topic echo /joint_states</code></pre></div>
+        <p class="source">출처: <a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/zenoh_communication/" target="_blank" rel="noopener">Zenoh Quick Checks</a>, <a href="https://docs.robotis.com/docs/systems/omy/imitation_learning/data_recording/" target="_blank" rel="noopener">Robot Preparation / Record Page</a>. 작업 품질 항목은 이 가이드의 운영 권장 사항입니다.</p>
+      </section>
+
+      <section id="record" class="section"><div class="step">06 · 시연 녹화</div><h2>하나의 시도 = 하나의 에피소드</h2>
+        <ol class="numbered"><li><strong>Home</strong>에서 로봇 유형을 선택합니다. 목록에는 <code>cyclo_intelligence/shared/shared/robot_configs</code>에 설정 파일이 있는 유형만 표시됩니다.</li><li><strong>Record</strong>로 이동해 <code>Camera Views</code>와 <code>Topic Monitor</code>를 다시 확인합니다. 화면이 비거나 토픽 수신이 없으면 녹화를 시작하지 않습니다.</li><li><strong>Rosbag Recorder</strong>에 <code>Task Num</code>, <code>Task Name</code>, <code>Task Instruction</code>을 입력합니다. 예: “검은 컵을 집어 재활용 상자에 넣어라”. 일반 기록은 <code>Add License</code>를 체크하지 않습니다.</li><li>세부 단계 레이블이 필요 없으면 <code>Number of SubTasks = 0</code>으로 둡니다. 단계별 지시가 필요하면 시작 전에 개수를 정하고 각 <code>Sub Task Instruction</code>을 입력합니다.</li><li>물체와 팔을 시작 자세에 놓고 <strong>Record Start</strong>를 누릅니다. 리더를 움직여 성공 시연을 수행한 뒤 <strong>Save Episode</strong>로 저장합니다. 실패하거나 잘못 기록한 시도는 <strong>Discard Episode</strong>를 누릅니다.</li><li>다음 시도 전 시작 조건을 재설정하고 반복합니다. 서브태스크를 사용하면 정한 단계 수를 모두 저장해야 에피소드가 완료됩니다.</li></ol>
+        <div class="tablewrap"><table><thead><tr><th>입력 필드</th><th>의미</th><th>권장 입력 방식</th></tr></thead><tbody><tr><td>Task Num</td><td>데이터셋 작업 번호/식별자</td><td>작업별로 고정해 관리</td></tr><tr><td>Task Name</td><td>짧은 작업명</td><td>한 작업에 일관된 이름 사용</td></tr><tr><td>Task Instruction</td><td>시연 전체의 자연어 지시</td><td>대상·동작·목적지를 명확히 기술</td></tr><tr><td>Number of SubTasks</td><td>단계별 레이블 수</td><td>단일 연속 시연이면 <code>0</code></td></tr><tr><td>Sub Task Instruction</td><td>각 단계의 자연어 지시</td><td>서브태스크가 있을 때만 입력</td></tr></tbody></table></div>
+        <div class="callout warn"><strong>서브태스크 개수는 녹화 전에 결정</strong>예를 들어 “접근 → 잡기 → 놓기”를 각 단계로 레이블하려면 3을 입력하고 각 단계를 순서대로 저장합니다. 단일 에피소드에 하나의 전체 지시만 필요하면 0이 단순합니다.</div>
+        <h3>저장 위치와 파일</h3><p>원본 rosbag2 데이터는 Cyclo Intelligence 컨테이너의 <code>/workspace/rosbag2/&lt;dataset_name&gt;/&lt;episode_index&gt;/</code>에 저장됩니다. 호스트에서는 <code>$HOME/cyclo_intelligence/docker/workspace/rosbag2/...</code>에서 찾습니다.</p>
+        <div class="tablewrap"><table><thead><tr><th>산출물</th><th>확인할 내용</th></tr></thead><tbody><tr><td><code>metadata.yaml</code></td><td>rosbag2 에피소드 메타데이터</td></tr><tr><td><code>episode_info.json</code></td><td>작업 정보와 기록 상세</td></tr><tr><td><code>*.mcap</code></td><td>기록된 ROS 2 데이터</td></tr><tr><td><code>videos/</code></td><td>카메라 영상과 카메라별 타임스탬프</td></tr><tr><td><code>camera_info/</code></td><td>카메라 보정 정보 스냅샷</td></tr></tbody></table></div>
+        <p class="source">출처: <a href="https://docs.robotis.com/docs/systems/omy/imitation_learning/data_recording/" target="_blank" rel="noopener">Data Recording</a></p>
+      </section>
+
+      <section id="review" class="section"><div class="step">07 · 데이터 마감</div><h2>검수 → 정리 → LeRobot 변환</h2>
+        <ol class="numbered"><li><strong>Review Episodes:</strong> <code>Select Task</code>에서 <code>/workspace/rosbag2</code>의 작업 폴더를 선택하고 각 에피소드를 재생합니다. 카메라 뷰, 3D 뷰, 관절 데이터, 지시문, 타임라인을 확인합니다.</li><li><strong>Delete Episodes:</strong> 실패 동작, 누락된 영상, 잘못된 지시문 등 사용할 수 없는 에피소드의 인덱스를 기록해 삭제합니다. 남은 인덱스를 <code>0..N-1</code>로 다시 매기려면 <code>Compact indices after delete</code>를 켭니다. 삭제 전 원본 백업을 권장합니다.</li><li><strong>Merge Rosbag Datasets:</strong> 같은 작업을 여러 폴더에 나눠 녹화했다면 필요한 경우 합칩니다. 결과는 <code>/workspace/rosbag2</code>에 생성됩니다.</li><li><strong>Convert Dataset:</strong> 검수한 작업을 선택하고 실제 카메라 발행 속도에 맞춰 목표 <code>FPS</code>를 정한 뒤 <code>LeRobot v2.1</code>, <code>v3.0</code> 또는 둘 다 선택합니다. 결과는 <code>/workspace/lerobot</code>에 저장됩니다.</li><li><strong>외부 학습 환경으로 전달:</strong> 필요한 경우 Data Tools의 Hugging Face 업로드 기능으로 변환 데이터셋을 전송합니다. 업로드 권한과 공개 범위는 사용 중인 계정·프로젝트 정책에 맞춰 결정합니다.</li></ol>
+        <div class="callout"><strong>FPS 기준</strong>15 Hz 카메라면 15 FPS, 30 Hz면 30 또는 용량을 줄인 15 FPS가 문서의 예시입니다. 카메라별 속도가 다르면 가장 느린 카메라를 기준으로 합니다. 변환은 실제로 없는 프레임을 만들어내지 못합니다.</div>
+        <p>Cyclo Data는 MCAP에서 관측과 행동을 목표 FPS에 맞춰 정렬하고, 카메라 타임스탬프로 대응 MP4 프레임을 선택합니다. 변환 완료 후 짧은 에피소드 몇 개를 다시 재생해 영상·행동 정렬과 지시문을 확인하세요.</p>
+        <p class="source">출처: <a href="https://docs.robotis.com/docs/systems/omy/imitation_learning/data_tools/" target="_blank" rel="noopener">Data Tools</a></p>
+      </section>
+
+      <section id="quality" class="section"><div class="step">08 · 운영 권장 사항</div><h2>VLA 학습에 쓰기 좋은 시연으로 만들기</h2>
+        <p class="note">이 절은 ROBOTIS UI 조작 명령이 아니라 데이터 품질을 위한 운영 권장 사항입니다. 장비와 학습 목표에 맞춰 조정하세요.</p>
+        <div class="grid2"><div class="card"><h3>언어 지시</h3><p>한 작업에 동일한 의미의 지시문을 일관되게 사용합니다. 물체·동작·목표 위치를 구체적으로 적고, 장면에서 확인할 수 없는 정보를 넣지 않습니다.</p></div><div class="card"><h3>시작과 끝</h3><p>시작 시 물체 위치와 팔 자세를 의도적으로 기록하고, 성공 판정이 화면에서 명확한 시점까지 이어갑니다. 매 시도마다 시작 조건을 기록해 분포를 추적합니다.</p></div><div class="card"><h3>장면 다양성</h3><p>물체 위치, 방향, 배경, 조명을 계획적으로 바꿉니다. 한 번에 많은 조건을 바꾸기보다 어떤 변화가 들어갔는지 메모합니다.</p></div><div class="card"><h3>품질 관리</h3><p>첫 3~5개 에피소드를 곧바로 재생해 영상 누락·관절 불연속·시간 어긋남을 확인합니다. 이상이 있으면 대량 수집 전에 연결과 설정을 고칩니다.</p></div></div>
+        <h3>권장 작업 기록표</h3><div class="tablewrap"><table><thead><tr><th>기록</th><th>예시</th></tr></thead><tbody><tr><td>작업 정의</td><td>검은 컵을 집어 오른쪽 상자에 놓기</td></tr><tr><td>성공 기준</td><td>그리퍼가 컵을 놓고 팔이 시야를 벗어나면 완료</td></tr><tr><td>카메라 구성</td><td>손목 <code>cam_wrist</code> + 고정 측면 카메라</td></tr><tr><td>변형 조건</td><td>컵 시작 위치 3곳, 방향 2종, 조명 2종</td></tr><tr><td>실패 사유</td><td>미집기 / 충돌 위험 / 프레임 누락 / 지시 오류</td></tr><tr><td>데이터 버전</td><td>원본 rosbag2 폴더와 변환 FPS·LeRobot 버전</td></tr></tbody></table></div>
+      </section>
+
+      <section id="trouble" class="section"><div class="step">09 · 진단</div><h2>막히는 지점별 확인 순서</h2>
+        <div class="tablewrap"><table><thead><tr><th>증상</th><th>먼저 확인할 것</th><th>조치</th></tr></thead><tbody><tr><td>ROS 2 토픽이 보이지 않음</td><td>Zenoh 데몬, 실제 로봇 IP, 7447 연결, <code>ROS_DOMAIN_ID</code></td><td>로봇 측 데몬 실행 → USER PC의 <code>ZENOH_CONFIG_OVERRIDE</code> 수정 → <code>ros2 daemon stop</code> 후 재확인</td></tr><tr><td>토픽은 보이나 값이 안 옴</td><td>컨테이너 네트워크 구성과 RMW, 카메라/로봇 노드 로그</td><td><code>ros2 topic echo /joint_states</code>와 Camera Views로 실제 메시지 흐름 확인</td></tr><tr><td>카메라 화면이 비어 있음</td><td>USB 연결, 카메라 노드, 실제 이미지 토픽</td><td>장치 재인식 후 토픽 이름과 로봇 설정 파일의 이름을 일치</td></tr><tr><td>D435i가 한 대만 보임</td><td>호스트·컨테이너의 <code>rs-enumerate-devices -S</code>, USB 3 링크, 전원</td><td>각 카메라를 단독으로 시험하고 포트·짧은 케이블·전원 공급 허브를 바꿔 비교</td></tr><tr><td>정면/측면 영상이 뒤바뀜</td><td>각 노드의 <code>serial_no</code>와 실제 기기 SN</td><td>일련번호 대응표를 수정하고 카메라 노드를 재시작</td></tr><tr><td>압축 RGB 토픽이 없음</td><td><code>compressed_image_transport</code>, 실제 <code>image_raw</code>/<code>image_rect_raw</code> 경로</td><td>USER PC 카메라 컨테이너의 플러그인 설치와 발행 토픽 확인</td></tr><tr><td>녹화했는데 영상이 빠짐</td><td>선택 로봇 config의 <code>observation.images</code>, Record의 Topic Monitor</td><td>설정에 발행 중인 토픽을 등록하고 짧은 시험 에피소드 재수집</td></tr><tr><td>깊이가 LeRobot 결과에 없음</td><td>Cyclo의 압축 RGB 변환 지원 범위</td><td>원본 깊이 토픽은 보조 MCAP으로 보존하고 별도 변환 파이프라인 설계</td></tr><tr><td>변환 FPS가 맞지 않음</td><td>각 영상 토픽의 실제 측정 Hz</td><td>가장 느린 카메라 이하로 목표 FPS 설정</td></tr></tbody></table></div>
+        <div class="callout danger"><strong>예상하지 못한 팔 움직임</strong>조작을 중지하고 주변을 확보합니다. 리더·팔로워 제어와 추론용 팔로워 bringup이 중복 실행 중인지 확인한 뒤, 안전한 상태에서 하나의 제어 경로만 재시작하세요.</div>
+        <p class="source">출처: <a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/zenoh_communication/" target="_blank" rel="noopener">Zenoh Quick Checks</a>, <a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/operation_guide/teleoperation/" target="_blank" rel="noopener">Teleoperation</a>, <a href="https://docs.robotis.com/docs/systems/omy/imitation_learning/data_recording/" target="_blank" rel="noopener">Data Recording</a>, <a href="https://docs.robotis.com/docs/systems/omy/imitation_learning/data_tools/" target="_blank" rel="noopener">Data Tools</a></p>
+      </section>
+
+      <section id="references" class="section"><div class="step">원문 링크</div><h2>공식 참고 문서</h2><ul><li><a href="https://docs.robotis.com/docs/systems/omy/imitation_learning/overview/" target="_blank" rel="noopener">ROBOTIS Imitation Learning Overview</a> — 지원 경로 선택</li><li><a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/setup_guide/" target="_blank" rel="noopener">ROBOTIS OMY Setup Guide</a> — 장비, 카메라 연결, 컨테이너</li><li><a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/zenoh_communication/" target="_blank" rel="noopener">ROBOTIS Zenoh Communication</a> — 로봇과 외부 PC 통신</li><li><a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/operation_guide/teleoperation/" target="_blank" rel="noopener">ROBOTIS Teleoperation</a> — 리더·팔로워 및 카메라 노드</li><li><a href="https://docs.robotis.com/docs/systems/omy/imitation_learning/setup/" target="_blank" rel="noopener">ROBOTIS Cyclo Intelligence Setup</a> — 수집 UI 설치</li><li><a href="https://docs.robotis.com/docs/systems/omy/imitation_learning/data_recording/" target="_blank" rel="noopener">ROBOTIS Data Recording</a> — 에피소드 녹화와 저장 형식</li><li><a href="https://docs.robotis.com/docs/systems/omy/imitation_learning/data_tools/" target="_blank" rel="noopener">ROBOTIS Data Tools</a> — 검수, 삭제, 병합, 변환</li><li><a href="https://dev.realsenseai.com/download/18385/" target="_blank" rel="noopener">RealSense D400 Multi-Camera Guide</a> — 다중 카메라 USB·전원·동기화</li><li><a href="https://github.com/realsenseai/realsense-ros/blob/ros2-master/README.md" target="_blank" rel="noopener">RealSense ROS 2 wrapper</a> — 일련번호, 노드 이름, 토픽</li><li><a href="https://github.com/ROBOTIS-GIT/cyclo_intelligence/blob/main/shared/shared/robot_configs/omy_f3m_config.yaml" target="_blank" rel="noopener">Cyclo OMY-F3M config</a> — 손목 영상과 로봇 관측 설정</li><li><a href="https://github.com/ROBOTIS-GIT/cyclo_intelligence/blob/main/shared/shared/robot_configs/schema.py" target="_blank" rel="noopener">Cyclo config schema</a> — 압축 영상 및 보조 토픽 지원 범위</li></ul><p class="note">이 가이드는 2026-10-12에 확인한 공개 문서 기준입니다. 명령·UI·지원 기종은 ROBOTIS와 RealSense 업데이트에 따라 달라질 수 있으므로 실행 전에 해당 섹션의 원문을 확인하세요.</p></section>
+    </main>
+  </div>
+  <footer class="footer">OMY Demonstration Collection Guide · ROBOTIS 공식 문서를 바탕으로 작성한 한국어 실습 요약</footer>
+  <script>
+    document.querySelectorAll('.copy').forEach(button=>button.addEventListener('click',async()=>{const pre=button.closest('.cmd').querySelector('pre');const code=pre.innerText;try{await navigator.clipboard.writeText(code);button.textContent='복사됨';setTimeout(()=>button.textContent='복사',1600)}catch{const range=document.createRange();range.selectNodeContents(pre);const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);button.textContent='선택됨 · Ctrl+C';setTimeout(()=>button.textContent='복사',2200)}}));
+    const checks=[...document.querySelectorAll('.checklist input')];const key='omy-demo-guide-checks-v1';try{const saved=JSON.parse(localStorage.getItem(key)||'[]');checks.forEach((c,i)=>c.checked=!!saved[i])}catch{}function update(){const n=checks.filter(c=>c.checked).length;const p=checks.length?Math.round(n/checks.length*100):0;document.querySelector('#progressbar').style.width=p+'%';document.querySelector('#progresslabel').textContent=`체크리스트 ${n}/${checks.length} 완료 · ${p}%`;try{localStorage.setItem(key,JSON.stringify(checks.map(c=>c.checked)))}catch{}}checks.forEach(c=>c.addEventListener('change',update));update();
+  </script>
+</body>
+</html>
