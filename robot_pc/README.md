@@ -39,7 +39,7 @@ OMY's END board forwards packets to ID 140 or supplies enough current.
 
 Use the OMY ROS 2 Jazzy environment that already contains
 `open_manipulator_bringup`, `open_manipulator_description`,
-`dynamixel_hardware_interface`, `robotis_interfaces`, and
+`dynamixel_hardware_interface`, and
 `realsense2_description`. Add the hand description, pressure broadcaster,
 and this package to a colcon overlay. One possible layout is:
 
@@ -57,10 +57,15 @@ ln -s "$OMY_HX5_REPO"/robot_pc/omy_hx5_bringup ~/omy_hx5_ws/src/omy_hx5_bringup
 ln -s "$OMY_HX5_REPO"/third_party/robotis_hand/robotis_hand_description ~/omy_hx5_ws/src/robotis_hand_description
 ln -s "$OMY_HX5_REPO"/third_party/robotis_hand/robotis_hand_pressure_broadcaster ~/omy_hx5_ws/src/robotis_hand_pressure_broadcaster
 ln -s "$OMY_HX5_REPO"/third_party/robotis_hand/robotis_hand_playground ~/omy_hx5_ws/src/robotis_hand_playground
+if [ ! -d ~/omy_hx5_ws/src/robotis_interfaces ]; then
+  git clone --depth 1 --branch jazzy https://github.com/ROBOTIS-GIT/robotis_interfaces.git ~/omy_hx5_ws/src/robotis_interfaces
+fi
 source /opt/ros/jazzy/setup.bash
 source /path/to/omy_ws/install/setup.bash
 cd ~/omy_hx5_ws
-colcon build --packages-up-to omy_hx5_bringup
+sudo apt-get update
+rosdep install --from-paths src --ignore-src --rosdistro jazzy -y
+MAKEFLAGS=-j2 CMAKE_BUILD_PARALLEL_LEVEL=2 colcon build --symlink-install --parallel-workers 1 --packages-up-to omy_hx5_bringup
 source install/setup.bash
 ```
 
@@ -68,6 +73,19 @@ Replace `/path/to/SHAPE_UP_Tactile` and `/path/to/omy_ws` with the robot
 PC's checkout and installed OMY workspace. Check all package prefixes
 with `ros2 pkg prefix PACKAGE_NAME` before building. Use the same ROS domain,
 RMW, and Zenoh setup as the installed OMY system.
+
+The five-month-old OMY image inspected on the robot contained
+`dynamixel_interfaces` but no `robotis_interfaces`. The latter is a separate
+official package providing `HandPressures` and `TactileSensor`; download its
+Jazzy source into the overlay before building. `rosdep install` also installs
+the Matplotlib dependency required by the tactile heatmap. The executable
+command sheet uses the actual container paths `/root/ros2_ws` and
+`/workspace/omy_ws`.
+
+On 2026-10-13, the actual OMY SNPR44B1050 container rebuilt all five overlay
+packages successfully after adding `robotis_interfaces` Jazzy commit
+`7a5670cb3fb3f42b479a1fbf17c1e767b43db067` and installing the missing
+Matplotlib dependency. This was a build check; no motor-control launch ran.
 
 ## Start and inspect
 

@@ -54,8 +54,16 @@ mkdir -p /workspace/omy_ws/src
 [ -e /workspace/omy_ws/src/robotis_hand_pressure_broadcaster ] || ln -s "$OMY_HX5_REPO/third_party/robotis_hand/robotis_hand_pressure_broadcaster" /workspace/omy_ws/src/robotis_hand_pressure_broadcaster
 [ -e /workspace/omy_ws/src/robotis_hand_playground ] || ln -s "$OMY_HX5_REPO/third_party/robotis_hand/robotis_hand_playground" /workspace/omy_ws/src/robotis_hand_playground
 
+# 기존 OMY 이미지에 없는 HandPressures/TactileSensor 메시지 소스 추가.
+if [ ! -d /workspace/omy_ws/src/robotis_interfaces ]; then
+  git clone --depth 1 --branch jazzy https://github.com/ROBOTIS-GIT/robotis_interfaces.git /workspace/omy_ws/src/robotis_interfaces
+fi
+
 cd /workspace/omy_ws
-colcon build --symlink-install --packages-up-to omy_hx5_bringup
+apt-get update
+rosdep install --from-paths src --ignore-src --rosdistro jazzy -y
+# Robot PC 메모리 사용을 제한하기 위해 패키지 1개, 컴파일 작업 2개씩 실행.
+MAKEFLAGS=-j2 CMAKE_BUILD_PARALLEL_LEVEL=2 colcon build --symlink-install --parallel-workers 1 --packages-up-to omy_hx5_bringup
 source /workspace/omy_ws/install/setup.bash
 ```
 
