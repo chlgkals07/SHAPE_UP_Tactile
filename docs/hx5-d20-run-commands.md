@@ -4,8 +4,8 @@
 
 ```bash
 # User PC와 OMY를 이더넷으로 연결한 뒤 실행.
-# SNPR44B1050의 10/09 현장 접속 주소. 실제 mDNS 응답은 연결 후 확인.
-export OMY_ROBOT_HOST="omy-snpr44b1050.local"
+# SNPR44B1050에서 마지막으로 확인된 직접 연결 IP. 재부팅 후 바뀌면 실제 IP 사용.
+export OMY_ROBOT_HOST="10.42.0.241"
 ssh root@"$OMY_ROBOT_HOST"
 ```
 
@@ -70,7 +70,7 @@ source /workspace/omy_ws/install/setup.bash
 ## User PC 호스트 — 터미널 A / B / C마다 새 SSH 접속
 
 ```bash
-export OMY_ROBOT_HOST="omy-snpr44b1050.local"
+export OMY_ROBOT_HOST="10.42.0.241"
 ssh root@"$OMY_ROBOT_HOST"
 ```
 
@@ -92,72 +92,12 @@ export ROS_DOMAIN_ID=30
 export RMW_IMPLEMENTATION=rmw_zenoh_cpp
 ```
 
-## Robot PC 컨테이너 — 기존 자동 실행 / 포트 점유 확인
-
-```bash
-# 기존 follower/leader bringup이 실행 중이면 원래 실행 절차로 중지한 뒤 HX5 launch 실행.
-# 기존 omy_ai와 HX5 launch를 동시에 실행하지 않음.
-ros2 node list
-pgrep -af 'ros2_control_node|omy_ai|rmw_zenohd|zenohd'
-```
-
 ## Robot PC 컨테이너 · 터미널 A — Zenoh 라우터
 
 ```bash
 # 이미 라우터가 실행 중이면 생략. 이 터미널은 계속 유지.
 # main의 zenohd alias 대신 .bashrc 의존성이 없는 명령 사용.
 ros2 run rmw_zenoh_cpp rmw_zenohd
-```
-
-## Robot PC 컨테이너 — ID 140 ping 준비
-
-```bash
-# 컨테이너 root 셸에서 최초 한 번.
-apt-get update
-apt-get install -y python3-venv
-python3 -m venv /workspace/hx5_ping_venv
-/workspace/hx5_ping_venv/bin/python -m pip install 'dynamixel-sdk==4.1.0'
-```
-
-## Robot PC 컨테이너 — END ID 210 / 손 ID 140 확인
-
-```bash
-# 4핀 핀 배열·극성·전압·전류 용량 확인 후 통전한 상태에서 실행.
-# /dev/ttyAMA4를 사용하는 모든 OMY/HX5 bringup을 먼저 중지.
-# ping만 전송하며 토크 활성화·재시작·관절 목표 쓰기를 하지 않음.
-/workspace/hx5_ping_venv/bin/python - <<'PY'
-from dynamixel_sdk import COMM_SUCCESS, PacketHandler, PortHandler
-
-port = PortHandler('/dev/ttyAMA4')
-packet = PacketHandler(2.0)
-try:
-    if not port.openPort():
-        raise SystemExit('Cannot open /dev/ttyAMA4; check path, permissions, and other owners')
-except OSError as exc:
-    raise SystemExit(f'Cannot open /dev/ttyAMA4: {exc}') from None
-
-hand_replied = False
-try:
-    if not port.setBaudRate(4_000_000):
-        raise SystemExit('Cannot set /dev/ttyAMA4 to 4 Mbps')
-    for device_id in (210, 140):
-        model, result, error = packet.ping(port, device_id)
-        if result != COMM_SUCCESS:
-            print(f'ID {device_id}: no reply: {packet.getTxRxResult(result)}')
-        elif error:
-            print(f'ID {device_id}: device error: {packet.getRxPacketError(error)}')
-        else:
-            print(f'ID {device_id}: ping OK, model number {model}')
-            if device_id == 140:
-                hand_replied = True
-except OSError as exc:
-    raise SystemExit(f'Serial communication failed: {exc}') from None
-finally:
-    port.closePort()
-
-if not hand_replied:
-    raise SystemExit('HX5 ID 140 did not reply; do not start real hand bringup')
-PY
 ```
 
 ## Robot PC 컨테이너 · 터미널 B — 손 전용 모의 제어
@@ -169,26 +109,16 @@ ros2 launch omy_hx5_bringup omy_hx5_hand_only.launch.py \
   mock_arm:=true mock_hand:=true hand_dry_run:=false
 ```
 
-## Robot PC 컨테이너 · 터미널 B — 실물 손 드라이런
+## Robot PC 컨테이너 · 터미널 B — 실물 손 직접 제어
 
 ```bash
-# 전기 조건·ID 140 통신 확인 후 실행. 실제 팔이 10초 동안 unpack 영점으로 이동함.
+# 별도 포트/ID ping 명령 없이 실물 드라이버와 손 명령 브리지를 실행.
+# 실제 팔이 10초 동안 unpack 영점으로 이동함.
 # 시작 자세는 공식 포장 자세 또는 이미 unpack된 자세여야 함.
-# unpack 완료 후 팔 컨트롤러가 계속 자세를 유지. 손 궤적만 드라이런.
-# 기존 omy_3m_unpack.launch.py 또는 omy_ai와 동시에 실행하지 않음.
-ros2 launch omy_hx5_bringup omy_hx5_hand_only.launch.py \
-  mock_arm:=false mock_hand:=false hand_dry_run:=true end_port:=/dev/ttyAMA4
-```
-
-## Robot PC 컨테이너 · 터미널 C — 드라이런에서 실물 손 개폐로 전환
-
-```bash
-# 터미널 B의 launch를 종료하지 않고 유지. 팔 컨트롤러도 계속 실행됨.
-# User PC 키보드에서 z를 누르고, 손끝을 무접촉 상태로 둔 뒤 실행.
-# arm_unpack_ready=true, 실제 손이 열린 자세, 키보드 입력이 신선할 때만 허용됨.
-ros2 topic echo /hx5/arm_unpack_ready --once
-ros2 param set /hx5_left_omy_teleop command_enabled true
-# 새 촉각 baseline 수집 후 [ 또는 ] 키로 작은 범위부터 시험.
+# unpack 완료 후 팔 컨트롤러가 자세를 유지. 손 명령은 열린 키보드 입력과
+# 실제 관절 상태·촉각 baseline이 준비된 뒤 발행됨.
+# 기존 omy_3m_unpack.launch.py 또는 omy_ai는 원래 터미널에서 종료한 뒤 실행.
+ros2 launch omy_hx5_bringup omy_hx5_hand_live.launch.py
 ```
 
 ## Robot PC 컨테이너 · 터미널 C — 손 명령만 중지
@@ -226,7 +156,7 @@ export ZENOH_CONFIG_OVERRIDE="mode=\"client\";connect/endpoints=[\"tcp/${OMY_ROB
 ros2 daemon stop
 
 # ]: 5% 닫기, [: 5% 열기, z: 모두 열기, x: 모두 닫기, ESC: 종료.
-# 실물 첫 동작은 [ 또는 ]로 작은 범위부터 확인.
+# 먼저 z로 열린 요청을 유지하고, 실물 첫 동작은 ]로 5%부터 확인.
 python3 "$OMY_HX5_REPO/user_pc/omy_hx5_keyboard.py" --step 0.05
 ```
 

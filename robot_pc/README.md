@@ -126,43 +126,37 @@ The expected active controllers are `joint_state_broadcaster`, `arm_controller`,
 `hand_l_controller`, and `pressure_l_broadcaster`. To exercise the mock hand,
 set `hand_dry_run:=false`. `mock_arm` and `mock_hand` must both be true for
 simulation or both false for physical operation; mixed modes are rejected.
-For a physical connection, first verify the END cable pinout, voltage,
-current budget, termination, ID 140 packet routing, Tool ID behavior, and
-hand mount. The real hardware plugin pings, reboots, configures, and may enable
-torque during initialization. `hand_dry_run:=true` only stops the Python bridge
-from publishing trajectories; it does **not** make hardware initialization
-read-only or torque-free. After the electrical and bus path are confirmed, run
-`mock_arm:=false mock_hand:=false hand_dry_run:=true`: **the real arm moves to
-unpack even though the hand bridge is dry-run**. Inspect all 26 joint states,
-five pressure sensors, and the driver communication state. The Xacro's real mode selects
-`dynamixel_hardware_interface/DynamixelHardware` on `/dev/ttyAMA4`; that
-software setting does not establish physical END-to-HX5 compatibility.
-After the dry run, keep the same launch alive to preserve arm torque. On the
-User PC keyboard, press `z` and keep the client running with the hand unloaded
-and near open. From another sourced Robot PC terminal, enable hand commands:
+For the physical hand-only trial, run the dedicated live launch on the Robot PC:
 
 ```bash
-ros2 topic echo /hx5/arm_unpack_ready --once
-ros2 param set /hx5_left_omy_teleop command_enabled true
+ros2 launch omy_hx5_bringup omy_hx5_hand_live.launch.py
 ```
 
-This switch rejects an unready arm, stale inputs, a closed keyboard request,
-or a hand away from open. It discards calculated dry-run targets and collects
-a new tactile baseline before sending commands seeded from measured joints.
+This starts the real arm and hand plugins and the live hand bridge without a
+separate SDK ping or `command_enabled` switch. The arm moves to unpack over
+10 seconds, then holds its pose. Keep the User PC keyboard at `z` with the
+hand unloaded and near open until the bridge collects its tactile baseline;
+use `]` for the first small closing request. The bridge still requires fresh
+arm, hand-joint, keyboard, and pressure data before it publishes trajectories.
+The driver opens `/dev/ttyAMA4` and checks communication during hardware
+initialization. The previous ID 140 no-reply result means this launch may fail
+before hand motion; removing the separate ping cannot make the END-to-hand
+path communicate. Hardware initialization can reboot/configure devices and
+activate torque.
+
 `command_enabled=false` stops new hand trajectories while the arm continues
 holding. Closing the keyboard does not stop the arm controller. Stopping the
 whole launch can torque off the arm; support it before shutting down.
 Do not run this launch alongside the full OMY/HX5 launch or another command
 publisher for the same hand controller.
 
-### Real-hardware audit points
+### Real-hardware notes
 
 - The first blocking check is electrical: identify the actual four-pin
   connector, polarity, supply voltage/current limit, RS-485 pair, and HX5
   termination before applying power. AI Worker's published four-pin swap is
   specific to its wiring and cannot certify OMY's connector.
-- The next blocking check is bus reachability. The driver opens
-  `/dev/ttyAMA4` at 4 Mbps and pings HX5 controller ID 140 directly. OMY's
+- The driver opens `/dev/ttyAMA4` at 4 Mbps and requests HX5 controller ID 140. OMY's
   original gripper was virtual ID 7 under END ID 210; END `Tool ID=1` and
   its SyncTable settings have not been demonstrated to route HX5 packets.
   The HX5 macro appears before the END GPIO in this Xacro, so the inspected
@@ -184,75 +178,6 @@ publisher for the same hand controller.
   END port and a controller manager. For the full seven-joint leader path, measure the actual open and
   closed `rh_r1_joint` values and confirm that the robot uses the same ROS
   domain, RMW, and Zenoh transport as the leader.
-
-### Read-only ID 140 ping on the Robot PC
-
-Only do this **after** confirming the exact OMY four-pin pinout, polarity,
-voltage, and current capacity for the HX5. Keep the hand clear of objects and
-stop every OMY/HX5 `ros2_control` bringup that might own `/dev/ttyAMA4`.
-Do not use `mock_hand:=false` as a ping test: that launch reboots, configures,
-and activates hardware. This check uses the official DYNAMIXEL SDK's Protocol
-2.0 `ping`, which requests an ID/model response without sending a joint goal.
-
-The Python SDK is not installed in the `robotis/robotis-hand:1.0.2` image by
-default. On the Robot PC, prepare an isolated Python environment once:
-
-```bash
-python3 -m venv ~/omy-hx5-ping-venv
-~/omy-hx5-ping-venv/bin/python -m pip install 'dynamixel-sdk==4.1.0'
-```
-
-If `venv` reports `ensurepip is not available` on an Ubuntu host, run
-`sudo apt-get install python3-venv` and retry the first command. Inside a
-root-owned Docker container, use `apt-get install python3-venv` instead.
-
-With the verified electrical connection powered and the serial port free,
-run this from the Robot PC terminal. It checks END ID 210 for comparison and
-then HX5 controller ID 140; the latter is the required result:
-
-```bash
-~/omy-hx5-ping-venv/bin/python - <<'PY'
-from dynamixel_sdk import COMM_SUCCESS, PacketHandler, PortHandler
-
-port = PortHandler('/dev/ttyAMA4')
-packet = PacketHandler(2.0)
-try:
-    if not port.openPort():
-        raise SystemExit('Cannot open /dev/ttyAMA4; check path, permissions, and other owners')
-except OSError as exc:
-    raise SystemExit(f'Cannot open /dev/ttyAMA4: {exc}') from None
-
-hand_replied = False
-try:
-    if not port.setBaudRate(4_000_000):
-        raise SystemExit('Cannot set /dev/ttyAMA4 to 4 Mbps')
-    for device_id in (210, 140):
-        model, result, error = packet.ping(port, device_id)
-        if result != COMM_SUCCESS:
-            print(f'ID {device_id}: no reply: {packet.getTxRxResult(result)}')
-        elif error:
-            print(f'ID {device_id}: device error: {packet.getRxPacketError(error)}')
-        else:
-            print(f'ID {device_id}: ping OK, model number {model}')
-            if device_id == 140:
-                hand_replied = True
-except OSError as exc:
-    raise SystemExit(f'Serial communication failed: {exc}') from None
-finally:
-    port.closePort()
-
-if not hand_replied:
-    raise SystemExit('HX5 ID 140 did not reply; do not start real hand bringup')
-PY
-```
-
-`ID 140: ping OK` establishes only that this serial path reaches the hand
-controller at 4 Mbps. It does not validate supply current, motor torque,
-tactile data, or safe motion. If ID 210 replies but ID 140 does not, the END
-board is reachable while the hand path remains unresolved. If neither replies,
-check the selected port, permissions, power, and baud rate before changing any
-IDs or Tool settings. The current [ROBOTIS SDK ping example](https://github.com/ROBOTIS-GIT/DynamixelSDK/blob/main/python/tests/protocol2_0/ping.py)
-uses the same `PortHandler` and `PacketHandler(2.0)` calls.
 
 On the remote User PC, source ROS 2 Jazzy, use the same ROS domain/RMW/Zenoh
 connection as the Robot PC, then run:
