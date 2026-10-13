@@ -54,6 +54,8 @@ def test_left_bridge_receives_official_messages_and_tracks_trigger_without_publi
     pressure_pub = fake.create_publisher(
         robotis.HandPressures, "/left_hand/finger_pressures", 10
     )
+    observed = []
+    fake.create_subscription(trajectory_msgs.JointTrajectory, bridge.topic, observed.append, 10)
     executor = SingleThreadedExecutor()
     executor.add_node(bridge.node)
     executor.add_node(fake)
@@ -72,14 +74,14 @@ def test_left_bridge_receives_official_messages_and_tracks_trigger_without_publi
     try:
         send(0.0, 0, 0.8)
         assert core.baseline_ready
-        assert bridge._active  # dry-run calculation only; no command publisher
+        assert bridge._active  # dry-run calculation only; no command messages
         opened = core.command
         send(0.6, 0, 0.5)
         assert core.command[5] > opened[5]
         assert 0.0 < core.command[5] <= 0.3  # 0.5 rad/s slew over a 0.5 s hold.
         send(0.0, 0, 0.5)
         assert core.command[5] < 0.05
-        assert bridge._publisher is None
+        assert not observed
     finally:
         executor.shutdown()
         fake.destroy_node()

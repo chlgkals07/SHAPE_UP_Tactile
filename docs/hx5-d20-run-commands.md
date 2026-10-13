@@ -154,35 +154,49 @@ PY
 ## Robot PC 컨테이너 · 터미널 B — 손 전용 모의 제어
 
 ```bash
-# 아래 launch 중 하나만 실행. 다른 launch는 Ctrl+C로 종료 후 전환.
+# 팔도 모의 하드웨어. unpack 완료 후 가상 팔 자세 유지 + 손 키보드 제어.
+# 아래 launch 중 하나만 실행. 다른 launch와 중복 실행하지 않음.
 ros2 launch omy_hx5_bringup omy_hx5_hand_only.launch.py \
-  mock_hand:=true hand_dry_run:=false
+  mock_arm:=true mock_hand:=true hand_dry_run:=false
 ```
 
 ## Robot PC 컨테이너 · 터미널 B — 실물 손 드라이런
 
 ```bash
-# 전기 조건·ID 140 통신 확인 후 실행. 팔은 이미 unpack 자세로 지지되어 있어야 함.
-# 손 브리지의 궤적만 발행하지 않으며, 드라이버 초기화·토크 활성화는 진행됨.
+# 전기 조건·ID 140 통신 확인 후 실행. 실제 팔이 10초 동안 unpack 영점으로 이동함.
+# 시작 자세는 공식 포장 자세 또는 이미 unpack된 자세여야 함.
+# unpack 완료 후 팔 컨트롤러가 계속 자세를 유지. 손 궤적만 드라이런.
+# 기존 omy_3m_unpack.launch.py 또는 omy_ai와 동시에 실행하지 않음.
 ros2 launch omy_hx5_bringup omy_hx5_hand_only.launch.py \
-  mock_hand:=false hand_dry_run:=true end_port:=/dev/ttyAMA4
+  mock_arm:=false mock_hand:=false hand_dry_run:=true end_port:=/dev/ttyAMA4
 ```
 
-## Robot PC 컨테이너 · 터미널 B — 실물 손 개폐
+## Robot PC 컨테이너 · 터미널 C — 드라이런에서 실물 손 개폐로 전환
 
 ```bash
-# 앞 단계의 드라이런 launch를 Ctrl+C로 종료한 뒤 실행.
-# 팔을 이동하거나 unpack 자세로 유지하는 명령은 포함하지 않음.
-ros2 launch omy_hx5_bringup omy_hx5_hand_only.launch.py \
-  mock_hand:=false hand_dry_run:=false end_port:=/dev/ttyAMA4
+# 터미널 B의 launch를 종료하지 않고 유지. 팔 컨트롤러도 계속 실행됨.
+# User PC 키보드에서 z를 누르고, 손끝을 무접촉 상태로 둔 뒤 실행.
+# arm_unpack_ready=true, 실제 손이 열린 자세, 키보드 입력이 신선할 때만 허용됨.
+ros2 topic echo /hx5/arm_unpack_ready --once
+ros2 param set /hx5_left_omy_teleop command_enabled true
+# 새 촉각 baseline 수집 후 [ 또는 ] 키로 작은 범위부터 시험.
+```
+
+## Robot PC 컨테이너 · 터미널 C — 손 명령만 중지
+
+```bash
+# 팔의 unpack 자세 유지는 계속됨. 손 컨트롤러는 마지막 목표를 유지.
+ros2 param set /hx5_left_omy_teleop command_enabled false
+# 전체 launch를 Ctrl+C로 종료하면 팔 토크도 꺼질 수 있으므로 팔을 지지해야 함.
 ```
 
 ## Robot PC 컨테이너 · 터미널 C — 상태 확인
 
 ```bash
-# 새 SSH 세션 → 컨테이너 진입 → 아래 공통 환경 source 후 실행.
+# 새 SSH 세션 → 컨테이너 진입 → 앞의 공통 환경 source 후 실행.
 ros2 control list_hardware_components
 ros2 control list_controllers
+ros2 topic echo /hx5/arm_unpack_ready --once
 # dxl_state는 실물 드라이버만 발행. mock 모드에서는 다음 한 줄 생략.
 ros2 topic echo /omy_hx5_end/dxl_state --once
 ros2 topic echo /joint_states --once
@@ -243,12 +257,9 @@ ros2 launch omy_hx5_bringup omy_hx5_teleop.launch.py \
 ## Robot PC 컨테이너 · 터미널 B — 팔·손 리더 텔레옵 실행
 
 ```bash
-# 앞 단계 launch를 종료한 뒤 같은 터미널에서 실행. 팔과 손 모두 움직임.
-ros2 launch omy_hx5_bringup omy_hx5_teleop.launch.py \
-  mock_arm:=false mock_hand:=false start_leader:=true mock_leader:=false \
-  enable_arm_teleop:=true enable_hand_teleop:=true hand_dry_run:=false \
-  leader_open:="$MEASURED_OPEN" leader_closed:="$MEASURED_CLOSED" \
-  hand_mount_xyz:="$MEASURED_MOUNT_XYZ" hand_mount_rpy:="$MEASURED_MOUNT_RPY"
+# 앞 단계 launch를 유지하고, 별도 터미널 C에서 실행.
+# 리더 방아쇠를 열고 손이 열린 무접촉 상태에서 전환. 새 baseline 수집 후 손 명령 발행.
+ros2 param set /hx5_left_omy_teleop command_enabled true
 ```
 
 ## 참고한 main 실행 순서

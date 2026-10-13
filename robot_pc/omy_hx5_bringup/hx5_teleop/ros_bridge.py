@@ -104,6 +104,8 @@ class Hx5RosBridge:
         leader_timeout: float = 0.5,
         joint_timeout: float = 0.5,
         tracking_error_limit: float = 0.5,
+        arm_ready_topic: str | None = None,
+        arm_ready_timeout: float = 0.5,
     ) -> None:
         if core.config.hand_side != side:
             raise ValueError("core hand_side must match the ROS bridge side")
@@ -117,6 +119,8 @@ class Hx5RosBridge:
             raise ValueError("invalid control rate or timeout")
         if tracking_error_limit <= 0:
             raise ValueError("tracking_error_limit must be positive")
+        if not math.isfinite(arm_ready_timeout) or arm_ready_timeout <= 0:
+            raise ValueError("arm_ready_timeout must be finite and positive")
         self.side = side
         self.names = joint_names(side)
         self.topic = f"/hand_{side[0]}_controller/joint_trajectory"
@@ -126,6 +130,9 @@ class Hx5RosBridge:
         self._leader_timeout = leader_timeout
         self._joint_timeout = joint_timeout
         self._tracking_error_limit = tracking_error_limit
+        self._arm_ready_topic = arm_ready_topic
+        self._arm_ready_timeout = arm_ready_timeout
+        self._arm_ready = None
         self._startup_delta_limit = core.config.max_joint_speed_rad_s / control_hz
         self._startup_motion_fault = False
         self._rclpy = rclpy
@@ -143,9 +150,15 @@ class Hx5RosBridge:
         self._last_log = 0.0
         self._mode = "waiting for joint states"
         self._JointTrajectory = JointTrajectory
-        self._publisher = None if dry_run else self.node.create_publisher(
+        self._publisher = self.node.create_publisher(
             JointTrajectory, self.topic, 10
         )
+        self.node.declare_parameter("command_enabled", not dry_run)
+        enabled = self.node.get_parameter("command_enabled").value
+        if not isinstance(enabled, bool):
+            raise ValueError("command_enabled must be a bool")
+        self._dry_run = not enabled
+        self.node.add_on_set_parameters_callback(self._on_parameters)
         self.node.create_subscription(
             JointTrajectory, leader.topic, self._on_leader, qos_profile_sensor_data
         )
@@ -158,7 +171,64 @@ class Hx5RosBridge:
         self.node.create_subscription(
             JointState, "/joint_states", self._on_joint, qos_profile_sensor_data
         )
+        if arm_ready_topic:
+            from std_msgs.msg import Bool
+
+            self.node.create_subscription(Bool, arm_ready_topic, self._on_arm_ready,
+                                          qos_profile_sensor_data)
         self.node.create_timer(1.0 / control_hz, self._tick)
+
+    def _on_arm_ready(self, msg: object) -> None:
+        self._arm_ready = (msg.data is True, time.monotonic())
+
+    def _arm_is_ready(self, now: float) -> bool:
+        return not self._arm_ready_topic or (
+            self._arm_ready is not None and self._arm_ready[0]
+            and now - self._arm_ready[1] <= self._arm_ready_timeout
+        )
+
+    def _on_parameters(self, parameters):
+        from rcl_interfaces.msg import SetParametersResult
+
+        for parameter in parameters:
+            if parameter.name != "command_enabled":
+                continue
+            enabled = parameter.value
+            if not isinstance(enabled, bool):
+                return SetParametersResult(successful=False, reason="command_enabled must be bool")
+            if enabled and self._dry_run:
+                now = time.monotonic()
+                if not self._arm_is_ready(now):
+                    return SetParametersResult(successful=False, reason="arm unpack/hold not ready")
+                if self._joint is None or now - self._joint[1] > self._joint_timeout:
+                    return SetParametersResult(successful=False, reason="hand joint states stale")
+                if (self._leader is None or now - self._leader[1] > self._leader_timeout
+                        or self._leader[0] > self._core.config.baseline_grasp_max):
+                    return SetParametersResult(successful=False,
+                                               reason="press z and keep keyboard client running")
+                if any(abs(position - opened) > self._core.config.baseline_open_tolerance_rad
+                       for position, opened, span in zip(
+                           self._joint[0], self._core.config.open_positions,
+                           self._core.config.closing_spans) if span != 0):
+                    return SetParametersResult(successful=False,
+                                               reason="hand must be unloaded and near open pose")
+                if self.node.count_publishers(self.topic) > 1:
+                    return SetParametersResult(successful=False, reason="another hand publisher exists")
+                # Discard dry-run targets. Seed a fresh baseline and the first
+                # live command from measured hand states, never a hidden goal.
+                core = Hx5GraspCore(self._core.config)
+                try:
+                    core.initialize(self._joint[0], now)
+                except ValueError as exc:
+                    return SetParametersResult(successful=False, reason=str(exc))
+                self._core = core
+                self._last_command = core.command
+                self._active = False
+                self._startup_motion_fault = False
+                self._tactile = None
+                self._used_tactile_time = -math.inf
+            self._dry_run = not enabled
+        return SetParametersResult(successful=True)
 
     def _on_leader(self, msg: object) -> None:
         points = [point.positions for point in msg.points[:1]]
@@ -197,6 +267,9 @@ class Hx5RosBridge:
 
     def _tick(self) -> None:
         now = time.monotonic()
+        if not self._arm_is_ready(now):
+            self._report("arm unpack/hold not ready; hand commands stopped", now)
+            return
         if (self._last_command is None or self._joint is None
                 or now - self._joint[1] > self._joint_timeout):
             self._report("joint states stale; command stopped", now)
@@ -239,7 +312,7 @@ class Hx5RosBridge:
                 return
             self._active = True
         self._last_command = tuple(positions)
-        if self._publisher is not None:
+        if not self._dry_run and self._publisher is not None:
             from trajectory_msgs.msg import JointTrajectoryPoint
 
             msg = self._JointTrajectory()

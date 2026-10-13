@@ -28,6 +28,8 @@ def parser() -> argparse.ArgumentParser:
                    help="per-joint command slew limit in rad/s")
     p.add_argument("--dry-run", action="store_true",
                    help="subscribe and calculate but publish no hand command")
+    p.add_argument("--arm-ready-topic", default=None,
+                   help="require a fresh true arm unpack/hold signal before commanding")
     return p
 
 
@@ -56,7 +58,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     from hx5_teleop.ros_bridge import Hx5RosBridge
 
-    bridge = Hx5RosBridge(core, leader, side=args.side, dry_run=args.dry_run)
+    bridge = Hx5RosBridge(core, leader, side=args.side, dry_run=args.dry_run,
+                         arm_ready_topic=args.arm_ready_topic)
     bridge.spin()
     return 0
 

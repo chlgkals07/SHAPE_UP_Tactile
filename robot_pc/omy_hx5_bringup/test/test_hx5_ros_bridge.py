@@ -124,6 +124,7 @@ def test_first_published_command_is_bounded_from_measured_pose(monkeypatch):
     bridge._leader_timeout = 0.5
     bridge._joint_timeout = 0.5
     bridge._tracking_error_limit = 0.5
+    bridge._arm_ready_topic = None
     bridge._startup_delta_limit = 0.025
     bridge._startup_motion_fault = False
     bridge._used_tactile_time = -math.inf
@@ -156,3 +157,25 @@ def test_first_published_command_is_bounded_from_measured_pose(monkeypatch):
     bridge._tick()
     assert len(published) == 2
     assert published[1].points[0].positions[6] - measured[6] <= 0.025 + 1e-12
+
+
+def test_arm_gate_blocks_hand_processing_until_ready_and_when_heartbeat_stales(monkeypatch):
+    from types import SimpleNamespace
+
+    clock = [10.0]
+    monkeypatch.setattr("hx5_teleop.ros_bridge.time.monotonic", lambda: clock[0])
+    bridge = Hx5RosBridge.__new__(Hx5RosBridge)
+    bridge._arm_ready_topic = "/hx5/arm_unpack_ready"
+    bridge._arm_ready_timeout = 0.5
+    bridge._arm_ready = None
+    reports = []
+    bridge._report = lambda message, now: reports.append(message)
+    # No core or publisher: a blocked arm must return before either is used.
+    bridge._tick()
+    bridge._on_arm_ready(SimpleNamespace(data=False))
+    bridge._tick()
+    bridge._on_arm_ready(SimpleNamespace(data=True))
+    clock[0] += 0.51
+    bridge._tick()
+    assert len(reports) == 3
+    assert all("arm unpack/hold not ready" in value for value in reports)

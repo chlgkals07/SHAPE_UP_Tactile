@@ -82,14 +82,21 @@ ros2 topic echo /left_hand/finger_pressures --once
 
 ### Hand-only remote keyboard at the unpack pose
 
-Use `omy_hx5_hand_only.launch.py` when the OMY arm is **already in its unpack
-pose** and only the left HX5 should move. This launch retains the arm's URDF
-geometry but creates no arm `ros2_control` hardware system, arm controller,
-arm bridge, or leader process. It never opens the arm's `/dev/ttyAMA2` port
-and does not move or hold the arm. Make sure the arm can remain supported in
-the unpack pose by the separate robot procedure.
+`omy_hx5_hand_only.launch.py` moves the arm to ROBOTIS's unpack posture and
+keeps its controller active while only the hand is teleoperated. One controller
+manager owns `OMYF3MSystem` on `/dev/ttyAMA2` and `OMYHX5EndSystem` on
+`/dev/ttyAMA4`. No leader process or arm teleoperation bridge starts.
 
-On the Robot PC, start with the default mock hand and dry-run bridge:
+The unpack coordinator accepts the official packed posture
+`[0, 0, -2.61799, -0.52360, 0, 0]` or an already unpacked arm, then sends
+`[0, 0, 0, 0, 0, 0]` to `/arm_controller/follow_joint_trajectory` over 10 seconds.
+It requires action success and fresh measured joints within 0.01 rad of the
+target for 0.5 seconds before publishing `/hx5/arm_unpack_ready=true`.
+The hand bridge waits for this heartbeat before collecting its tactile baseline
+or commanding. If the action fails, joint states go stale, or the arm departs
+from the held posture by more than 0.05 rad, readiness is latched false.
+
+On the Robot PC, start with the default mock arm/hand and dry-run bridge:
 
 ```bash
 ros2 launch omy_hx5_bringup omy_hx5_hand_only.launch.py
@@ -97,20 +104,36 @@ ros2 control list_controllers
 ros2 control list_hardware_components
 ```
 
-The expected active controllers are `joint_state_broadcaster`,
-`hand_l_controller`, and `pressure_l_broadcaster`; the only hardware system
-is `OMYHX5EndSystem`. To exercise the mock hand, set `hand_dry_run:=false`.
+The expected active controllers are `joint_state_broadcaster`, `arm_controller`,
+`hand_l_controller`, and `pressure_l_broadcaster`. To exercise the mock hand,
+set `hand_dry_run:=false`. `mock_arm` and `mock_hand` must both be true for
+simulation or both false for physical operation; mixed modes are rejected.
 For a physical connection, first verify the END cable pinout, voltage,
 current budget, termination, ID 140 packet routing, Tool ID behavior, and
 hand mount. The real hardware plugin pings, reboots, configures, and may enable
 torque during initialization. `hand_dry_run:=true` only stops the Python bridge
 from publishing trajectories; it does **not** make hardware initialization
 read-only or torque-free. After the electrical and bus path are confirmed, run
-`mock_hand:=false hand_dry_run:=true` and inspect all 20 hand joint states,
+`mock_arm:=false mock_hand:=false hand_dry_run:=true`: **the real arm moves to
+unpack even though the hand bridge is dry-run**. Inspect all 26 joint states,
 five pressure sensors, and the driver communication state. The Xacro's real mode selects
 `dynamixel_hardware_interface/DynamixelHardware` on `/dev/ttyAMA4`; that
 software setting does not establish physical END-to-HX5 compatibility.
-After the dry run and low-motion checks, set `hand_dry_run:=false`.
+After the dry run, keep the same launch alive to preserve arm torque. On the
+User PC keyboard, press `z` and keep the client running with the hand unloaded
+and near open. From another sourced Robot PC terminal, enable hand commands:
+
+```bash
+ros2 topic echo /hx5/arm_unpack_ready --once
+ros2 param set /hx5_left_omy_teleop command_enabled true
+```
+
+This switch rejects an unready arm, stale inputs, a closed keyboard request,
+or a hand away from open. It discards calculated dry-run targets and collects
+a new tactile baseline before sending commands seeded from measured joints.
+`command_enabled=false` stops new hand trajectories while the arm continues
+holding. Closing the keyboard does not stop the arm controller. Stopping the
+whole launch can torque off the arm; support it before shutting down.
 Do not run this launch alongside the full OMY/HX5 launch or another command
 publisher for the same hand controller.
 
@@ -138,8 +161,9 @@ publisher for the same hand controller.
   one finger at a time. A broadcaster can publish fresh timestamps around
   unchanged or invalid hardware values, so topic frequency alone does not
   prove tactile feedback. The grasp thresholds are experimental raw counts.
-- On the first hand-only test, the arm is neither commanded nor held by this
-  launch. For the full seven-joint leader path, measure the actual open and
+- The hand-only launch moves the arm once and then holds it. Do not run the
+  original `omy_3m_unpack.launch.py` alongside it: that launch also owns the
+  END port and a controller manager. For the full seven-joint leader path, measure the actual open and
   closed `rh_r1_joint` values and confirm that the robot uses the same ROS
   domain, RMW, and Zenoh transport as the leader.
 
@@ -282,8 +306,9 @@ ros2 launch omy_hx5_bringup omy_hx5_teleop.launch.py \
 The first run logs hand calculations but sends no hand trajectory from the
 bridge; the real hardware plugin still performs its initialization writes. Confirm
 the active controllers, `finger_l_joint1..20` states, pressure frames, and
-leader endpoints. Then rerun with `hand_dry_run:=false` for a low-motion
-test. `contact_threshold` and `pressure_hard_cap` launch arguments are raw
+leader endpoints. Keep the launch alive and switch `command_enabled=true`
+with a released leader and unloaded open hand for a low-motion test.
+`contact_threshold` and `pressure_hard_cap` launch arguments are raw
 pressure-count sums, **not newtons**; their defaults are experimental. Do not
 run the official tactile grasp demo at the same time as this hand bridge.
 
@@ -314,7 +339,7 @@ power-off procedure must be available during hardware operation.
 - Python checks cover the scalar grasp logic and official MuJoCo left-hand
   model. These checks do not verify OMY END electrical compatibility or real
   tactile calibration.
-- The hand-only Xacro expands to one `OMYHX5EndSystem` with 20 left-hand
+- The earlier hand-only implementation expanded to one `OMYHX5EndSystem` with 20 left-hand
   joints and no arm hardware in mock and real configurations. The mock launch
   activated only the hand, pressure, and joint-state controllers. A real
   keyboard client sent open, half, close, and release through a pseudo
@@ -322,6 +347,17 @@ power-off procedure must be available during hardware operation.
   thumb `joint1/2` reached -0.864/+0.864 rad. The state record is
   `preview/omy_hx5_hand_only_keyboard_mock_states.json`. No serial bus or
   physical hand was involved.
+- The updated hand-only implementation uses two mock systems under one
+  controller manager. `test/mock_unpack_hold_check.py` seeds the mock arm at
+  the official packed posture, verifies motion to zero while hand commands
+  are blocked, and then switches dry-run to live without restarting the arm.
+  A pseudo-terminal drives the real keyboard client through open/half/close/
+  release while all six arm joints remain at zero. An unrelated seven-joint
+  leader stream has no effect. The readiness/fault tests cover action failure,
+  stale states, posture departure, and rejection of live enable before unpack.
+  Both the packed fixture and production launch passed. Records:
+  `preview/omy_hx5_unpack_hold_packed_mock_states.json` and
+  `preview/omy_hx5_unpack_hold_launch_mock_states.json`.
 - The official `tactile_rviz` node received synthetic thumb/index taxel
   pressure on a test topic and published five left-fingertip arrow markers
   and five CoP markers; only the two touched fingers were visible. The

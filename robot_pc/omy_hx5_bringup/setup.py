@@ -26,6 +26,7 @@ setup(
         "console_scripts": [
             "omy_hx5_arm_bridge = omy_hx5_bringup.arm_bridge:main",
             "omy_hx5_hand_bridge = hx5_teleop.cli:main",
+            "omy_hx5_unpack_and_hold = omy_hx5_bringup.unpack:main",
         ],
     },
 )
