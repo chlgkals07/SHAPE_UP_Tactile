@@ -17,7 +17,7 @@ from hx5_teleop.core import Hx5CoreConfig, Hx5GraspCore, TactileFrame, joint_nam
 mujoco = pytest.importorskip("mujoco")
 
 SCENE = (
-    Path(__file__).resolve().parents[2]
+    Path(__file__).resolve().parents[3]
     / "third_party/robotis_hand/robotis_hand_description/mujoco/hx5_d20_rev2/scene_left.xml"
 )
 
@@ -59,7 +59,7 @@ def test_trigger_cycle_tracks_in_official_left_scene_without_self_contact():
     zero_pressure = ((0.0,) * 9,) * 5
     elapsed_steps = 0
     max_tracking_error = 0.0
-    for grasp, duration_s in ((0.0, 0.8), (0.5, 1.2), (1.0, 1.2), (0.0, 1.2)):
+    for grasp, duration_s in ((0.0, 0.8), (0.5, 1.8), (1.0, 2.0), (0.0, 3.4)):
         for _ in range(round(duration_s / 0.02)):
             elapsed_steps += 1
             now = elapsed_steps * 0.02

@@ -1,0 +1,70 @@
+/**:
+  controller_manager:
+    ros__parameters:
+      update_rate: 100
+      joint_state_broadcaster:
+        type: joint_state_broadcaster/JointStateBroadcaster
+      arm_controller:
+        type: joint_trajectory_controller/JointTrajectoryController
+      hand_l_controller:
+        type: joint_trajectory_controller/JointTrajectoryController
+      pressure_l_broadcaster:
+        type: robotis_hand_pressure_broadcaster/PressureBroadcaster
+
+/**:
+  arm_controller:
+    ros__parameters:
+      joints: [joint1, joint2, joint3, joint4, joint5, joint6]
+      command_interfaces: [position]
+      state_interfaces: [position, velocity]
+      allow_partial_joints_goal: false
+
+/**:
+  hand_l_controller:
+    ros__parameters:
+      joints:
+        - finger_l_joint1
+        - finger_l_joint2
+        - finger_l_joint3
+        - finger_l_joint4
+        - finger_l_joint5
+        - finger_l_joint6
+        - finger_l_joint7
+        - finger_l_joint8
+        - finger_l_joint9
+        - finger_l_joint10
+        - finger_l_joint11
+        - finger_l_joint12
+        - finger_l_joint13
+        - finger_l_joint14
+        - finger_l_joint15
+        - finger_l_joint16
+        - finger_l_joint17
+        - finger_l_joint18
+        - finger_l_joint19
+        - finger_l_joint20
+      command_interfaces: [position]
+      state_interfaces: [position, velocity]
+      allow_nonzero_velocity_at_trajectory_end: true
+      allow_partial_joints_goal: false
+
+/**:
+  pressure_l_broadcaster:
+    ros__parameters:
+      topic_name: /left_hand/finger_pressures
+      sensor_names:
+        - finger_l_sensor1
+        - finger_l_sensor2
+        - finger_l_sensor3
+        - finger_l_sensor4
+        - finger_l_sensor5
+      interface_names:
+        - Present Pressure 1
+        - Present Pressure 2
+        - Present Pressure 3
+        - Present Pressure 4
+        - Present Pressure 5
+        - Present Pressure 6
+        - Present Pressure 7
+        - Present Pressure 8
+        - Present Pressure 9

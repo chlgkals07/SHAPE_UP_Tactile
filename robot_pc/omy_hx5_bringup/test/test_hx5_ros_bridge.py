@@ -10,7 +10,7 @@ import pytest
 from hx5_teleop.core import Hx5CoreConfig, Hx5GraspCore, TactileFrame
 from hx5_teleop.ros_bridge import Hx5RosBridge
 from hx5_teleop.ros_bridge import joint_positions, pressure_frame
-from leap_teleop.config import LeaderGripperConfig
+from hx5_teleop.leader import LeaderGripperConfig
 
 
 def pressures(*, side="left", names=None, stamp_ns=2_000_000_000, value=8):

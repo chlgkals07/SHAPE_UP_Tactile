@@ -13,7 +13,7 @@ from rclpy.executors import SingleThreadedExecutor
 
 from hx5_teleop.core import Hx5CoreConfig, Hx5GraspCore
 from hx5_teleop.ros_bridge import Hx5RosBridge, joint_names
-from leap_teleop.config import LeaderGripperConfig
+from hx5_teleop.leader import LeaderGripperConfig
 
 
 def _leader(value):
@@ -76,7 +76,7 @@ def test_left_bridge_receives_official_messages_and_tracks_trigger_without_publi
         opened = core.command
         send(0.6, 0, 0.5)
         assert core.command[5] > opened[5]
-        assert 0.0 < core.command[5] <= 0.2
+        assert 0.0 < core.command[5] <= 0.3  # 0.5 rad/s slew over a 0.5 s hold.
         send(0.0, 0, 0.5)
         assert core.command[5] < 0.05
         assert bridge._publisher is None

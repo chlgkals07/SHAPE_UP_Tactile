@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!-- One DynamixelHardware instance owns OMY's END port and the left HX5. -->
+  <xacro:include filename="$(find robotis_hand_description)/ros2_control/hx5_d20_rev2/hx5_d20_left.joints.xacro"/>
+  <xacro:macro name="omy_hx5_end_system" params="port_name tool_id use_mock_hardware mock_sensor_commands">
+    <ros2_control name="OMYHX5EndSystem" type="system" is_async="true">
+      <hardware>
+        <xacro:if value="${use_mock_hardware}">
+          <plugin>mock_components/GenericSystem</plugin>
+          <param name="mock_sensor_commands">${mock_sensor_commands}</param>
+          <param name="state_following_offset">0.0</param>
+        </xacro:if>
+        <xacro:unless value="${use_mock_hardware}">
+          <plugin>dynamixel_hardware_interface/DynamixelHardware</plugin>
+          <param name="port_name">${port_name}</param>
+          <param name="baud_rate">4000000</param>
+          <param name="error_timeout_ms">500</param>
+          <param name="dynamixel_model_folder">/param/dxl_model</param>
+          <param name="number_of_joints">20</param>
+          <param name="number_of_transmissions">20</param>
+          <param name="disable_torque_at_init">true</param>
+          <param name="dynamixel_state_pub_msg_name">omy_hx5_end/dxl_state</param>
+          <param name="get_dynamixel_data_srv_name">omy_hx5_end/get_dxl_data</param>
+          <param name="set_dynamixel_data_srv_name">omy_hx5_end/set_dxl_data</param>
+          <param name="reboot_dxl_srv_name">omy_hx5_end/reboot_dxl</param>
+          <param name="set_dxl_torque_srv_name">omy_hx5_end/set_dxl_torque</param>
+        </xacro:unless>
+      </hardware>
+
+      <!-- Official rev2 definition: 20 joints, controller ID 140, 20 virtual
+           motor IDs and five tactile sensor IDs. No rh_r1_joint/ID 7. -->
+      <xacro:hx5_left_joints/>
+
+      <!-- Preserve OMY END board configuration from its official F3M xacro.
+           Tool ID 1 is the stock value; HX5 ID 140 routing is unverified. -->
+      <gpio name="omy_end">
+        <state_interface name="Button Status"/>
+        <param name="type">controller</param>
+        <param name="ID">210</param>
+        <param name="Baud Rate (Bus)">6</param>
+        <param name="Tool Analog Enable">0</param>
+        <param name="Tool Baud Rate">8</param>
+        <param name="Tool ID">${tool_id}</param>
+        <param name="Tool Protocol">0</param>
+        <param name="R LED">200</param>
+        <param name="G LED">200</param>
+        <param name="B LED">120</param>
+        <param name="SyncTable Read Address">634</param>
+        <param name="SyncTable Read Size">16</param>
+        <param name="SyncTable Write Address">665</param>
+        <param name="SyncTable Write Size">12</param>
+        <param name="SyncTable Enable">1</param>
+      </gpio>
+    </ros2_control>
+  </xacro:macro>
+</robot>

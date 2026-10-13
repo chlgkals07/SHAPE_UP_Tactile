@@ -1,0 +1,53 @@
+{
+  "object": {
+    "center_m": [
+      0,
+      -0.35,
+      0.04
+    ],
+    "half_size_m": [
+      0.04,
+      0.04,
+      0.04
+    ]
+  },
+  "phase_contacts": {
+    "home": {
+      "samples": 29,
+      "max_object_contacts": 0,
+      "last_object_contacts": 0,
+      "max_visual_penetration_m": 0.0
+    },
+    "pregrasp": {
+      "samples": 24,
+      "max_object_contacts": 0,
+      "last_object_contacts": 0,
+      "max_visual_penetration_m": 0.0
+    },
+    "above": {
+      "samples": 14,
+      "max_object_contacts": 0,
+      "last_object_contacts": 0,
+      "max_visual_penetration_m": 0.0
+    },
+    "floor": {
+      "samples": 14,
+      "max_object_contacts": 4,
+      "last_object_contacts": 4,
+      "max_visual_penetration_m": 0.0050558458497741154
+    },
+    "close": {
+      "samples": 14,
+      "max_object_contacts": 4,
+      "last_object_contacts": 2,
+      "max_visual_penetration_m": 0.006535738610835464
+    },
+    "lift": {
+      "samples": 24,
+      "max_object_contacts": 2,
+      "last_object_contacts": 0,
+      "max_visual_penetration_m": 0.0021501294628080035
+    }
+  },
+  "limitations": "Visual-mesh contacts and fixed floor object; no dynamics, force, or grasp proof."
+}

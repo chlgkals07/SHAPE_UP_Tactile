@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<robot name="omy_f3m_hx5_left" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="use_sim" default="false"/>
+  <xacro:arg name="mock_arm" default="true"/>
+  <xacro:arg name="mock_hand" default="true"/>
+  <xacro:arg name="enable_arm_hardware" default="true"/>
+  <xacro:arg name="mock_sensor_commands" default="false"/>
+  <xacro:arg name="end_port" default="/dev/ttyAMA4"/>
+  <xacro:arg name="end_tool_id" default="1"/>
+  <!-- The stock gripper points along flange -Y. The four HX5 fingers point
+       along hand +Z; this rotation maps +Z to -Y and rolls the palm downward
+       by 180 degrees around that forward axis. The translation still
+       requires the measured OMY-to-HX5 adapter geometry. -->
+  <xacro:arg name="hand_mount_xyz" default="0 -0.006 0"/>
+  <xacro:arg name="hand_mount_rpy" default="1.57079632679 1.57079632679 0"/>
+
+  <xacro:include filename="$(find open_manipulator_description)/urdf/omy_f3m/omy_f3m_arm.urdf.xacro"/>
+  <xacro:include filename="$(find open_manipulator_description)/ros2_control/omy_f3m_position.ros2_control.xacro"/>
+  <xacro:include filename="$(find robotis_hand_description)/urdf/hx5_d20_rev2/hx5_d20_left.urdf.xacro"/>
+  <xacro:include filename="$(find omy_hx5_bringup)/urdf/omy_hx5_end.ros2_control.xacro"/>
+
+  <link name="world"/>
+  <joint name="world_fixed" type="fixed">
+    <parent link="world"/>
+    <child link="link0"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:omy_f3m prefix=""/>
+  <xacro:hx5_d20_left prefix=""/>
+
+  <joint name="hx5_mount" type="fixed">
+    <parent link="end_effector_flange_link"/>
+    <child link="hx5_d20_left_base"/>
+    <origin xyz="$(arg hand_mount_xyz)" rpy="$(arg hand_mount_rpy)"/>
+  </joint>
+
+  <link name="end_effector_link"/>
+  <joint name="end_effector_joint" type="fixed">
+    <parent link="end_effector_flange_link"/>
+    <child link="end_effector_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:if value="$(arg enable_arm_hardware)">
+    <xacro:omy_f3m_system name="OMYF3MSystem" prefix=""
+      use_sim="false" use_mock_hardware="$(arg mock_arm)"
+      mock_sensor_commands="$(arg mock_sensor_commands)"/>
+  </xacro:if>
+  <xacro:omy_hx5_end_system port_name="$(arg end_port)" tool_id="$(arg end_tool_id)"
+    use_mock_hardware="$(arg mock_hand)"
+    mock_sensor_commands="$(arg mock_sensor_commands)"/>
+</robot>

@@ -23,7 +23,7 @@ def frame(timestamp, *, finger=None, count=0.0):
 def make_core(**overrides):
     parameters = dict(
         baseline_frames=2, pressure_ema_alpha=1.0,
-        max_joint_speed_rad_s=100.0, pressure_deadband=2.0,
+        max_joint_speed_rad_s=1000.0, pressure_deadband=2.0,
     )
     parameters.update(overrides)
     config = Hx5CoreConfig(**parameters)
@@ -95,13 +95,13 @@ def test_stale_new_sample_cannot_update_pressure_or_drive_closure():
 def test_scalar_grasp_interpolates_model_safe_positions_with_side_specific_thumb_sign():
     left = make_core()
     out = left.step(0.5, frame(0.03), 0.03)
-    assert out[:4] == pytest.approx((0.0, 0.0, -0.15, -0.15))
-    assert out[4:8] == pytest.approx((0.0, 0.1, 0.15, 0.15))
+    assert out[:4] == pytest.approx((-0.432, 0.432, -0.6, -0.6))
+    assert out[4:8] == pytest.approx((0.0, 0.65, 0.39, 0.26))
     assert out[8:12] == pytest.approx(out[4:8])
-    assert left.step(1.0, frame(0.04), 0.04)[4:8] == pytest.approx((0.0, 0.2, 0.3, 0.3))
+    assert left.step(1.0, frame(0.04), 0.04)[4:8] == pytest.approx((0.0, 1.3, 0.78, 0.52))
 
     right = make_core(hand_side="right")
-    assert right.step(0.5, frame(0.03), 0.03)[:4] == pytest.approx((0.0, 0.0, 0.15, 0.15))
+    assert right.step(0.5, frame(0.03), 0.03)[:4] == pytest.approx((0.432, -0.432, 0.6, 0.6))
 
 
 def test_contact_caps_only_that_finger_and_trigger_release_opens_even_with_pressure():
@@ -110,20 +110,20 @@ def test_contact_caps_only_that_finger_and_trigger_release_opens_even_with_press
     core.step(0.4, frame(0.04, finger=1, count=12.0), 0.04)
     assert core.contacted == (False, True, False, False, False)
     out = core.step(1.0, frame(0.05, finger=1, count=12.0), 0.05)
-    assert out[6] == pytest.approx(0.12)  # Index stays at the contact pose.
-    assert out[10] == pytest.approx(0.3)  # Middle finger follows the trigger.
+    assert out[6] == pytest.approx(0.312)  # Index stays at the contact pose.
+    assert out[10] == pytest.approx(0.78)  # Middle finger follows the trigger.
     released = core.step(0.1, frame(0.06, finger=1, count=12.0), 0.06)
-    assert released[6] == pytest.approx(0.03)
-    assert released[10] == pytest.approx(0.03)
+    assert released[6] == pytest.approx(0.078)
+    assert released[10] == pytest.approx(0.078)
 
 
 def test_contact_pressure_regulation_moves_cap_slowly_but_never_beyond_trigger():
     core = make_core()
     core.step(0.4, frame(0.03), 0.03)
     core.step(0.4, frame(0.04, finger=1, count=12.0), 0.04)
-    assert core.step(1.0, frame(0.05, finger=1, count=12.0), 0.05)[6] == pytest.approx(0.12)
+    assert core.step(1.0, frame(0.05, finger=1, count=12.0), 0.05)[6] == pytest.approx(0.312)
     under = core.step(1.0, frame(0.06, finger=1, count=5.0), 0.06)[6]
-    assert 0.12 < under < 0.121  # Slow pressure correction, in radians.
+    assert 0.312 < under < 0.313  # Slow pressure correction, in radians.
     over = core.step(1.0, frame(0.07, finger=1, count=25.0), 0.07)[6]
     assert over < under
     hard = core.step(1.0, frame(0.08, finger=1, count=40.0), 0.08)[6]

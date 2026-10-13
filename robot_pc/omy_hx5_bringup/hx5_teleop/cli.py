@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import argparse
 import math
+import sys
 
 from hx5_teleop.core import Hx5CoreConfig, Hx5GraspCore
-from leap_teleop.config import LeaderGripperConfig
+from hx5_teleop.leader import LeaderGripperConfig
 
 
 def parser() -> argparse.ArgumentParser:
@@ -31,6 +32,11 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    if argv is None:
+        # launch_ros appends --ros-args to console_scripts even without remaps.
+        from rclpy.utilities import remove_ros_args
+
+        argv = remove_ros_args(args=sys.argv)[1:]
     args = parser().parse_args(argv)
     if (not math.isfinite(args.leader_open) or not math.isfinite(args.leader_closed)
             or args.leader_open == args.leader_closed):

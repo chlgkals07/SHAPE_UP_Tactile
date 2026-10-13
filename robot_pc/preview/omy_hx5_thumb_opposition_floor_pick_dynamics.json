@@ -1,0 +1,40 @@
+{
+  "object_initial_center_m": [
+    0.0,
+    -0.35,
+    0.04
+  ],
+  "object_final_center_m": [
+    0.02114479768069901,
+    -0.3488271320606585,
+    0.03989224457978386
+  ],
+  "phase_heights": {
+    "home": {
+      "max_center_z_m": 0.03989224458161737,
+      "last_center_z_m": 0.03989224457978385
+    },
+    "pregrasp": {
+      "max_center_z_m": 0.03989224457978385,
+      "last_center_z_m": 0.03989224457978384
+    },
+    "above": {
+      "max_center_z_m": 0.03989224457978384,
+      "last_center_z_m": 0.03989224457978384
+    },
+    "floor": {
+      "max_center_z_m": 0.04133858626961407,
+      "last_center_z_m": 0.039558986743835844
+    },
+    "close": {
+      "max_center_z_m": 0.047596557999249944,
+      "last_center_z_m": 0.03989224457978386
+    },
+    "lift": {
+      "max_center_z_m": 0.03989224457978386,
+      "last_center_z_m": 0.03989224457978386
+    }
+  },
+  "lifted_over_2cm": false,
+  "limitations": "Pose-driven robot, free 0.2 kg box, visual mesh collisions; not validated grasp physics."
+}

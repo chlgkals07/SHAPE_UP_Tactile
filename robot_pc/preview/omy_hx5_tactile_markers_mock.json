@@ -1,0 +1,34 @@
+{
+  "source": "synthetic 0..255 pressure counts, not measured force",
+  "arrow_frames": [
+    "finger_end_l_link1",
+    "finger_end_l_link2",
+    "finger_end_l_link3",
+    "finger_end_l_link4",
+    "finger_end_l_link5"
+  ],
+  "visible_arrows": [
+    1,
+    2
+  ],
+  "visible_cop_dots": [
+    1,
+    2
+  ],
+  "start_minus_end_vectors_m": {
+    "1": [
+      0.0,
+      0.0,
+      0.04996237282709175
+    ],
+    "2": [
+      0.011558180236509478,
+      -0.027055509944084254,
+      0.027055509944084254
+    ]
+  },
+  "arrow_lengths_m": {
+    "1": 0.04996237282709175,
+    "2": 0.0399698982616734
+  }
+}

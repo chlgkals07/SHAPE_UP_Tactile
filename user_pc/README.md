@@ -3,7 +3,34 @@
 LEAP Hand v1을 키보드 또는 OMY leader 그리퍼로 구동한다.
 설계: `../docs/superpowers/specs/2026-10-08-leap-omy-teleop-design.md`
 
-HX5-D20 **왼손** 텔레옵은 별도 [`hx5_teleop`](src/hx5_teleop/) 경로에 있다. 기존 LEAP 16관절 드라이버 대신 공식 HX5 ROS 2 20관절 토픽을 쓰며, 동일한 `rh_r1_joint` 방아쇠 정규화 함수를 재사용한다. 촉각 입력은 손가락별 닫힘을 제한·미세 보정한다. 공식 Docker image에서 실행하는 [`run_hx5_docker.sh`](run_hx5_docker.sh)는 `--leader-open`과 `--leader-closed`의 실측값을 요구한다. 실물 연결 전의 실행 순서와 미검증 항목은 [HX5 × OMY 준비 문서](../docs/hx5-d20-omy-teleop.md)에 있다.
+HX5-D20 **왼손** 제어 본체는 [Robot PC용 `omy_hx5_bringup`](../robot_pc/README.md)에 있다. 이 디렉터리에는 손만 원격 조작하는 키보드 클라이언트 [`omy_hx5_keyboard.py`](omy_hx5_keyboard.py)도 있다. 아래 LEAP 설치·캘리브레이션 절차는 HX5에 적용하지 않는다.
+
+## HX5 손만 원격 키보드로 제어
+
+OMY 팔이 이미 unpack 자세에 있을 때 Robot PC에서 `omy_hx5_hand_only.launch.py`를 실행한다. 이 launch는 팔 하드웨어와 팔 컨트롤러를 시작하지 않는다. 자세를 만들어 주거나 유지하지도 않는다. 처음에는 기본 `mock_hand:=true hand_dry_run:=true`로 확인한다. [손 전용 실행 절차](../robot_pc/README.md#hand-only-remote-keyboard-at-the-unpack-pose)를 따른다.
+
+원격 User PC에서 ROS 2 Jazzy를 source하고 Robot PC와 동일한 ROS domain, RMW, Zenoh 연결을 설정한 뒤 다음 명령을 실행한다.
+
+```bash
+source /opt/ros/jazzy/setup.bash
+python3 /path/to/SHAPE_UP_Tactile/user_pc/omy_hx5_keyboard.py
+```
+
+공식 ROBOTIS Hand 키보드와 같이 `x`는 쥐기, `z`는 펴기다. `]`와 `[`는 요청한 쥐기 정도를 각각 10% 올리고 내린다. `ESC`는 종료한다. 키보드는 `/hx5/keyboard_grasp_trajectory`에 `rh_r1_joint` **한 값만** 20 Hz로 발행한다. Robot PC 손 브리지가 이 값을 HX5의 왼손 20관절 명령으로 바꾸며, 팔 각도는 발행하지 않는다. 종료 전에 `z`를 누르고 손이 완전히 펴질 때까지 기다린다. 종료만으로 손 토크가 꺼지지 않는다.
+
+실물 END 4핀 배선의 전기·통신 적합성과 HX5 구동은 아직 검증되지 않았다. 모의 시험에서는 실제 키보드 프로그램 → Robot PC 손 브리지 → 손 20관절 모의 컨트롤러를 확인했다.
+
+### HX5 촉각 신호 보기
+
+이 PC에는 ROS 2 Jazzy RViz2, Matplotlib/Tk, Xacro, RealSense 모델, 공식 `robotis_interfaces`와 `robotis_hand_playground`를 설치했다. 공식 손·OMY 설명 패키지도 `/home/jiwoo/Projects/hx5_tactile_viz_ws`에 빌드되어 있다. [가시화 실행 스크립트](run_hx5_tactile_viz.sh)는 이 작업공간을 자동으로 source한다. 작업공간을 옮기면 `HX5_TACTILE_VIZ_WS` 환경 변수로 새 경로를 지정한다.
+
+Robot PC에서 손 bringup을 실행하고, 이 PC에서 Robot PC와 같은 ROS domain/RMW/Zenoh 연결을 설정한 뒤 다음을 실행한다.
+
+```bash
+/path/to/SHAPE_UP_Tactile/user_pc/run_hx5_tactile_viz.sh
+```
+
+이 스크립트는 공식 `tactile_rviz`의 손끝 압력 화살표·CoP 마커와 공식 `matplot_visualize_tactile.py`의 다섯 손가락 3×3 히트맵을 **왼손** `/left_hand/finger_pressures`에 연결한다. RViz의 고정 좌표계는 손 베이스라서 팔 제어를 띄우지 않아도 손을 볼 수 있다. 가시화 노드는 모터 명령을 내리지 않는다. 첫 약 1초 동안 손끝에 물체가 닿지 않게 해 baseline을 잡는다. 표시값은 원시 압력 계수에서 baseline을 뺀 신호이며 뉴턴 단위 힘이 아니다. mock 하드웨어에서는 압력이 0이라 화면이 어둡게 유지된다. 이 PC에서 RViz와 히트맵 창이 열리는 것을 확인했지만 실제 센서 입력은 확인하지 못했다. [합성 입력으로 만든 화면](../robot_pc/preview/omy_hx5_official_heatmap_synthetic.png)을 참고한다.
 
 ## 준비
 이 PC(Ubuntu 24.04 + ROS 2 Jazzy)에서 `dynamixel-sdk`는 `ros-jazzy-dynamixel-sdk`라서 **ROS를 source 해야** 시스템 `python3`에서 import 된다.

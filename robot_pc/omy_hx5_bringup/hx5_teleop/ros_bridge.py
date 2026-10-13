@@ -9,8 +9,7 @@ from __future__ import annotations
 import math
 import time
 from hx5_teleop.core import Hx5GraspCore, TactileFrame
-from leap_teleop.config import LeaderGripperConfig
-from leap_teleop.sources.ros2_leader import grasp_from_trajectory
+from hx5_teleop.leader import LeaderGripperConfig, grasp_from_trajectory
 
 
 def joint_names(side: str) -> tuple[str, ...]:
@@ -120,9 +119,7 @@ class Hx5RosBridge:
             raise ValueError("tracking_error_limit must be positive")
         self.side = side
         self.names = joint_names(side)
-        self.topic = (
-            f"/leader/joint_trajectory_command_broadcaster_{side}_hand/joint_trajectory"
-        )
+        self.topic = f"/hand_{side[0]}_controller/joint_trajectory"
         self._core = core
         self._leader_cfg = leader
         self._dry_run = dry_run

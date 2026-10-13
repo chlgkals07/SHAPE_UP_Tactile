@@ -1,11 +1,11 @@
 """Pure-Python OMY trigger to HX5-D20 grasp control.
 
-The 20-joint order, finger grouping and closing directions follow ROBOTIS
-robotis_hand_playground/src/tactile_force_controller.cpp. The default open
-command follows the official bringup's 20 zero initial positions. The separate
-reference_open_pose() returns the tactile example's open posture, except that
-its thumb joint2 (+/-1.792 rad) is clipped inside the HX5-D20 model limit to
-+/-1.5 rad. Closing spans are modest starting values, not a full-fist pose.
+The 20-joint order and thumb opposition direction follow ROBOTIS's
+robotis_hand_teleop/hx5_d20_teleop.py. The zero open pose follows the official
+bringup. Its keyboard grip uses full joint limits; this continuous trigger
+mapping uses a smaller, collision-free endpoint from the official MuJoCo
+model. The separate reference_open_pose() describes the tactile example's
+posture and is not used by the trigger mapping.
 
 Tactile thresholds apply to baseline-corrected 0..255 sensor counts summed
 over nine taxels per finger. They are not forces in newtons.
@@ -45,7 +45,14 @@ def _default_open(side: str) -> tuple[float, ...]:
 
 def _default_span(side: str) -> tuple[float, ...]:
     thumb_direction = -1.0 if side == "left" else 1.0
-    return (0.0, 0.0, 0.3 * thumb_direction, 0.3 * thumb_direction) + (0.0, 0.2, 0.3, 0.3) * 4
+    # The keyboard teleop puts the left thumb shift joints at -1.57/+1.57
+    # before gripping. Interpolate those joints toward an opposing posture
+    # rather than leaving them at zero. Full keyboard limits self-contact in
+    # the unloaded MuJoCo scene, so use a smaller collision-free endpoint.
+    return (
+        0.864 * thumb_direction, -0.864 * thumb_direction,
+        1.2 * thumb_direction, 1.2 * thumb_direction,
+    ) + (0.0, 1.3, 0.78, 0.52) * 4
 
 
 def _joint_limits(side: str) -> tuple[tuple[float, float], ...]:
@@ -378,19 +385,32 @@ class Hx5GraspCore:
             if not may_close:
                 target_progress = min(target_progress, current_progress)
 
+            desired = list(self._command[finger * 4:finger * 4 + 4])
             for local_joint in range(4):
                 index = finger * 4 + local_joint
                 span = cfg.closing_spans[index]
                 if span == 0.0:
-                    continue  # Side joints and thumb joint2 are not driven by one trigger.
+                    continue  # Side joints are not driven by one trigger.
                 current = self._command[index]
                 target = cfg.open_positions[index] + target_progress * span
                 if not may_close and (target - current) * span > 0.0:
                     target = current
-                max_step = cfg.max_joint_speed_rad_s * dt
-                target = max(current - max_step, min(current + max_step, target))
                 low, high = self._limits[index]
-                next_command[index] = max(low, min(high, target))
+                desired[local_joint] = max(low, min(high, target))
+
+            # Scale one finger's four joint deltas together. Independent speed
+            # clipping distorts the thumb opposition path during release and
+            # causes transient self-contact in the official MuJoCo model.
+            largest_delta = max(
+                abs(target - current)
+                for target, current in zip(desired, self._command[finger * 4:finger * 4 + 4])
+            )
+            max_step = cfg.max_joint_speed_rad_s * dt
+            scale = min(1.0, max_step / largest_delta) if largest_delta else 1.0
+            for local_joint, target in enumerate(desired):
+                index = finger * 4 + local_joint
+                current = self._command[index]
+                next_command[index] = current + scale * (target - current)
 
         self._command = tuple(next_command)
         return self._command
