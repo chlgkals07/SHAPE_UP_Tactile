@@ -3,8 +3,9 @@
 ## User PC 호스트 — Robot PC SSH 접속
 
 ```bash
-# User PC의 Bash 터미널. 사용자가 확인한 SSH 호스트 이름.
-export OMY_ROBOT_HOST="snpr44b1050"
+# User PC와 OMY를 이더넷으로 연결한 뒤 실행.
+# SNPR44B1050의 10/09 현장 접속 주소. 실제 mDNS 응답은 연결 후 확인.
+export OMY_ROBOT_HOST="omy-snpr44b1050.local"
 ssh root@"$OMY_ROBOT_HOST"
 ```
 
@@ -61,7 +62,7 @@ source /workspace/omy_ws/install/setup.bash
 ## User PC 호스트 — 터미널 A / B / C마다 새 SSH 접속
 
 ```bash
-export OMY_ROBOT_HOST="snpr44b1050"
+export OMY_ROBOT_HOST="omy-snpr44b1050.local"
 ssh root@"$OMY_ROBOT_HOST"
 ```
 
