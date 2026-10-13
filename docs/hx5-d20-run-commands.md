@@ -100,15 +100,6 @@ export RMW_IMPLEMENTATION=rmw_zenoh_cpp
 ros2 run rmw_zenoh_cpp rmw_zenohd
 ```
 
-## Robot PC 컨테이너 · 터미널 B — 손 전용 모의 제어
-
-```bash
-# 팔도 모의 하드웨어. unpack 완료 후 가상 팔 자세 유지 + 손 키보드 제어.
-# 아래 launch 중 하나만 실행. 다른 launch와 중복 실행하지 않음.
-ros2 launch omy_hx5_bringup omy_hx5_hand_only.launch.py \
-  mock_arm:=true mock_hand:=true hand_dry_run:=false
-```
-
 ## Robot PC 컨테이너 · 터미널 B — 실물 손 직접 제어
 
 ```bash
@@ -137,7 +128,7 @@ ros2 param set /hx5_left_omy_teleop command_enabled false
 ros2 control list_hardware_components
 ros2 control list_controllers
 ros2 topic echo /hx5/arm_unpack_ready --once
-# dxl_state는 실물 드라이버만 발행. mock 모드에서는 다음 한 줄 생략.
+# 실물 손 드라이버의 상태.
 ros2 topic echo /omy_hx5_end/dxl_state --once
 ros2 topic echo /joint_states --once
 ros2 topic echo /left_hand/finger_pressures --once
