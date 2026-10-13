@@ -3,8 +3,8 @@
 ## User PC 호스트 — Robot PC SSH 접속
 
 ```bash
-# Bash 터미널. 10/09에 사용한 호스트 이름: omy-snpr44b1050.local.
-read -rp 'OMY 호스트 이름(omy-...local): ' OMY_ROBOT_HOST
+# User PC의 Bash 터미널. 사용자가 확인한 SSH 호스트 이름.
+export OMY_ROBOT_HOST="snpr44b1050"
 ssh root@"$OMY_ROBOT_HOST"
 ```
 
@@ -61,7 +61,7 @@ source /workspace/omy_ws/install/setup.bash
 ## User PC 호스트 — 터미널 A / B / C마다 새 SSH 접속
 
 ```bash
-read -rp 'OMY 호스트 이름(omy-...local): ' OMY_ROBOT_HOST
+export OMY_ROBOT_HOST="snpr44b1050"
 ssh root@"$OMY_ROBOT_HOST"
 ```
 
