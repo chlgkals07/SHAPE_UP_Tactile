@@ -146,7 +146,8 @@ activate torque.
 
 `command_enabled=false` stops new hand trajectories while the arm continues
 holding. Closing the keyboard does not stop the arm controller. Stopping the
-whole launch can torque off the arm; support it before shutting down.
+whole launch torques off the OMY arm; its integrated brakes hold the stopped
+posture. Another bringup can then take ownership of `/dev/ttyAMA4`.
 Do not run this launch alongside the full OMY/HX5 launch or another command
 publisher for the same hand controller.
 

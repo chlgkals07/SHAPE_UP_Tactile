@@ -126,7 +126,8 @@ ros2 launch omy_hx5_bringup omy_hx5_hand_live.launch.py
 ```bash
 # 팔의 unpack 자세 유지는 계속됨. 손 컨트롤러는 마지막 목표를 유지.
 ros2 param set /hx5_left_omy_teleop command_enabled false
-# 전체 launch를 Ctrl+C로 종료하면 팔 토크도 꺼질 수 있으므로 팔을 지지해야 함.
+# 전체 launch를 Ctrl+C로 종료하면 팔 토크가 꺼지고 OMY 관절 브레이크가 자세를 유지함.
+# 종료한 launch의 /dev/ttyAMA4 소유권도 해제되므로 다른 bringup은 종료 후 시작.
 ```
 
 ## Robot PC 컨테이너 · 터미널 C — 상태 확인
