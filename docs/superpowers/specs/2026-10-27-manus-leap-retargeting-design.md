@@ -14,7 +14,7 @@
 4. 구현은 단계마다 수식과 동작을 설명하며 진행한다 (리타게팅 원리를 이해하는 것도 목표).
 
 **비목표 (이번 단계)**
-- 손끝 위치 최적화 리타게팅 (`dex-retargeting`, DexPilot 방식) — 7절 판단 기준에 따라 다음 단계
+- 손끝 IK / 최적화 리타게팅 (엄지 IK, `dex-retargeting`) — 7절 판단 기준에 따라 다음 단계
 - leader 그리퍼 모터 제거 — 8절, 리타게팅 다음 단계
 - Meta Quest로 팔 제어 — 보류 (OMY 팔 제어까지 바뀌는 큰 작업)
 - 햅틱 피드백 (LEAP 전류/촉각 → 글러브 진동) — 보류. 촉각 연구와 연결되는 후보
@@ -43,7 +43,7 @@
 [User PC, Ubuntu 24.04 + ROS 2 Jazzy]
  Manus 동글 ─► Manus SDK (Integrated) ─► ManusSource ──Reading(human=…)──┐
                                                                          ▼
-                                      ManusLeapRetargeter (W·h + b, clip, filter)
+                                      ManusLeapRetargeter (관절별 affine, clip, filter)
                                                                          ▼
                                       StaleGuard (기존) ─► LEAP v1 driver (기존)
 
@@ -55,7 +55,7 @@
 |---|---|
 | `types.py` | `Reading`에 `human: np.ndarray | None` 추가 (Manus ergonomics 20값, 순서는 `sources/manus.py`의 상수). 셋 중 정확히 하나 |
 | `sources/manus.py` | 새 파일. SDK(또는 ROS 2 토픽)에서 최신 값을 받아 `Reading(human=…)` 반환 |
-| `retarget/linear_map.py` | 새 파일. 4절 수식 |
+| `retarget/joint_map.py` | 새 파일. 4절 수식 |
 | `tools/calibrate_manus.py` | 새 파일. 5절 절차로 W, b를 구해 yaml로 저장 |
 | `cli.py` | `--source manus` 추가 |
 | `config/manus_leap.yaml` | 캘리브레이션 결과 (사용자별, gitignore) |
@@ -66,23 +66,15 @@
 
 입력 h ∈ ℝ²⁰ (사람 관절각), 출력 q ∈ ℝ¹⁶ (LEAP 관절각, 0 = 편 손).
 
-### 4-1. 기본형: 관절별 gain·offset
+### 4-1. 관절별 affine 매핑 (이번 단계)
 LEAP 관절 i를 대응하는 사람 관절 j 하나로 만든다.
 
     q_i = g_i · (h_j − h_j,open) + q_i,open
 
-- `h_j,open`: 사람이 손을 폈을 때 값, `g_i`: 사람 가동범위 → LEAP 가동범위 비율
+- `h_j,open`: 사람이 손을 폈을 때 값, `g_i`: 사람 가동범위(ROM) → LEAP 가동범위 비율
 - 새끼손가락 4값은 쓰지 않는다
-- 장점: 한 관절이 이상하면 그 줄만 보면 된다. 단점: 엄지처럼 회전축이 다른 관절은 1:1이 맞지 않는다
-
-### 4-2. 확장형: 혼합 행렬 (이번 단계의 목표)
-
-    q = W · h + b        (W: 16×20, b: 16)
-
-- 4-1은 W가 대각에 가까운 특수한 경우다. 확장형은 로봇 관절 하나를 **여러 사람 관절의 조합**으로 만든다 (예: LEAP 엄지 `cmc_side` = 사람 엄지 CMC spread와 stretch의 조합).
-- 구하는 법: 캘리브레이션 자세 N개에서 (사람 h_k, 원하는 로봇 q_k) 짝을 모은다. `[h_k, 1]`을 쌓은 행렬 H(N×21)와 Q(N×16)로 `numpy.linalg.lstsq(H, Q)` 한 번이면 [W; b]가 나온다.
-- 과적합 방지: N이 작으므로 **엄지 블록만 혼합을 허용**하고 나머지 손가락은 대각(4-1)으로 제한한다. 필요하면 ridge(작은 λ)를 더한다.
-- 로봇 손이 바뀌면 W의 크기와 목표 자세만 바뀐다 (ROBOTIS 손 = 다른 W, 다른 driver).
+- 장점: 한 관절이 이상하면 그 줄만 보면 된다. 단점: 엄지는 회전축·위치가 달라 1:1이 맞지 않는다 (pinch 실패 예상)
+- 관행: 엄지 외 손가락은 이 방식이 실제로 쓰인다 ([2609.06009](https://arxiv.org/pdf/2609.06009))
 
 ### 4-3. 후처리
 1. **관절 한계 clip**: 기존 안전범위를 그대로 쓴다.
@@ -91,28 +83,19 @@ LEAP 관절 i를 대응하는 사람 관절 j 하나로 만든다.
 4. **속도 제한**: 틱당 최대 변화량.
 
 ### 4-4. 다음 후보 (구현하지 않음)
-- **pinch 보정**: 스켈레톤으로 엄지 끝–손끝 거리 d를 구해 d가 임계값보다 작으면 저장된 로봇 pinch 자세 쪽으로 섞는다.
-- **손끝 위치 최적화**: `dex-retargeting`, LEAP URDF 사용. 같은 `human` 입력에 키포인트만 더하면 된다.
+- **엄지만 손끝 IK**: 엄지 4관절만 LEAP URDF FK로 손끝 위치를 사람 엄지 끝(스켈레톤, 손 크기 스케일)에 맞추고 opposition 항을 더한다. 이전 해에서 시작. 나머지 손가락은 4-1 그대로 ([2609.06009](https://arxiv.org/pdf/2609.06009)).
+- **전체 최적화**: `dex-retargeting` DexPilot / keyvector 방식. 같은 `human` 입력에 키포인트만 더하면 된다.
+- 혼합 행렬(`q = W·h + b`, 최소제곱)은 검토 후 제외: 엄지 문제는 기구학 차이라 선형으로 풀리지 않고, 캘리브레이션 자세 수 대비 파라미터가 많다. LEAP 텔레옵 관행에도 없다.
 
 ## 5. 캘리브레이션 절차
 
 `tools/calibrate_manus.py`가 안내하고, 자세마다 1초씩 평균을 낸다.
 
 1. **가동범위(ROM)**: 손가락을 하나씩 끝까지 굽혔다 펴고, 벌렸다 모은다 → 관절마다 사람 min/max
-2. **짝 자세**: 사람이 아래 자세를 취하면 짝이 되는 LEAP 목표 자세를 쓴다.
+2. **편 손**: h_open 기록 (LEAP `open`에 대응)
+3. g_i = (LEAP 관절 범위) / (사람 ROM). LEAP 범위는 `open`~`fist`(`postures.yaml`)를 쓴다.
 
-| 자세 | LEAP 목표 |
-|---|---|
-| 편 손 | `open` (전부 0) |
-| 주먹 | `postures.yaml`의 `fist` |
-| 손가락 벌리기 | `mcp_side` 최대 |
-| 엄지–검지 pinch | 실물에서 손으로 맞춰 기록 |
-| 엄지–중지 pinch | 〃 |
-| 엄지–약지 pinch | 〃 |
-| 엄지 접기 (손바닥 쪽) | 〃 |
-
-- pinch 목표 자세는 LEAP를 torque off 상태로 손으로 맞춘 뒤 읽어서 저장한다 (`joint_test`/`check_hardware` 읽기 기능 재사용).
-- 결과는 `config/manus_leap.yaml`에 저장한다. 사람 h_open, ROM, W, b, 필터 파라미터를 담는다.
+- 결과는 `config/manus_leap.yaml`에 저장한다. 사람 h_open, ROM, 관절 대응표, 필터 파라미터를 담는다.
 
 ## 6. 안전
 - 기존 StaleGuard 그대로: 글러브 데이터가 끊기면 hold → release(`--safe-pose`).
@@ -122,8 +105,8 @@ LEAP 관절 i를 대응하는 사람 관절 j 하나로 만든다.
 ## 7. 시험과 판단 기준
 
 **하드웨어 없이** (pytest)
-- `linear_map`: 알려진 W, b로 만든 가짜 짝 → lstsq가 W, b를 복원하는지
-- 대각 제한이 엄지 외 손가락에서 지켜지는지, clip·결합 제한·속도 제한
+- `joint_map`: open → LEAP open, ROM 끝 → LEAP fist, 새끼손가락 무시
+- clip·결합 제한·속도 제한, One-Euro 필터 (정지 입력에서 출력 고정)
 - `ManusSource`: SDK 호출부를 가짜로 바꿔 Reading 변환과 stale 처리
 - `--dry-run --source manus` (녹화한 글러브 데이터 재생)
 
@@ -136,7 +119,7 @@ LEAP 관절 i를 대응하는 사람 관절 j 하나로 만든다.
 | pinch 결과 | 다음 |
 |---|---|
 | 통과 | 이 방식으로 확정, leader 작업(8절)으로 |
-| 엄지만 실패 | 4-4 pinch 보정 추가 |
+| 엄지만 실패 | 4-4 엄지 손끝 IK 추가 |
 | 전반적 실패 | `dex-retargeting` 도입 |
 
 ## 8. 다음 단계: leader 그리퍼 모터 제거 (별도 spec)
@@ -156,7 +139,7 @@ LEAP 관절 i를 대응하는 사람 관절 j 하나로 만든다.
 | 단계 | 내용 | 완료 기준 |
 |---|---|---|
 | 0 | Linux Manus SDK bring-up, 2절 미확인 항목 확인 | 글러브 값 출력, 이 문서 2절 갱신 |
-| 1 | `Reading.human`, `ManusSource`, 4-1 대각 매핑, dry-run | pytest 통과, 녹화 데이터 dry-run |
-| 2 | 4-2 혼합 행렬 + 캘리브레이션 도구 + 4-3 후처리 | pytest 통과 |
+| 1 | `Reading.human`, `ManusSource`, 4-1 매핑, dry-run | pytest 통과, 녹화 데이터 dry-run |
+| 2 | 캘리브레이션 도구 + 4-3 후처리 | pytest 통과 |
 | 3 | 실물 시험 (7절) | 결과 문서 (10/09와 같은 형식) |
-| 4 | 판단 기준에 따라 pinch 보정 / dex-retargeting / leader 작업 | — |
+| 4 | 판단 기준에 따라 엄지 IK / dex-retargeting / leader 작업 | — |
