@@ -104,7 +104,7 @@ def least_squares(
     *,
     iterations: int = 40,
     damping: float = 2e-2,
-    tolerance: float = 1e-9,
+    tolerance: float = 1e-5,
 ) -> np.ndarray:
     """Minimise ||residual(x)||^2 inside [lower, upper] with Levenberg-Marquardt.
 

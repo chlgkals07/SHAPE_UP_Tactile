@@ -1,0 +1,45 @@
+# 예시(공칭값). 실측이 아니므로 실물 구동에는 쓸 수 없다 (--dry-run 전용).
+# 실측은 tools/calibrate_manus.py 로 config/manus_calibration.yaml 을 만든다. 단위: 도.
+open:
+  ThumbMCPSpread: 0.0
+  ThumbMCPStretch: 0.0
+  ThumbPIPStretch: 0.0
+  ThumbDIPStretch: 0.0
+  IndexMCPSpread: 0.0
+  IndexMCPStretch: 0.0
+  IndexPIPStretch: 0.0
+  IndexDIPStretch: 0.0
+  MiddleMCPSpread: 0.0
+  MiddleMCPStretch: 0.0
+  MiddlePIPStretch: 0.0
+  MiddleDIPStretch: 0.0
+  RingMCPSpread: 0.0
+  RingMCPStretch: 0.0
+  RingPIPStretch: 0.0
+  RingDIPStretch: 0.0
+  PinkyMCPSpread: 0.0
+  PinkyMCPStretch: 0.0
+  PinkyPIPStretch: 0.0
+  PinkyDIPStretch: 0.0
+closed:
+  ThumbMCPSpread: 0.0
+  ThumbMCPStretch: 40.0
+  ThumbPIPStretch: 45.0
+  ThumbDIPStretch: 50.0
+  IndexMCPSpread: 0.0
+  IndexMCPStretch: 80.0
+  IndexPIPStretch: 95.0
+  IndexDIPStretch: 70.0
+  MiddleMCPSpread: 0.0
+  MiddleMCPStretch: 80.0
+  MiddlePIPStretch: 95.0
+  MiddleDIPStretch: 70.0
+  RingMCPSpread: 0.0
+  RingMCPStretch: 80.0
+  RingPIPStretch: 95.0
+  RingDIPStretch: 70.0
+  PinkyMCPSpread: 0.0
+  PinkyMCPStretch: 80.0
+  PinkyPIPStretch: 95.0
+  PinkyDIPStretch: 70.0
+scale: 1.6

@@ -74,3 +74,47 @@ def test_default_leader_gripper_file_loads():
     cfg = load_leader_gripper(CONFIG_DIR / "leader_gripper.yaml")
     assert cfg.topic == "/leader/joint_trajectory"
     assert cfg.joint_name == "rh_r1_joint"
+
+
+def test_tracked_manus_config_maps_every_leap_joint():
+    from leap_teleop.config import load_manus_leap
+    from leap_teleop.types import HUMAN_ANGLE_NAMES
+
+    cfg = load_manus_leap(CONFIG_DIR / "manus_leap.yaml")
+    assert len(cfg.sources) == 16
+    assert HUMAN_ANGLE_NAMES[cfg.sources[ANGLE_NAMES.index("index_pip_flex")]] == "IndexPIPStretch"
+    assert np.all(cfg.side_gain == 1.0)
+
+
+def test_manus_config_rejects_unknown_glove_angle(tmp_path):
+    import yaml
+
+    from leap_teleop.config import load_manus_leap
+
+    data = yaml.safe_load((CONFIG_DIR / "manus_leap.yaml").read_text())
+    data["joint_map"]["index_pip_flex"] = "IndexBogus"
+    path = tmp_path / "manus_leap.yaml"
+    path.write_text(yaml.safe_dump(data))
+    with pytest.raises(ValueError, match="IndexBogus"):
+        load_manus_leap(path)
+
+
+def test_manus_calibration_round_trips(tmp_path):
+    from leap_teleop.config import ManusCalibration, load_manus_calibration, save_manus_calibration
+
+    original = ManusCalibration(np.arange(20.0), np.arange(20.0) + 50.0, 1.6)
+    path = tmp_path / "cal.yaml"
+    save_manus_calibration(original, path)
+    loaded = load_manus_calibration(path)
+    assert loaded.open_angles == pytest.approx(original.open_angles)
+    assert loaded.closed_angles == pytest.approx(original.closed_angles)
+    assert loaded.scale == pytest.approx(1.6)
+
+
+def test_manus_calibration_requires_all_glove_angles(tmp_path):
+    from leap_teleop.config import load_manus_calibration
+
+    path = tmp_path / "cal.yaml"
+    path.write_text("open: {IndexMCPStretch: 0}\nclosed: {}\nscale: 1.6\n")
+    with pytest.raises(ValueError, match="missing"):
+        load_manus_calibration(path)
