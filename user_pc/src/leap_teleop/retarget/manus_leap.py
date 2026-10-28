@@ -119,10 +119,7 @@ class ManusLeapRetargeter:
         """Thumb joints (degrees) for the human thumb tip, starting from the affine thumb."""
         offset = self._cfg.urdf_offset_deg
         urdf = np.radians(command + offset)
-        rotation = self._leap_basis @ human_palm_basis(human, self._cfg.flip_normal).T
-        target = self._thumb_base + self._scale * rotation @ (
-            human.point("thumb_tip") - human.point("thumb_cmc")
-        )
+        target = self.thumb_target(human)
         index_q = dict(zip(INDEX_JOINTS, urdf[0:4]))
         index_pad = 0.5 * (
             self._chain.link_position("fingertip", index_q)
@@ -147,6 +144,21 @@ class ManusLeapRetargeter:
         solved = least_squares(residual, previous, self._lower, self._upper, iterations=10)
         self._q_prev = solved
         return np.degrees(solved) - offset[THUMB]
+
+    @property
+    def thumb_base(self) -> np.ndarray:
+        return self._thumb_base.copy()
+
+    @property
+    def palm_normal(self) -> np.ndarray:
+        return self._leap_basis[:, 2].copy()
+
+    def thumb_target(self, human: HumanHand) -> np.ndarray:
+        """Human thumb tip moved into the LEAP palm frame (metres, URDF root frame)."""
+        rotation = self._leap_basis @ human_palm_basis(human, self._cfg.flip_normal).T
+        return self._thumb_base + self._scale * rotation @ (
+            human.point("thumb_tip") - human.point("thumb_cmc")
+        )
 
     def thumb_tip_and_pad(self, q: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Thumb tip position and pad normal (unit) for thumb joints q (radians, URDF)."""
