@@ -3,6 +3,7 @@
 - 작성일: 2026-10-28
 - 관련: [spec](2026-10-27-manus-leap-retargeting-design.md), [plan](../plans/2026-10-28-manus-leap-retargeting.md)
 - 결정: 검지·중지·약지는 관절별 affine, 엄지는 affine과 IK를 둘 다 구현하고 `--thumb`로 고른다 (기본 IK). 굽힘–측면 결합 제한은 넣고, pinch snap·dex-retargeting은 미룬다.
+- **개정 (2026-10-29)**: 엄지 IK의 자세 선택을 지문 면 항에서 **BiDex 방식(엄지 끝 + IP 관절 두 점)**으로 바꿨다. 엄지 affine 대응도 BiDex 직접 매핑 예제를 따랐다. 7절.
 
 ## 1. 예전 방식 (shinjju1209/leap-hand@ddfabaa) = affine
 
@@ -60,7 +61,8 @@
 
 ## 5. 결정
 
-### 엄지 IK: 위치 + 지문 면 방향 + affine prior + smoothing
+### (개정 전) 엄지 IK: 위치 + 지문 면 방향 + affine prior + smoothing
+> 2026-10-29에 7절의 BiDex 방식(끝 + IP 두 점)으로 바뀌었다. 아래는 기록으로 남긴다.
 
     min ‖f(q) − p*‖² + λo‖pad(q) − dir(q)‖² + λp‖q − q_aff‖² + λs‖q − q_prev‖²
 
@@ -101,3 +103,43 @@
 | pinch snap | 보류 | 사람 손끝이 가까우면 IK 목표를 LEAP 손끝으로 강제. 주먹·원통 잡기에서 오작동 위험, 임계값 튜닝 필요. IK 단독 pinch 시험에서 틈이 남을 때 추가 (10줄 내외) |
 | dex-retargeting | 보류 | 의존성(pinocchio, nlopt)과 ROS 시스템 numpy 충돌 위험, 손가락까지 최적화로 바뀌면 affine의 예측 가능성 상실(반대 사례가 이 방식). ROBOTIS 손 단계에서 재검토 |
 | 혼합 행렬 `q = W·h + b` | 제외 | 엄지 문제는 기구학 차이라 선형으로 풀리지 않고, 캘리브레이션 자세 수 대비 파라미터가 많다. LEAP 텔레옵 관행에도 없다 |
+
+## 7. BiDex 공식 코드 반영 (2026-10-29)
+
+출처: [leap-hand/Bidex_Manus_Teleop](https://github.com/leap-hand/Bidex_Manus_Teleop) (MIT), [BiDex 논문](https://arxiv.org/html/2411.13677v1).
+
+### 코드가 하는 일
+- **리타게팅** (`ros2/telekinesis/telekinesis/leap_ik.py`): 손가락 4개 모두 IK. 손가락마다 목표가 **두 점**(끝 바로 전 관절 + 손끝, DexCap 방식). pybullet `calculateInverseKinematics2`, `IK_DLS`, 50회. 스케일 1.6 (x만 추가 1.15배), 2 mm offset 등 수동 보정. prior·smoothing·방향 항 없음.
+- **직접 매핑 예제** (`python/MANUS_LEAP_example.py`): 관절별 affine을 손으로 맞춘 배율(1.5, 3, −2.5)과 offset으로. LEAP 12번 ← `ThumbMCPStretch`, 13번 ← `ThumbMCPSpread`. README: "이 모드에서는 엄지가 좋을 수 없다".
+- **데이터 경로**: Manus SDK 2.4 C++ 클라이언트 → ZMQ → ROS 2. 코드 주석: Linux Integrated 모드에서 스켈레톤 노드 **순서가 뒤섞임**. README: Manus가 공식 ROS 2 패키지를 냈다.
+
+### 반영한 것
+| 항목 | 이전 | 이후 | 이유 |
+|---|---|---|---|
+| 엄지 IK 자세 선택 | 지문 면 법선이 검지 끝마디를 향하게 (자체 휴리스틱) | **엄지 IP 관절 위치도 목표** (`ip_weight` 0.3, 끝보다 약하게) | 사람 엄지가 실제로 향하는 방향을 따른다(항상 검지를 향하지 않음). 논문 근거("정확한 pinch와 엄지 위치"). 아래 수치 |
+| 엄지 affine 대응 | 12 ← Spread(배율 매핑), 13 ← Stretch | **12 ← ThumbMCPStretch, 13 ← ThumbMCPSpread**, 12도 편 손~주먹 비율 매핑 + `fist_override_deg` | BiDex 예제와 같은 대응. 손으로 맞춘 큰 배율 대신 캘리브레이션 두 점이 배율을 정한다 |
+| 키포인트 | 7개 | 8개 (`thumb_ip` = Manus `Thumb`/`Distal`) | IP 목표 |
+| 스켈레톤 노드 | — | 이름(chain/joint 타입)으로 찾음 (그대로) | BiDex가 겪은 순서 뒤섞임을 피한다 |
+| ergonomics 이름 | 하나 | SDK 3.1.1 이름 변경 별칭 (`ThumbMCPSpread` → `ThumbSpread`) | Manus 문서 |
+
+### 반영하지 않은 것
+- pybullet: numpy LM으로 같은 역할 (의존성 추가 없음).
+- 손가락 IK: affine 유지 (LEAP 논문 근거). 부족하면 BiDex처럼 DIP + 손끝 두 점 IK로, 같은 LM 코드 재사용.
+- x축 1.15배, 2 mm offset 같은 수동 보정: 필요해지면 실물에서.
+
+### 수치 검증 (URDF, 사람 손 = LEAP 크기의 합성 데이터)
+엄지가 편 상태에서 목표 자세까지 0.8 s(50 Hz) 동안 부드럽게 움직이고, IK는 매 틱 이전 해에서 시작:
+
+| 목표 엄지 (°) | 끝만 (`ip_weight` 0): 자세 오차 최대 | 끝 + IP (0.3): 자세 오차 최대 |
+|---|---|---|
+| [8, 21, 64, 47] | 12.7° | 0.9° |
+| [8, 39, 38, 13] | 28.1° | 2.7° |
+| [66, 10, 31, 41] | 9.1° | 0.8° |
+| [39, 53, 59, 77] | 16.3° | 1.9° |
+| [26, 58, 56, 23] | 44.1° | 2.8° |
+
+두 경우 모두 엄지 끝 오차는 0.0 mm다. **끝만 맞추면 위치는 맞아도 자세가 9~44° 어긋나고, IP를 더하면 3° 이내로 따라간다.** 틱당 계산 중앙값 0.9 ms, 최대 4.5 ms.
+
+### 알려진 한계
+- **차가운 시작(cold start)의 local minimum**: 이전 해 없이, 실제 자세와 멀리 떨어진 affine 엄지에서 시작하면 관절 한계에 걸린 해로 수렴할 수 있다 (편 손 0°에서 [20, 65, 55, 50]°로 바로 풀었을 때 13·15번이 한계에 붙음). 연속으로 따라가면 생기지 않았다. 시작·재시작(입력 0.5 s 끊김, 키포인트 손실 후)은 affine 엄지에서 하므로 **affine 대응이 대략 맞아야** 한다. 실물에서 문제가 되면 재시작 때 여러 시작점을 시도한다.
+- 사람과 LEAP 엄지 마디 비율이 달라 두 점을 동시에 정확히 맞출 수 없다. `ip_weight`를 끝보다 작게 둔 이유이고, 실물에서 조정한다.

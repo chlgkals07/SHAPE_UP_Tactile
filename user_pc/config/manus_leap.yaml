@@ -5,9 +5,11 @@
 # Manus SDK ROS 2 노드의 토픽. 0단계(SDK 확인)에서 실제 이름으로 바꾼다.
 topic: /manus_glove_0
 
-# LEAP 관절 ← Manus ergonomics 이름. *_flex는 편 손~주먹 비율 × fist 목표(postures.yaml),
-# *_side는 side_gain × (현재 − 편 손). Manus 엄지는 CMC를 MCP, MCP를 PIP, IP를 DIP라 부른다.
-# 엄지 대응은 추정이다. 실물에서 --thumb affine으로 보고 조정한다.
+# LEAP 관절 ← Manus ergonomics 이름. *_flex와 thumb_cmc_side는 편 손~주먹 비율 × 주먹 목표
+# (postures.yaml fist + 아래 fist_override_deg), 손가락 *_side는 side_gain × (현재 − 편 손).
+# Manus 엄지는 CMC를 MCP, MCP를 PIP, IP를 DIP라 부른다.
+# 엄지 12·13번 대응은 BiDex 직접 매핑 예제(leap-hand/Bidex_Manus_Teleop MANUS_LEAP_example.py)를 따른다:
+# 12(엄지를 손바닥 앞으로 돌림) ← CMC 굽힘, 13(비틀기) ← CMC 벌림. 실물에서 --thumb affine으로 확인한다.
 joint_map:
   index_mcp_side: IndexMCPSpread
   index_mcp_flex: IndexMCPStretch
@@ -21,13 +23,18 @@ joint_map:
   ring_mcp_flex: RingMCPStretch
   ring_pip_flex: RingPIPStretch
   ring_dip_flex: RingDIPStretch
-  thumb_cmc_side: ThumbMCPSpread
-  thumb_cmc_flex: ThumbMCPStretch
+  thumb_cmc_side: ThumbMCPStretch
+  thumb_cmc_flex: ThumbMCPSpread
   thumb_mcp_flex: ThumbPIPStretch
   thumb_ip_flex: ThumbDIPStretch
 
-# *_side 관절 배율 (생략 = 1). 방향이 반대면 -1.
+# 손가락 *_side 관절 배율 (생략 = 1). 방향이 반대면 -1, 끄려면 0.
 side_gain: {}
+
+# Manus용 주먹 목표 (도). postures.yaml fist(키보드·leader와 공유, 10/09 검증)는 건드리지 않고 덮어쓴다.
+# thumb_cmc_side(12번) 주먹 목표는 실측 전이라 0(= 주먹에서도 돌리지 않음). 실물에서 정한다.
+fist_override_deg:
+  thumb_cmc_side: 0.0
 
 # 굽힘–측면 결합 제한: |side| ≤ side_max × (1 − mcp_flex / flex_max) + side_floor (도)
 coupling:
@@ -35,10 +42,11 @@ coupling:
   side_floor_deg: 5.0
   flex_max_deg: 90.0
 
-# 엄지 IK 가중치. 위치 잔차는 m 단위다 (1 cm 오차 = 1e-4).
-# opposition/smooth는 2609.06009 값에서 시작, prior는 affine 자세로 당기는 힘. 실물에서 조정.
+# 엄지 IK 가중치 (BiDex 방식: 엄지 끝 + IP 관절 두 점).
+# 위치 잔차는 cm 단위다: 엄지 끝 1 cm 오차 = 비용 1. 관절 항(prior, smooth)은 rad 단위.
+# ip_weight: IP 관절을 얼마나 따를지 (끝보다 약하게). prior: affine 자세로 당김. smooth: 이전 해로 당김.
 thumb_ik:
-  opposition_weight: 0.2
+  ip_weight: 0.3
   prior_weight: 0.01
   smooth_weight: 0.05
   flip_normal: false   # 캘리브레이션에서 엄지 목표가 손바닥 반대편으로 가면 true
@@ -47,5 +55,5 @@ one_euro:
   min_cutoff: 0.5
   beta: 0.08
 
-# 실측 open 영점과 URDF 0의 차이 (도). 생략 = 0.
+# URDF 각도 = 우리 각도 + offset (도). 실측 open 영점과 URDF 0이 다를 때. 생략 = 0.
 urdf_offset_deg: {}

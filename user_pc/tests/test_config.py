@@ -118,3 +118,18 @@ def test_manus_calibration_requires_all_glove_angles(tmp_path):
     path.write_text("open: {IndexMCPStretch: 0}\nclosed: {}\nscale: 1.6\n")
     with pytest.raises(ValueError, match="missing"):
         load_manus_calibration(path)
+
+
+def test_manus_side_gain_zero_turns_a_joint_off(tmp_path):
+    import yaml
+
+    from leap_teleop.config import load_manus_leap
+
+    data = yaml.safe_load((CONFIG_DIR / "manus_leap.yaml").read_text())
+    data["side_gain"] = {"index_mcp_side": 0.0, "ring_mcp_side": -1.0}
+    path = tmp_path / "manus_leap.yaml"
+    path.write_text(yaml.safe_dump(data))
+    gain = load_manus_leap(path).side_gain
+    assert gain[ANGLE_NAMES.index("index_mcp_side")] == 0.0
+    assert gain[ANGLE_NAMES.index("ring_mcp_side")] == -1.0
+    assert gain[ANGLE_NAMES.index("middle_mcp_side")] == 1.0

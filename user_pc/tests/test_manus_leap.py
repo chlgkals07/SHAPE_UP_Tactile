@@ -41,6 +41,7 @@ def leap_keypoints(thumb_q, index_q=None):
     links = {
         "wrist": "palm_lower",
         "thumb_cmc": "thumb_temp_base",
+        "thumb_ip": "thumb_fingertip",
         "thumb_tip": "thumb_tip_head",
         "index_mcp": "mcp_joint",
         "index_tip": "index_tip_head",
@@ -106,7 +107,7 @@ def test_thumb_ik_reaches_a_leap_generated_thumb_tip():
     human = HumanHand(CAL.open_angles, leap_keypoints(truth))
     retarget = make("ik", cfg=replace(CFG, prior_weight=0.0, smooth_weight=0.0), cal=cal)
     thumb = retarget.thumb_ik(human, retarget.affine(human))
-    tip, _ = retarget.thumb_tip_and_pad(np.radians(thumb))
+    tip, _ = retarget.thumb_points(np.radians(thumb))
     assert np.linalg.norm(tip - human.point("thumb_tip")) < 2e-3
 
 
@@ -117,21 +118,48 @@ def test_strong_prior_keeps_the_affine_thumb():
     assert retarget.thumb_ik(human, affine) == pytest.approx(affine[THUMB], abs=0.5)
 
 
-def test_pad_term_turns_the_pad_toward_the_index_finger():
-    index_q = {"1": np.radians(56.0), "2": np.radians(82.0), "3": np.radians(3.0)}
-    human = HumanHand(CAL.open_angles, leap_keypoints(np.radians([20.0, 65.0, 55.0, 50.0]), index_q))
-    command = np.zeros(16)
-    command[1:4] = np.degrees([index_q["1"], index_q["2"], index_q["3"]])
+def test_ip_point_keeps_the_operator_thumb_posture_while_tracking():
+    # The thumb moves smoothly from open to a pose, as a real hand does (IK warm-starts each
+    # tick). Tip alone stays on target but the redundant posture drifts; tip + IP follows it.
+    truth = np.radians([26.0, 58.0, 56.0, 23.0])
     cal = replace(CAL, scale=1.0)
-    facing = []
-    for weight in (0.0, 1.0):
-        retarget = make("ik", cfg=replace(CFG, opposition_weight=weight, prior_weight=1e-4), cal=cal)
-        thumb = np.radians(retarget.thumb_ik(human, command))
-        tip, pad = retarget.thumb_tip_and_pad(thumb)
-        q = {"1": index_q["1"], "2": index_q["2"], "3": index_q["3"]}
-        index_pad = 0.5 * (CHAIN.link_position("fingertip", q) + CHAIN.link_position("index_tip_head", q))
-        facing.append(float(pad @ (index_pad - tip) / np.linalg.norm(index_pad - tip)))
-    assert facing[1] > facing[0]
+    worst = {}
+    for w_ip in (0.0, 0.3):
+        retarget = make("ik", cfg=replace(CFG, ip_weight=w_ip, prior_weight=0.0), cal=cal)
+        command = retarget.affine(HumanHand(CAL.open_angles))
+        errors = []
+        for k in range(1, 61):
+            q = truth * min(k / 40, 1.0)
+            human = HumanHand(CAL.open_angles, leap_keypoints(q))
+            thumb = np.radians(retarget.thumb_ik(human, command))
+            errors.append(np.degrees(np.abs(thumb - q)).max())
+            tip, _ = retarget.thumb_points(thumb)
+        assert np.linalg.norm(tip - human.point("thumb_tip")) < 2e-3
+        worst[w_ip] = max(errors)
+    assert worst[0.3] < 5.0
+    assert worst[0.0] > 20.0
+
+
+def test_keypoint_dropout_restarts_ik_from_the_affine_thumb():
+    retarget = make("ik")
+    with_points = HumanHand(CAL.closed_angles, leap_keypoints(np.radians([60.0, 10.0, 0.0, 90.0])))
+    retarget(Reading(timestamp=1.0, human=with_points))
+    assert retarget._q_prev is not None
+    retarget(Reading(timestamp=1.02, human=HumanHand(CAL.closed_angles)))
+    assert retarget._q_prev is None
+
+
+def test_long_input_gap_resets_the_filter():
+    retarget = make()
+    retarget(Reading(timestamp=1.0, human=HumanHand(CAL.open_angles)))
+    after_gap = retarget(Reading(timestamp=5.0, human=HumanHand(CAL.closed_angles)))
+    assert after_gap == pytest.approx(FIST)  # no smoothing toward the old open hand
+
+
+def test_thumb_cmc_side_follows_the_fist_override():
+    cfg = replace(CFG, fist_override_deg={"thumb_cmc_side": 40.0})
+    out = make(cfg=cfg).affine(HumanHand(CAL.closed_angles))
+    assert out[J("thumb_cmc_side")] == pytest.approx(40.0)
 
 
 def test_thumb_mode_is_validated():

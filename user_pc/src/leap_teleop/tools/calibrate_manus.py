@@ -59,7 +59,8 @@ def hand_scale(chain: Chain, open_hand: HumanHand) -> float:
 
 
 def fist_thumb_sides_mm(
-    retarget: ManusLeapRetargeter, fist_hand: HumanHand, fist_thumb_deg: np.ndarray
+    retarget: ManusLeapRetargeter, fist_hand: HumanHand, fist_thumb_deg: np.ndarray,
+    urdf_offset_deg: np.ndarray,
 ) -> tuple[float, float]:
     """How far in front of the palm (+) or behind it (-) the thumb tip is, in the LEAP frame.
 
@@ -68,9 +69,10 @@ def fist_thumb_sides_mm(
     (flip thumb_ik.flip_normal). An open hand cannot show this: the thumb lies in the palm plane.
     """
     normal = retarget.palm_normal
-    target = (retarget.thumb_target(fist_hand) - retarget.thumb_base) @ normal
-    leap_tip, _ = retarget.thumb_tip_and_pad(np.radians(fist_thumb_deg))
-    return float(target * 1000.0), float((leap_tip - retarget.thumb_base) @ normal * 1000.0)
+    target, _ = retarget.thumb_targets(fist_hand)
+    leap_tip, _ = retarget.thumb_points(np.radians(fist_thumb_deg + urdf_offset_deg))
+    base = retarget.thumb_base
+    return float((target - base) @ normal * 1000.0), float((leap_tip - base) @ normal * 1000.0)
 
 
 def record(source, seconds: float) -> HumanHand:
@@ -123,7 +125,8 @@ def main(argv: Sequence[str] | None = None) -> int:
               [n for n, s in zip(HUMAN_ANGLE_NAMES, small_span) if s])
     if fist_hand.keypoints is not None:
         retarget = ManusLeapRetargeter(cfg, calibration, fist_pose, chain, "ik")
-        target, leap = fist_thumb_sides_mm(retarget, fist_hand, fist_pose[12:16])
+        target, leap = fist_thumb_sides_mm(
+            retarget, fist_hand, fist_pose[12:16], cfg.urdf_offset_deg[12:16])
         print(f"fist thumb, mm in front of palm: glove target {target:.0f}, LEAP fist {leap:.0f}")
         if target * leap < 0:
             print("WARNING: opposite sides -> palm frame mirrored. "

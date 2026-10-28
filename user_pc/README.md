@@ -68,7 +68,7 @@ export PYTHONPATH="src:$PYTHONPATH"
    토픽이 0.5초 끊기면 마지막 자세를 유지하고, 3초 끊기면 안전 자세로 간다. 안전 자세는 첫 입력 전(`waiting`)에도 쓰며 기본은 편 손이다. 팔이 움직이는 동안 손을 쥐고 있어야 하면 `--safe-pose fist`를 붙인다. `Ctrl+C`로 종료하면 Torque OFF 후 종료한다.
 
 ## Manus 글러브로 구동
-손가락은 affine(편 손~주먹 비율), 엄지는 `--thumb ik`(기본: 손끝 위치 + 지문 면 방향 IK) 또는 `--thumb affine`.
+손가락은 affine(편 손~주먹 비율), 엄지는 `--thumb ik`(기본: BiDex처럼 엄지 끝 + IP 관절 두 점 IK) 또는 `--thumb affine`.
 근거: `../docs/superpowers/specs/2026-10-28-manus-leap-thumb-ik-rationale.md`. A 방식(ROS source)으로 실행한다.
 
 0. **Manus SDK 확인 (처음 한 번)**: SDK의 ROS 2 노드를 띄우고 아래를 확인해 spec 2절과 `config/manus_leap.yaml`의 `topic`에 반영한다.
@@ -77,6 +77,9 @@ export PYTHONPATH="src:$PYTHONPATH"
    ros2 topic list | grep -i manus
    ros2 topic info <토픽> && ros2 interface show <메시지 타입>
    ros2 topic echo <토픽> --once        # ergonomics 이름 20개, raw node chain/joint 이름 확인
+   ```
+   키포인트는 `sources/manus.py`의 `KEYPOINT_NODES`(손목, 엄지 CMC·IP·끝, 검지 MCP·끝, 중지·새끼 MCP)를 chain/joint 타입 이름으로 찾는다. 이름이 다르면 거기만 고친다. ergonomics 이름이 SDK 버전에 따라 다르면(예: 3.1.1 `ThumbSpread`) `ERGONOMICS_ALIASES`에 추가한다.
+   ```bash
    ros2 bag record <토픽> -o manus_open_fist_pinch   # 편 손 → 주먹 → pinch 3종 녹화 (dry-run 재생용)
    ```
 1. **글러브 캘리브레이션 (사용자마다)**: LEAP 없이 한다. 결과 `config/manus_calibration.yaml` (gitignore).
@@ -93,7 +96,8 @@ export PYTHONPATH="src:$PYTHONPATH"
 4. **pinch 시험 (affine vs IK 비교)**: `--thumb affine`과 `--thumb ik` 각각으로 엄지 끝–검지/중지/약지 끝 붙이기, 펜·작은 블록 집기. 결과를 `docs/field-test/`에 10/09 형식으로 남긴다. IK에서 손끝 틈이 남으면 pinch snap을 추가한다 (spec 7절).
 5. **팔 + 손**: Robot PC에서 `omy_ai`, User PC에서 3번 명령. 두 프로세스는 독립이다. leader 트리거 모터 제거는 `OMY_Tactile_Robot_PC`에서 따로 한다.
 
-조정 값은 모두 `config/manus_leap.yaml`(추적, 공통)에 있다: 대응표, `side_gain`, 결합 제한, IK 가중치, One-Euro, URDF 영점 offset.
+조정 값은 모두 `config/manus_leap.yaml`(추적, 공통)에 있다: 대응표, `side_gain`, `fist_override_deg`(엄지 12번 주먹 목표), 결합 제한, IK 가중치, One-Euro, URDF 영점 offset.
+`assets/leap_hand_right.urdf`를 소스 트리에서 읽으므로 `PYTHONPATH=src` 또는 `pip install -e`로 실행한다 (`pip install .`은 안 됨).
 
 ## 문제 해결
 - `error: ... not found. Run calibrate_motors`: 3단계를 먼저 한다 (공칭 영점으로 움직이지 않는다).

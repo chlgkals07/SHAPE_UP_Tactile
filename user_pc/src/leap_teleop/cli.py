@@ -59,7 +59,7 @@ def build_source(args: argparse.Namespace) -> Source:
     if args.source == "manus":
         from leap_teleop.sources.manus import Ros2ManusSource
 
-        return Ros2ManusSource(load_manus_leap(args.manus_config).topic, side=args.glove_side)
+        return Ros2ManusSource(args.manus.topic, side=args.glove_side)
     if args.source == "leader":
         from leap_teleop.sources.ros2_leader import Ros2LeaderSource
 
@@ -89,7 +89,7 @@ def build_retargeter(
             "Run `python3 -m leap_teleop.tools.calibrate_manus`."
         )
     return ManusLeapRetargeter(
-        load_manus_leap(args.manus_config),
+        args.manus,
         load_manus_calibration(args.manus_calibration),
         fist_pose,
         load_chain(LEAP_URDF),
@@ -119,6 +119,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not 10.0 <= args.rate <= 200.0:
             raise ValueError("rate must be between 10 and 200 Hz (the bus watchdog is 500 ms)")
         open_pose, fist_pose = load_postures(args.postures)
+        args.manus = load_manus_leap(args.manus_config) if args.source == "manus" else None
         if not args.dry_run and not args.motor_calibration_file.exists():
             raise FileNotFoundError(
                 f"{args.motor_calibration_file} not found. Run "
@@ -133,9 +134,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         safe_pose = fist_pose if args.safe_pose == "fist" else open_pose
         guard = StaleGuard(safe_pose, args.stale_timeout, args.release_timeout)
         retarget = build_retargeter(args, open_pose, fist_pose)
-        driver = build_driver(args)
+        # Input first: a missing ROS / Manus package must fail before the hand is opened.
         source = build_source(args)
-    except (FileNotFoundError, ValueError, RuntimeError) as error:
+        try:
+            driver = build_driver(args)
+        except BaseException:
+            source.close()
+            raise
+    except (FileNotFoundError, ValueError, RuntimeError, ImportError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
 

@@ -78,16 +78,15 @@
 - 새끼손가락 4값은 쓰지 않는다. 예전 leap-hand 방식과 같다.
 
 ### 4-2. 엄지: affine과 IK 둘 다, `--thumb`로 선택 (기본 IK)
-- **affine**: 엄지 4값을 12~15번에 1:1 직선. 대응표는 yaml (기본 12←CMCSpread, 13←CMCStretch, 14←MCPStretch, 15←IPStretch, 실물로 조정). IK의 prior이자 키포인트가 없을 때의 fallback.
+- **affine**: 엄지 4값을 12~15번에 편 손~주먹 비율로. 대응은 BiDex 예제를 따라 12←ThumbMCPStretch, 13←ThumbMCPSpread, 14←ThumbPIPStretch, 15←ThumbDIPStretch (Manus 엄지 이름은 한 마디씩 밀려 있다). 12번 주먹 목표는 `fist_override_deg`(실측 전 0). IK의 prior, 키포인트가 없을 때의 fallback, IK 재시작점.
 - **IK**:
 
-      min ‖f(q) − p*‖² + λo‖pad(q) − dir(q)‖² + λp‖q − q_aff‖² + λs‖q − q_prev‖²
+      min ‖tip(q) − tip*‖² + λip‖ip(q) − ip*‖² + λp‖q − q_aff‖² + λs‖q − q_prev‖²
 
-  - `p* = c_L + s·R·(p_thumb_tip − p_thumb_cmc)`: 사람 엄지 끝을 LEAP 손바닥 좌표계로 옮긴 목표 (R은 매 샘플 손바닥 키포인트로)
-  - `pad(q)`: 엄지 지문 면 법선, `dir(q)`: 엄지 끝 → LEAP 검지 끝마디 중앙(손가락 affine 결과로 FK). 지문 면이 손가락을 향하게
-  - 2609.06009의 끝–끝 방향 항은 손끝 위치에만 의존해 자세를 고르지 못하므로 바꿨다 (설계 근거 5절)
-  - LM, 이전 해에서 시작, 관절 한계 안에서, 틱당 최대 10회
-  - 기본 λo = 0.2, λs = 0.05, λp = 0.01, 위치 잔차 cm 단위 — 실물 조정
+  - `tip*`, `ip*` = `c_L + s·R·(사람 점 − 사람 엄지 CMC)`: 사람 엄지 끝과 IP 관절을 LEAP 손바닥 좌표계로 (R은 매 샘플 손바닥 키포인트로)
+  - **BiDex 방식**: 끝만 맞추면 자세가 9~44° 어긋나고 IP를 더하면 3° 이내 (설계 근거 7절)
+  - LM, 이전 해에서 시작, 관절 한계 안에서, 틱당 최대 10회. 입력이 0.5 s 넘게 끊기거나 키포인트가 빠지면 affine 엄지에서 다시 시작
+  - 기본 λip = 0.3, λp = 0.01, λs = 0.05. 위치 잔차 cm, 관절 rad — 실물 조정
 - 근거와 장단점은 설계 근거 문서 참고.
 
 ### 4-3. 후처리

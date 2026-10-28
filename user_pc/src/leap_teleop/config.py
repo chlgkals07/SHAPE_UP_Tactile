@@ -77,12 +77,13 @@ class ManusLeapConfig:
     side_floor_deg: float
     flex_max_deg: float
     flip_normal: bool
-    opposition_weight: float
+    ip_weight: float
     prior_weight: float
     smooth_weight: float
     one_euro_min_cutoff: float
     one_euro_beta: float
     urdf_offset_deg: np.ndarray
+    fist_override_deg: Mapping[str, float]  # replaces postures.yaml fist targets for Manus
 
 
 @dataclass(frozen=True)
@@ -113,8 +114,11 @@ def load_manus_leap(path: str | Path) -> ManusLeapConfig:
         if unknown:
             raise ValueError(f"{path}: joint_map uses unknown glove angles {unknown}")
         coupling, weights, one_euro = data["coupling"], data["thumb_ik"], data["one_euro"]
-        side_gain = make_posture(data.get("side_gain") or {})
-        side_gain[side_gain == 0.0] = 1.0  # unspecified gains default to 1
+        gains = data.get("side_gain") or {}
+        side_gain = make_posture({n: gains.get(n, 1.0) for n in ANGLE_NAMES})
+        make_posture(gains)  # rejects unknown joint names
+        fist_override = {str(k): float(v) for k, v in (data.get("fist_override_deg") or {}).items()}
+        make_posture(fist_override)
         cfg = ManusLeapConfig(
             topic=str(data["topic"]),
             sources=tuple(HUMAN_ANGLE_NAMES.index(joint_map[n]) for n in ANGLE_NAMES),
@@ -123,12 +127,13 @@ def load_manus_leap(path: str | Path) -> ManusLeapConfig:
             side_floor_deg=float(coupling["side_floor_deg"]),
             flex_max_deg=float(coupling["flex_max_deg"]),
             flip_normal=bool(weights.get("flip_normal", False)),
-            opposition_weight=float(weights["opposition_weight"]),
+            ip_weight=float(weights["ip_weight"]),
             prior_weight=float(weights["prior_weight"]),
             smooth_weight=float(weights["smooth_weight"]),
             one_euro_min_cutoff=float(one_euro["min_cutoff"]),
             one_euro_beta=float(one_euro["beta"]),
             urdf_offset_deg=make_posture(data.get("urdf_offset_deg") or {}),
+            fist_override_deg=fist_override,
         )
     except KeyError as missing_key:
         raise ValueError(f"{path} is missing {missing_key}") from None

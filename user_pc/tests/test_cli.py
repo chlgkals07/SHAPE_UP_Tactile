@@ -125,3 +125,13 @@ def test_manus_requires_a_glove_calibration(tmp_path, capsys, monkeypatch):
     args = BASE + MANUS[:-1] + [str(tmp_path / "missing.yaml"), "--dry-run"]
     assert cli.main(args) == 2
     assert "calibrate_manus" in capsys.readouterr().err
+
+
+def test_missing_ros_package_fails_cleanly_before_the_hand_is_opened(monkeypatch, capsys):
+    def no_manus_msgs(args):
+        raise ModuleNotFoundError("No module named 'manus_ros2_msgs'")
+
+    monkeypatch.setattr(cli, "build_source", no_manus_msgs)
+    monkeypatch.setattr(cli, "build_driver", lambda args: pytest.fail("opened the hand first"))
+    assert cli.main(BASE + MANUS + ["--dry-run"]) == 2
+    assert "manus_ros2_msgs" in capsys.readouterr().err

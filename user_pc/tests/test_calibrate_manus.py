@@ -15,7 +15,7 @@ def test_median_ignores_a_single_glitch():
 
 
 def test_median_drops_keypoints_unless_every_frame_has_them():
-    with_points = HumanHand(np.zeros(20), np.zeros((7, 3)))
+    with_points = HumanHand(np.zeros(20), np.zeros((8, 3)))
     without = HumanHand(np.zeros(20))
     assert median_hand([with_points, without]).keypoints is None
 
@@ -36,8 +36,8 @@ def test_fist_check_agrees_for_matching_hands_and_flags_a_mirror():
     fist_thumb = FIST[12:16]
     fist_hand = HumanHand(np.zeros(20), leap_keypoints(np.radians(fist_thumb)))
     cal = replace(CAL, scale=1.0)
-    target, leap = fist_thumb_sides_mm(make("ik", cal=cal), fist_hand, fist_thumb)
+    target, leap = fist_thumb_sides_mm(make("ik", cal=cal), fist_hand, fist_thumb, np.zeros(4))
     assert target == pytest.approx(leap, abs=1.0) and leap > 0
     mirrored = make("ik", cfg=replace(CFG, flip_normal=True), cal=cal)
-    target, leap = fist_thumb_sides_mm(mirrored, fist_hand, fist_thumb)
+    target, leap = fist_thumb_sides_mm(mirrored, fist_hand, fist_thumb, np.zeros(4))
     assert target * leap < 0

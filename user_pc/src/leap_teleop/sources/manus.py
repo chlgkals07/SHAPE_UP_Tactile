@@ -19,10 +19,15 @@ import numpy as np
 from leap_teleop.sources.base import Source
 from leap_teleop.types import HUMAN_ANGLE_NAMES, KEYPOINT_NAMES, HumanHand, Reading
 
+# Later SDKs renamed some ergonomics types (3.1.1: ThumbMCPSpread -> ThumbSpread).
+# Add the rest here once seen on the real SDK.
+ERGONOMICS_ALIASES = {"ThumbMCPSpread": ("ThumbSpread",)}
+
 # Keypoint -> (Manus chain type, joint type). A "Proximal" node sits at the MCP joint.
 KEYPOINT_NODES = {
     "wrist": ("Hand", "Metacarpal"),
     "thumb_cmc": ("Thumb", "Metacarpal"),
+    "thumb_ip": ("Thumb", "Distal"),
     "thumb_tip": ("Thumb", "Tip"),
     "index_mcp": ("Index", "Proximal"),
     "index_tip": ("Index", "Tip"),
@@ -38,11 +43,13 @@ def human_from_glove(
     """Build a HumanHand, or None if an angle is missing or anything is not finite.
 
     Ergonomics keys may carry a side prefix ("RightFingerIndexMCPStretch"); they are matched
-    by suffix. Missing keypoints only drop the keypoints (the thumb then runs affine).
+    by suffix, also under ERGONOMICS_ALIASES. Missing keypoints only drop the keypoints (the
+    thumb then runs affine).
     """
     angles = []
     for name in HUMAN_ANGLE_NAMES:
-        matches = [value for key, value in ergonomics.items() if key.endswith(name)]
+        names = (name, *ERGONOMICS_ALIASES.get(name, ()))
+        matches = [v for k, v in ergonomics.items() if any(k.endswith(n) for n in names)]
         if len(matches) != 1 or not np.isfinite(matches[0]):
             return None
         angles.append(float(matches[0]))

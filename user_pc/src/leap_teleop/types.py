@@ -20,7 +20,8 @@ HUMAN_ANGLE_NAMES = tuple(
 )
 # The few glove skeleton points the thumb IK and calibration need (metres, glove frame).
 KEYPOINT_NAMES = (
-    "wrist", "thumb_cmc", "thumb_tip", "index_mcp", "index_tip", "middle_mcp", "pinky_mcp",
+    "wrist", "thumb_cmc", "thumb_ip", "thumb_tip", "index_mcp", "index_tip", "middle_mcp",
+    "pinky_mcp",
 )
 
 
@@ -46,9 +47,6 @@ class HumanHand:
         if self.keypoints is not None:
             points = _finite_array(self.keypoints, (len(KEYPOINT_NAMES), 3), "keypoints")
             object.__setattr__(self, "keypoints", points)
-
-    def angle(self, name: str) -> float:
-        return float(self.angles[HUMAN_ANGLE_NAMES.index(name)])
 
     def point(self, name: str) -> np.ndarray:
         if self.keypoints is None:

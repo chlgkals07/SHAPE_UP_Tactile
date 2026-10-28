@@ -7,6 +7,8 @@
 - 설정 분리: `config/manus_leap.yaml`(추적, 조정 값) + `config/manus_calibration.yaml`(gitignore, 사용자별; 예시 `.example.yaml`). 기존 `hardware_motors` 규칙과 같다.
 - 손바닥 정렬 R은 yaml 상수가 아니라 매 샘플 키포인트로 계산, 거울상만 `flip_normal`로. 캘리브레이션 확인은 편 손이 아니라 주먹에서 (편 손은 엄지가 손바닥 평면 안).
 - IK 틱당 10회 제한 (도달 불가 목표에서 최대 ~11 ms → ~3 ms).
+- **BiDex 공식 코드 반영 (2026-10-29)**: 엄지 IK 자세 선택을 지문 면 항 → 엄지 끝 + IP 두 점으로. 엄지 affine 대응 12←ThumbMCPStretch, 13←ThumbMCPSpread, 12번도 비율 매핑(`fist_override_deg`). 키포인트에 `thumb_ip`. ergonomics 이름 별칭. 설계 근거 7절.
+- `/code-review` 반영: `side_gain` 0 허용, yaml 단위 주석(cm), 거울상 검사 offset, 입력 끊김·키포인트 손실 시 IK·필터 초기화, 입력 소스를 드라이버보다 먼저 만들고 ImportError 처리, 설정 한 번만 읽기.
 
 ## Context
 OMY leader 그리퍼(scalar 0~1)로 LEAP Hand를 쥐었다 펴는 데까지 검증됨(10/09). 다음은 Manus Pro Haptic 글러브로 16관절을 직접 조종한다. 논의 결과:

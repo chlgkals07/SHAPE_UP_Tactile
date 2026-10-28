@@ -1,13 +1,13 @@
 """Manus glove (HumanHand) -> LEAP Hand command: affine fingers, affine or IK thumb.
 
-Fingers: *_flex = clip((h - h_open) / (h_closed - h_open), 0, 1) * fist target,
-         *_side = side_gain * (h - h_open), then flex-side coupling.
-Thumb IK (radians, URDF frame, position in cm):
-    min |f(q) - p*|^2 + w_o |pad(q) - dir(q)|^2 + w_p |q - q_aff|^2 + w_s |q - q_prev|^2
-pad(q) is the thumb pad normal (where IP flexion moves the tip) and dir(q) points from the
-thumb tip to the middle of the LEAP index distal segment, so the pad faces the finger.
-Four joints for a 3D target leave a family of solutions; the pad and prior terms pick one.
-Design rationale: docs/superpowers/specs/2026-10-28-manus-leap-thumb-ik-rationale.md
+Affine: range joints (*_flex and thumb_cmc_side) = clip((h - h_open) / (h_closed - h_open), 0, 1)
+        * fist target; finger *_side = side_gain * (h - h_open), then flex-side coupling.
+Thumb IK, BiDex style (leap-hand/Bidex_Manus_Teleop matches the last two points of each finger).
+Radians, URDF frame, positions in cm:
+    min |tip(q) - tip*|^2 + w_ip |ip(q) - ip*|^2 + w_p |q - q_aff|^2 + w_s |q - q_prev|^2
+Four joints for one 3D tip leave a family of solutions; the IP joint point picks the one that
+follows the operator's own thumb. Design rationale:
+docs/superpowers/specs/2026-10-28-manus-leap-thumb-ik-rationale.md
 """
 
 from __future__ import annotations
@@ -23,12 +23,12 @@ from leap_teleop.types import HAND_DOF, HumanHand, Reading
 THUMB_MODES = ("ik", "affine")
 THUMB = slice(12, 16)
 THUMB_JOINTS = ("12", "13", "14", "15")
-INDEX_JOINTS = ("0", "1", "2", "3")
-FLEX_GROUPS = ((1, 2, 3), (5, 6, 7), (9, 10, 11), (13, 14, 15))
+RANGE_GROUPS = ((1, 2, 3), (5, 6, 7), (9, 10, 11), (12, 13, 14, 15))
 SIDE_FLEX_PAIRS = ((0, 1), (4, 5), (8, 9))  # index, middle, ring
 MIN_SPAN_DEG = 10.0
-IS_FLEX = np.array([name.endswith("_flex") for name in ANGLE_NAMES])
+IS_RANGE = np.array([n.endswith("_flex") or n == "thumb_cmc_side" for n in ANGLE_NAMES])
 CM = 100.0
+RESET_GAP_S = 0.5  # input gap after which IK warm start and filter history are stale
 
 
 def _unit(vector: np.ndarray) -> np.ndarray:
@@ -72,6 +72,8 @@ class ManusLeapRetargeter:
         self._fist = np.array(fist_pose, dtype=np.float64)
         if self._fist.shape != (HAND_DOF,):
             raise ValueError(f"fist_pose must have shape ({HAND_DOF},)")
+        for name, value in cfg.fist_override_deg.items():
+            self._fist[ANGLE_NAMES.index(name)] = value
         self._lower, self._upper = chain.limits(THUMB_JOINTS)
         # LEAP reference frame at q = 0: thumb base and palm axes (ring stands in for pinky).
         self._thumb_base = chain.link_position("thumb_temp_base", {})
@@ -89,9 +91,14 @@ class ManusLeapRetargeter:
         # Sources repeat the latest reading every tick; the filter needs increasing time.
         if self._last is not None and reading.timestamp <= self._last[0]:
             return self._last[1].copy()
+        if self._last is not None and reading.timestamp - self._last[0] > RESET_GAP_S:
+            self._q_prev = None
+            self._filter.reset()
         command = self.affine(reading.human)
         if self._thumb_mode == "ik" and reading.human.keypoints is not None:
             command[THUMB] = self.thumb_ik(reading.human, command)
+        else:
+            self._q_prev = None  # when keypoints return, restart IK from the affine thumb
         output = self._filter.filter(command, reading.timestamp)
         self._last = (reading.timestamp, output)
         return output.copy()
@@ -99,13 +106,13 @@ class ManusLeapRetargeter:
     def affine(self, human: HumanHand) -> np.ndarray:
         """All 16 joints from the glove angles (degrees), coupling applied."""
         delta = human.angles[list(self._cfg.sources)] - self._h_open
-        command = np.where(IS_FLEX, 0.0, self._cfg.side_gain * delta)
-        for group in FLEX_GROUPS:
+        command = np.where(IS_RANGE, 0.0, self._cfg.side_gain * delta)
+        for group in RANGE_GROUPS:
             group = np.array(group)
             usable = np.abs(self._span[group]) >= MIN_SPAN_DEG
             ratios = np.zeros(group.size)
             ratios[usable] = np.clip(delta[group[usable]] / self._span[group[usable]], 0.0, 1.0)
-            # A joint the glove barely moved borrows its finger's median bend.
+            # A joint the glove barely moved borrows its finger's median ratio.
             if usable.any():
                 ratios[~usable] = float(np.median(ratios[usable]))
             command[group] = ratios * self._fist[group]
@@ -116,25 +123,19 @@ class ManusLeapRetargeter:
         return command
 
     def thumb_ik(self, human: HumanHand, command: np.ndarray) -> np.ndarray:
-        """Thumb joints (degrees) for the human thumb tip, starting from the affine thumb."""
-        offset = self._cfg.urdf_offset_deg
-        urdf = np.radians(command + offset)
-        target = self.thumb_target(human)
-        index_q = dict(zip(INDEX_JOINTS, urdf[0:4]))
-        index_pad = 0.5 * (
-            self._chain.link_position("fingertip", index_q)
-            + self._chain.link_position("index_tip_head", index_q)
-        )
-        prior = urdf[THUMB]
+        """Thumb joints (degrees) matching the operator's thumb tip and IP joint."""
+        offset = self._cfg.urdf_offset_deg[THUMB]
+        tip_target, ip_target = self.thumb_targets(human)
+        prior = np.radians(command[THUMB] + offset)
         previous = prior if self._q_prev is None else self._q_prev
-        w_o, w_p, w_s = (np.sqrt(w) for w in (
-            self._cfg.opposition_weight, self._cfg.prior_weight, self._cfg.smooth_weight))
+        w_ip, w_p, w_s = (np.sqrt(w) for w in (
+            self._cfg.ip_weight, self._cfg.prior_weight, self._cfg.smooth_weight))
 
         def residual(q: np.ndarray) -> np.ndarray:
-            tip, pad = self.thumb_tip_and_pad(q)
+            tip, ip = self.thumb_points(q)
             return np.concatenate((
-                (tip - target) * CM,
-                w_o * (pad - _unit(index_pad - tip)),
+                (tip - tip_target) * CM,
+                w_ip * (ip - ip_target) * CM,
                 w_p * (q - prior),
                 w_s * (q - previous),
             ))
@@ -143,7 +144,7 @@ class ManusLeapRetargeter:
         # next tick. Unreachable targets would otherwise burn all iterations every tick.
         solved = least_squares(residual, previous, self._lower, self._upper, iterations=10)
         self._q_prev = solved
-        return np.degrees(solved) - offset[THUMB]
+        return np.degrees(solved) - offset
 
     @property
     def thumb_base(self) -> np.ndarray:
@@ -153,17 +154,19 @@ class ManusLeapRetargeter:
     def palm_normal(self) -> np.ndarray:
         return self._leap_basis[:, 2].copy()
 
-    def thumb_target(self, human: HumanHand) -> np.ndarray:
-        """Human thumb tip moved into the LEAP palm frame (metres, URDF root frame)."""
+    def thumb_targets(self, human: HumanHand) -> tuple[np.ndarray, np.ndarray]:
+        """Operator thumb tip and IP joint moved into the LEAP palm frame (metres, URDF root)."""
         rotation = self._leap_basis @ human_palm_basis(human, self._cfg.flip_normal).T
-        return self._thumb_base + self._scale * rotation @ (
-            human.point("thumb_tip") - human.point("thumb_cmc")
+        base = human.point("thumb_cmc")
+        return tuple(
+            self._thumb_base + self._scale * rotation @ (human.point(name) - base)
+            for name in ("thumb_tip", "thumb_ip")
         )
 
-    def thumb_tip_and_pad(self, q: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """Thumb tip position and pad normal (unit) for thumb joints q (radians, URDF)."""
-        tip = self._chain.link_position("thumb_tip_head", dict(zip(THUMB_JOINTS, q)))
-        flexed = np.array(q, dtype=np.float64)
-        flexed[3] += 1e-4  # a little more IP flexion moves the tip toward the pad side
-        nudged = self._chain.link_position("thumb_tip_head", dict(zip(THUMB_JOINTS, flexed)))
-        return tip, _unit(nudged - tip)
+    def thumb_points(self, q: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """LEAP thumb tip and IP joint (joint 15) positions for thumb joints q (radians, URDF)."""
+        joints = dict(zip(THUMB_JOINTS, q))
+        return (
+            self._chain.link_position("thumb_tip_head", joints),
+            self._chain.link_position("thumb_fingertip", joints),
+        )

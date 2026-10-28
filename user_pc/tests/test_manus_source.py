@@ -15,7 +15,8 @@ def test_reads_angles_by_name_with_a_side_prefix():
 
 def test_reads_keypoints_in_keypoint_order():
     human = human_from_glove(ERGONOMICS, NODES)
-    assert human.point("thumb_tip").tolist() == [2.0, 2.0, 2.0]
+    i = float(KEYPOINT_NAMES.index("thumb_tip"))
+    assert human.point("thumb_tip").tolist() == [i, i, i]
 
 
 def test_missing_angle_gives_no_reading():
@@ -36,3 +37,9 @@ def test_missing_or_bad_keypoints_only_drop_the_keypoints():
     bad = dict(NODES)
     bad[KEYPOINT_NODES["wrist"]] = (np.nan, 0.0, 0.0)
     assert human_from_glove(ERGONOMICS, bad).keypoints is None
+
+
+def test_renamed_ergonomics_types_are_accepted():
+    renamed = dict(ERGONOMICS)
+    renamed["RightFingerThumbSpread"] = renamed.pop("RightFingerThumbMCPSpread")
+    assert human_from_glove(renamed).angles.tolist() == list(range(20))

@@ -52,13 +52,13 @@ def test_reading_rejects_wrong_hand_shape_and_nan():
 def test_human_names_cover_twenty_angles_and_the_thumb_ik_points():
     assert len(HUMAN_ANGLE_NAMES) == 20
     assert HUMAN_ANGLE_NAMES[0] == "ThumbMCPSpread"
-    assert {"wrist", "thumb_tip", "index_tip"} <= set(KEYPOINT_NAMES)
+    assert {"wrist", "thumb_ip", "thumb_tip", "index_tip"} <= set(KEYPOINT_NAMES)
 
 
 def test_reading_accepts_human_hand():
-    human = HumanHand(np.arange(20.0), np.ones((7, 3)))
+    human = HumanHand(np.arange(20.0), np.ones((8, 3)))
     reading = Reading(timestamp=1.0, human=human)
-    assert reading.human.angle("IndexMCPStretch") == 5.0
+    assert reading.human.angles[HUMAN_ANGLE_NAMES.index("IndexMCPStretch")] == 5.0
     assert reading.human.point("thumb_tip").tolist() == [1.0, 1.0, 1.0]
 
 
