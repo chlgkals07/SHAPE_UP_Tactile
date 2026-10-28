@@ -1,0 +1,92 @@
+# 설계 근거: 손가락 affine + 엄지 IK
+
+- 작성일: 2026-10-28
+- 관련: [spec](2026-10-27-manus-leap-retargeting-design.md), [plan](../plans/2026-10-28-manus-leap-retargeting.md)
+- 결정: 검지·중지·약지는 관절별 affine, 엄지는 affine과 IK를 둘 다 구현하고 `--thumb`로 고른다 (기본 IK). 굽힘–측면 결합 제한은 넣고, pinch snap·dex-retargeting은 미룬다.
+
+## 1. 예전 방식 (shinjju1209/leap-hand@ddfabaa) = affine
+
+`hand_angles.py` + `neutral_calibration.py`:
+1. 웹캠 MediaPipe 21점 → 사람 관절각 16개
+2. 편 손(neutral)과 주먹(closed)을 1.5 s씩 기록, 중앙값
+3. 굽힘: `q = clip((h − h_open) / (h_closed − h_open), 0, 1) × q_fist` (q_fist = 90/100/80°, 엄지 0/60/75/70°)
+4. 측면: `q = h − h_open`
+
+이 식은 `q = g·h + b` 꼴(관절마다 직선 하나)이라 affine이다. `g = q_fist / (h_closed − h_open)`, `b = −g·h_open`.
+
+## 2. LEAP 엄지 구조 (URDF FK로 직접 계산)
+
+`dex-urdf` `leap_hand_right.urdf`, 모든 관절 0에서 손바닥 좌표계 기준:
+
+| 관절 (우리 이름) | 축 | 하는 일 | 범위 |
+|---|---|---|---|
+| 12 `thumb_cmc_side` | 손가락과 평행 | 엄지 전체를 손바닥 앞으로 돌림 | −20° ~ 120° |
+| 13 `thumb_cmc_flex` | 엄지 길이 방향에 가까움 | 사실상 비틀기(roll) | −27° ~ 140° |
+| 14 `thumb_mcp_flex` | 손바닥 법선 | 굽힘, 13번에 따라 굽는 평면이 바뀜 | −69° ~ 109° |
+| 15 `thumb_ip_flex` | 14번과 평행 | 굽힘 | −77° ~ 108° |
+
+- 0 자세에서 엄지는 손바닥 평면 안에서 옆으로 뻗은 L자다.
+- 사람 엄지의 opposition은 CMC 안장관절 하나에서 벌림·굽힘·안쪽 회전이 함께 일어난다. LEAP는 이를 12번(돌리기) + 13번(비틀기)으로 나눴다. 이름은 같아도 1:1 대응이 아니다.
+- 예전 코드는 "손바닥 평면 안 벌림 → 12번", "손바닥 밖으로 나온 각 → 13번(비틀기)"로 연결했다. 움직임이 엇갈려 대응된 것으로 보인다.
+- 손가락은 다르다. MCP 굽힘(1번) 위에 측면(0번)이 얹힌 universal 구조이고, LEAP 논문도 손가락은 관절각을 그대로 매핑할 수 있다고 한다.
+- 우리 `ANGLE_NAMES` 인덱스 = 모터 ID = URDF 관절 이름 `"0"`~`"15"`이고, `SIM_MIN/MAX_RADIANS`는 URDF limit과 같다. 따라서 우리 각도를 라디안으로 바꾼 값이 URDF q다. 영점은 실측 open이므로 offset knob을 둔다.
+
+## 3. URDF 수치 검증
+
+엄지 4관절 + 검지 3굽힘에 대해, 엄지 끝–검지 끝 거리를 LM으로 최소화했다 (무작위 시작점 30개):
+
+| 조건 | 최소 거리 | 엄지 q (°) |
+|---|---|---|
+| 12번을 0°로 고정 | 0.0 mm | [0, 67, 96, 11] |
+| 전부 자유 | 0.0 mm | [58, 28, 0, 108] |
+
+- 12번이 0°여도 13·14번 조합으로 pinch에 도달한다. 대화 중 "12번이 0이면 엄지가 못 나온다"고 한 것은 틀렸다.
+- **문제는 도달 가능성이 아니라 해 선택이다.** 같은 손끝 위치를 만드는 엄지 자세가 여럿이다(관절 4개 vs 위치 3차원). 그래서 IK에는 위치 외에 자세를 고르는 항이 필요하다.
+- 가정: 우리 0 = URDF 0, 부호 같음. 실물에서 확인한다.
+
+## 4. 문헌 근거
+
+| 근거 | 내용 |
+|---|---|
+| [2609.06009](https://arxiv.org/html/2609.06009) | Manus → LEAP. 손가락은 관절별 affine(편 손·반쯤·주먹 3점 최소제곱), 엄지는 손끝 IK + opposition 항. `min ‖r_x‖² + λo‖r_o‖² + λs‖q − q_prev‖²`, λo = 0.2, λs = 0.05, LM, warm start, 보통 10회 미만 수렴. 직접 매핑은 "지연이 없지만 엄지–검지 opposition을 잃는다"고 서술 |
+| [LEAP Hand](https://arxiv.org/html/2309.06440) | 손가락 관절이 사람과 비슷해 관절각을 직접 매핑 |
+| [RAPID Hand](https://arxiv.org/pdf/2510.16931) | 직접 매핑은 주먹 때 손가락 충돌, 부자연스러운 자세 |
+| [dex-retargeting](https://github.com/dexsuite/dex-retargeting) | LEAP 설정은 DexPilot, `scaling_factor: 1.6` |
+| [Feel Robot Feels](https://arxiv.org/pdf/2603.28542) | 엄지–손가락 opposition 유지가 조작 성공에 중요해 제약으로 넣음 |
+
+**한계**: 엄지 affine과 IK를 같은 손·글러브에서 직접 비교한 실험(ablation)은 찾지 못했다. 2609.06009도 정성적 이유만 든다.
+
+**반대 사례**: [quest3-dexterous-teleop](https://github.com/ismael-esp/quest3-dexterous-teleop) (Quest 3 → Allegro)는 손끝만 맞추는 DexPilot에서 뿌리 쪽 관절이 떠서 주먹이 10~50%만 닫혔고, 엄지 MCP가 늘 반쯤 굽어 있었다. 그래서 엄지를 각도 매핑으로 되돌리고 5.5 cm 안에서만 IK로 붙였다.
+
+## 5. 결정
+
+### 엄지 IK에 affine prior 항을 더한다
+
+    min ‖f(q) − p*‖² + λo‖unit(index_L − f(q)) − n*‖² + λp‖q − q_aff‖² + λs‖q − q_prev‖²
+
+- `p*`: 사람 엄지 끝을 LEAP 손바닥 좌표계로 옮긴 목표 (회전 R, 스케일 s ≈ 1.6, 엄지 뿌리 기준)
+- `n*`: 사람 엄지 끝 → 검지 끝 방향. 지문 면이 손가락을 향하게 한다
+- `q_aff`: 엄지 affine 결과. 위치만 맞추는 IK가 관절을 띄우는 문제(반대 사례)를 막는다
+- `q_prev`: 이전 해. 해가 프레임마다 다른 쪽으로 튀는 것을 막는다
+
+### 엄지 affine도 남긴다
+- 키포인트가 없을 때의 fallback, IK의 prior, 그리고 **pinch 시험에서 IK와 비교할 기준**(문헌에 ablation이 없으므로 우리가 직접 한다).
+
+### 장단점
+
+| | affine (손가락) | IK (엄지) |
+|---|---|---|
+| 맞추는 것 | 관절 각도 | 손끝 위치와 엄지가 마주 보는 방향 |
+| 장점 | 단순, 결과가 늘 같음, 지연 없음, 관절 하나만 보면 디버깅 가능, 글러브 좌표계 오차에 둔감 | 축이 다른 엄지 처리, pinch 접촉, 손 크기 차이를 스케일 하나로 흡수, URDF만 바꾸면 다른 손에 적용 |
+| 단점 | 관절 1:1 대응이 전제, 접촉 보장 없음 | 손바닥 정렬·스케일 오차가 손끝 오차로 커짐, 키포인트 품질 의존, λ 튜닝, 원인 찾기 어려움 |
+
+가장 큰 위험은 IK 계산이 아니라 **손바닥 정렬 캘리브레이션**이다. 캘리브레이션 도구가 편 손에서 IK 목표와 LEAP 엄지 끝 사이 거리를 출력해 확인한다.
+
+## 6. 함께 검토한 항목
+
+| 항목 | 결정 | 이유 |
+|---|---|---|
+| 굽힘–측면 결합 제한 | **포함** | `|side| ≤ side_max × (1 − flex/flex_max) + side_floor`. 3~5줄. LEAP 측면 범위가 ±60°라 주먹 때 글러브 측면 노이즈로 이웃 손가락과 충돌할 수 있다(RAPID Hand 보고). 손가락을 굽힌 채 벌리는 동작은 거의 없다 |
+| pinch snap | 보류 | 사람 손끝이 가까우면 IK 목표를 LEAP 손끝으로 강제. 주먹·원통 잡기에서 오작동 위험, 임계값 튜닝 필요. IK 단독 pinch 시험에서 틈이 남을 때 추가 (10줄 내외) |
+| dex-retargeting | 보류 | 의존성(pinocchio, nlopt)과 ROS 시스템 numpy 충돌 위험, 손가락까지 최적화로 바뀌면 affine의 예측 가능성 상실(반대 사례가 이 방식). ROBOTIS 손 단계에서 재검토 |
+| 혼합 행렬 `q = W·h + b` | 제외 | 엄지 문제는 기구학 차이라 선형으로 풀리지 않고, 캘리브레이션 자세 수 대비 파라미터가 많다. LEAP 텔레옵 관행에도 없다 |
