@@ -1,7 +1,7 @@
 # leap_teleop (User PC)
 
-LEAP Hand v1을 키보드 또는 OMY leader 그리퍼로 구동한다.
-설계: `../docs/superpowers/specs/2026-10-08-leap-omy-teleop-design.md`
+LEAP Hand v1을 키보드, OMY leader 그리퍼 또는 Manus 글러브로 구동한다.
+설계: `../docs/superpowers/specs/2026-10-08-leap-omy-teleop-design.md`, Manus: `../docs/superpowers/specs/2026-10-27-manus-leap-retargeting-design.md`
 
 ## 준비
 이 PC(Ubuntu 24.04 + ROS 2 Jazzy)에서 `dynamixel-sdk`는 `ros-jazzy-dynamixel-sdk`라서 **ROS를 source 해야** 시스템 `python3`에서 import 된다.
@@ -67,10 +67,40 @@ export PYTHONPATH="src:$PYTHONPATH"
 4. 종료: Robot PC `omy_ai` `Ctrl+C` (팔 받치기) → User PC `Ctrl+C` → `zenohd` `Ctrl+C`.
    토픽이 0.5초 끊기면 마지막 자세를 유지하고, 3초 끊기면 안전 자세로 간다. 안전 자세는 첫 입력 전(`waiting`)에도 쓰며 기본은 편 손이다. 팔이 움직이는 동안 손을 쥐고 있어야 하면 `--safe-pose fist`를 붙인다. `Ctrl+C`로 종료하면 Torque OFF 후 종료한다.
 
+## Manus 글러브로 구동
+손가락은 affine(편 손~주먹 비율), 엄지는 `--thumb ik`(기본: 손끝 위치 + 지문 면 방향 IK) 또는 `--thumb affine`.
+근거: `../docs/superpowers/specs/2026-10-28-manus-leap-thumb-ik-rationale.md`. A 방식(ROS source)으로 실행한다.
+
+0. **Manus SDK 확인 (처음 한 번)**: SDK의 ROS 2 노드를 띄우고 아래를 확인해 spec 2절과 `config/manus_leap.yaml`의 `topic`에 반영한다.
+   `sources/manus.py`의 메시지 형식(`manus_ros2_msgs/ManusGlove`: `side`, `ergonomics[type,value]`, `raw_nodes[chain_type,joint_type,pose]`)은 **추정**이다. 다르면 `Ros2ManusSource._on_message`만 고친다.
+   ```bash
+   ros2 topic list | grep -i manus
+   ros2 topic info <토픽> && ros2 interface show <메시지 타입>
+   ros2 topic echo <토픽> --once        # ergonomics 이름 20개, raw node chain/joint 이름 확인
+   ros2 bag record <토픽> -o manus_open_fist_pinch   # 편 손 → 주먹 → pinch 3종 녹화 (dry-run 재생용)
+   ```
+1. **글러브 캘리브레이션 (사용자마다)**: LEAP 없이 한다. 결과 `config/manus_calibration.yaml` (gitignore).
+   ```bash
+   $PY -m leap_teleop.tools.calibrate_manus           # 편 손 Enter → 주먹 Enter. 다시 잡을 때 --force
+   ```
+   마지막 줄 `fist thumb, mm in front of palm`에서 두 값의 부호가 다르면(WARNING) `config/manus_leap.yaml`의 `thumb_ik.flip_normal`을 바꾸고 다시 한다.
+2. **dry-run**: `ros2 bag play manus_open_fist_pinch` 를 다른 셸에서 틀고
+   ```bash
+   $PY -m leap_teleop.cli --source manus --dry-run
+   ```
+3. **LEAP 단독 실물**: `$PY -m leap_teleop.cli --source manus --safe-pose fist` — 편 손, 주먹, 손가락 벌리기, 엄지 순서로 천천히.
+   손가락 방향이 반대면 `side_gain`(측면) 또는 `joint_map`을, 엄지가 이상하면 먼저 `--thumb affine`으로 대응표를 맞춘다.
+4. **pinch 시험 (affine vs IK 비교)**: `--thumb affine`과 `--thumb ik` 각각으로 엄지 끝–검지/중지/약지 끝 붙이기, 펜·작은 블록 집기. 결과를 `docs/field-test/`에 10/09 형식으로 남긴다. IK에서 손끝 틈이 남으면 pinch snap을 추가한다 (spec 7절).
+5. **팔 + 손**: Robot PC에서 `omy_ai`, User PC에서 3번 명령. 두 프로세스는 독립이다. leader 트리거 모터 제거는 `OMY_Tactile_Robot_PC`에서 따로 한다.
+
+조정 값은 모두 `config/manus_leap.yaml`(추적, 공통)에 있다: 대응표, `side_gain`, 결합 제한, IK 가중치, One-Euro, URDF 영점 offset.
+
 ## 문제 해결
 - `error: ... not found. Run calibrate_motors`: 3단계를 먼저 한다 (공칭 영점으로 움직이지 않는다).
 - `Missing or unresponsive DYNAMIXEL IDs`: 5V 전원, USB 케이블, Dynamixel Wizard가 포트를 점유 중인지 확인한다.
 - `No module named 'dynamixel_sdk'`: ROS를 source 하지 않은 셸이다. 준비의 A 또는 B로 실행한다.
 - 토픽이 안 보임 / `[teleop] waiting`에서 안 바뀜: User PC에서 `ros2 topic info /leader/joint_trajectory`의 Publisher count를 본다. 0이면 Robot PC에서 omy_ai를 띄운 셸의 `echo $RMW_IMPLEMENTATION $ROS_DOMAIN_ID`가 `rmw_zenoh_cpp 30`인지 확인한다. 컨테이너 `.bashrc`가 로드되지 않은 셸이면 둘 다 빠져 있다(`zenohd: command not found`도 같은 원인). export 후 다시 띄운다.
 - 그 외: 두 PC가 같은 네트워크인지, 포트 7447, `ZENOH_CONFIG_OVERRIDE`, Robot PC `zenohd` 실행 여부 순으로 확인한다.
+- `No module named 'manus_ros2_msgs'`: Manus SDK의 ROS 2 워크스페이스를 source 하지 않았다 (`source <manus_ws>/install/setup.bash`).
+- `[teleop] waiting`에서 안 바뀜 (Manus): 토픽 이름(`manus_leap.yaml`), `--glove-side`(Left/Right), ergonomics 이름이 `HUMAN_ANGLE_NAMES`와 맞는지 본다. 하나라도 빠지면 reading을 버린다.
 - `No module named rclpy`: `PYTHONPATH=src`가 ROS 경로를 덮어쓴 것이다. `PYTHONPATH="src:$PYTHONPATH"`로 쓴다.

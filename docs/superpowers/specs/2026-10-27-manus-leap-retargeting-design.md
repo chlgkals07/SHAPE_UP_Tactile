@@ -63,7 +63,8 @@
 | `tools/calibrate_manus.py` | 새 파일. 편 손/주먹 기록, 스케일 계산 |
 | `cli.py` | `--source manus`, `--manus-config`, `--thumb {ik,affine}` |
 | `assets/leap_hand_right.urdf` | dex-urdf(MIT)에서 복사 |
-| `config/manus_leap.yaml` | 캘리브레이션 결과 (사용자별, gitignore). 예시는 `.example.yaml` |
+| `config/manus_leap.yaml` | 대응표·가중치·필터 (추적, 공통) |
+| `config/manus_calibration.yaml` | 편 손/주먹/스케일 (사용자별, gitignore). 예시는 `.example.yaml`, dry-run 전용 |
 
 나머지(StaleGuard, driver의 clip·속도 제한)는 그대로 쓴다.
 
@@ -80,13 +81,13 @@
 - **affine**: 엄지 4값을 12~15번에 1:1 직선. 대응표는 yaml (기본 12←CMCSpread, 13←CMCStretch, 14←MCPStretch, 15←IPStretch, 실물로 조정). IK의 prior이자 키포인트가 없을 때의 fallback.
 - **IK**:
 
-      min ‖f(q) − p*‖² + λo‖unit(index_L − f(q)) − n*‖² + λp‖q − q_aff‖² + λs‖q − q_prev‖²
+      min ‖f(q) − p*‖² + λo‖pad(q) − dir(q)‖² + λp‖q − q_aff‖² + λs‖q − q_prev‖²
 
-  - `p* = c_L + s·R·(p_thumb_tip − p_thumb_cmc)`: 사람 엄지 끝을 LEAP 손바닥 좌표계로 옮긴 목표
-  - `n* = R·unit(p_index_tip − p_thumb_tip)`: 지문 면이 손가락을 향하게
-  - `index_L`: 손가락 affine 결과로 FK한 LEAP 검지 끝 (고정)
-  - LM, 이전 해에서 시작, 관절 한계 안에서
-  - 기본 λo = 0.2, λs = 0.05 (2609.06009), λp = 0.01 — 실물 조정
+  - `p* = c_L + s·R·(p_thumb_tip − p_thumb_cmc)`: 사람 엄지 끝을 LEAP 손바닥 좌표계로 옮긴 목표 (R은 매 샘플 손바닥 키포인트로)
+  - `pad(q)`: 엄지 지문 면 법선, `dir(q)`: 엄지 끝 → LEAP 검지 끝마디 중앙(손가락 affine 결과로 FK). 지문 면이 손가락을 향하게
+  - 2609.06009의 끝–끝 방향 항은 손끝 위치에만 의존해 자세를 고르지 못하므로 바꿨다 (설계 근거 5절)
+  - LM, 이전 해에서 시작, 관절 한계 안에서, 틱당 최대 10회
+  - 기본 λo = 0.2, λs = 0.05, λp = 0.01, 위치 잔차 cm 단위 — 실물 조정
 - 근거와 장단점은 설계 근거 문서 참고.
 
 ### 4-3. 후처리
@@ -106,9 +107,9 @@
 
 1. **편 손** (`OPEN`): h_open, 스케일 `s = |LEAP 검지 MCP→끝| / |사람 index_mcp→index_tip|`
 2. **주먹** (`FIST`): h_closed
-3. 확인 출력: 편 손에서 IK 엄지 목표와 LEAP q=0 엄지 끝 사이 거리(mm). 크면 손바닥 정렬 R이나 부호가 틀린 것이다.
+3. 확인 출력: 주먹에서 엄지가 손바닥 앞(+)/뒤(−) 몇 mm인지, 글러브 목표와 LEAP 주먹 자세를 비교. 부호가 다르면 거울상 → `thumb_ik.flip_normal`. (편 손에서는 엄지가 손바닥 평면 안이라 거울상이 안 보인다.)
 
-- 결과는 `config/manus_leap.yaml`에 저장한다.
+- 결과는 `config/manus_calibration.yaml`(사용자별, gitignore)에 저장한다. 조정 값은 `config/manus_leap.yaml`(추적).
 
 ## 6. 안전
 - 기존 StaleGuard 그대로: 글러브 데이터가 끊기면 hold → release(`--safe-pose`).

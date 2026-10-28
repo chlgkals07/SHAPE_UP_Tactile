@@ -2,6 +2,12 @@
 
 > 상태: 승인됨 (2026-10-28). Spec: [`2026-10-27-manus-leap-retargeting-design.md`](../specs/2026-10-27-manus-leap-retargeting-design.md), 설계 근거: [`2026-10-28-manus-leap-thumb-ik-rationale.md`](../specs/2026-10-28-manus-leap-thumb-ik-rationale.md)
 
+## 구현 중 변경 (2026-10-29)
+- 엄지 opposition 항: 논문의 끝–끝 방향 항 → **지문 면 법선 항** (끝–끝 방향은 손끝 위치에만 의존해 자세를 못 고름). 설계 근거 문서 5절.
+- 설정 분리: `config/manus_leap.yaml`(추적, 조정 값) + `config/manus_calibration.yaml`(gitignore, 사용자별; 예시 `.example.yaml`). 기존 `hardware_motors` 규칙과 같다.
+- 손바닥 정렬 R은 yaml 상수가 아니라 매 샘플 키포인트로 계산, 거울상만 `flip_normal`로. 캘리브레이션 확인은 편 손이 아니라 주먹에서 (편 손은 엄지가 손바닥 평면 안).
+- IK 틱당 10회 제한 (도달 불가 목표에서 최대 ~11 ms → ~3 ms).
+
 ## Context
 OMY leader 그리퍼(scalar 0~1)로 LEAP Hand를 쥐었다 펴는 데까지 검증됨(10/09). 다음은 Manus Pro Haptic 글러브로 16관절을 직접 조종한다. 논의 결과:
 - 손가락(검지·중지·약지): **affine** (예전 `shinjju1209/leap-hand@ddfabaa` `neutral_calibration.py` 방식, 편 손/주먹 두 점)
