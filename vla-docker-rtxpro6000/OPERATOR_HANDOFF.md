@@ -3,16 +3,34 @@
 목적: NVIDIA RTX PRO 6000 Blackwell에서 π0.5 우선, FTP-1 차순위,
 UniVTAC/Isaac Sim 5.1은 별도 환경으로 추가할 수 있는 연구용 인스턴스.
 
-## 우선 배포할 대상
+## 이번 요청: `models` 하나만 빌드·배포
+
+**운영진께 요청하는 빌드 대상은 `models` 하나입니다.** 아래 명령으로 만든
+`vla-rtxpro6000:models` 이미지를 기존 SSH·인스턴스 시스템에 연결해 주세요.
+`pi05`·`full`을 추가로 빌드하거나 UniVTAC을 설치할 필요는 없습니다.
+
+서버에서 실행할 명령은 다음과 같습니다. 이미 저장소를 받았다면 `git clone`을
+생략하고 해당 저장소의 `vla-docker-rtxpro6000` 폴더에서 빌드하세요.
 
 ```bash
+git clone https://github.com/chlgkals07/SHAPE_UP_Tactile.git
+cd SHAPE_UP_Tactile/vla-docker-rtxpro6000
 docker build --target models -t vla-rtxpro6000:models .
 ```
 
-위 빌드에는 π0.5/FTP-1이 서로 다른 conda 환경에 설치됩니다. UniVTAC은 소스만
-포함됩니다. FTP-1 설치에 실패하면 `--target pi05`로 1순위 이미지를 먼저 만들 수 있습니다.
-UniVTAC 전체 설치는 선택적으로 `--target full --build-arg ACCEPT_ISAAC_EULA=YES`를
-사용하며, Blackwell 대응 버전 조정이 실제 서버에서 검증되지는 않았습니다.
+이 이미지에는 π0.5/FTP-1이 서로 다른 conda 환경에 설치되며, UniVTAC은 소스만
+포함됩니다. **이번 범위는 `models` 빌드, 기존 접속 계약 적용, 아래 모델 환경
+확인까지입니다. UniVTAC/Isaac 설치·검증은 배포 완료 조건이 아닙니다.**
+
+다른 타깃은 다음 상황에서만 선택합니다.
+
+- `pi05`: `models` 빌드가 FTP-1 설치 단계에서 실패했을 때의 대안입니다.
+- `full`: 추후 별도 요청이 있을 때만 검토하는 실험적 전체 빌드입니다.
+  이번에는 생략해 주세요. UniVTAC은 연구자가 필요할 때 `/workspace`의
+  별도 conda 환경에 추가할 예정입니다.
+
+Dockerfile의 마지막 `default` 스테이지도 `models`를 그대로 상속하지만,
+운영진은 위의 `--target models` 명령으로 대상을 명시해 주세요.
 
 ## 기존 접속 계약 적용
 
@@ -51,7 +69,8 @@ vla-check ftp1
 
 이 검사는 모델 다운로드 없는 import/버전/일부 CUDA 커널 검사입니다. 전체 학습 성공을
 의미하지 않습니다. 실제 모델 추론은 사용자 체크포인트와 설정으로 확인해야 합니다.
-UniVTAC을 설치했다면 다음의 렌더링/촉각 smoke test도 필요합니다.
+다음은 연구자가 추후 UniVTAC을 설치했을 때만 실행하는 선택적 검사입니다.
+**이번 `models` 배포에서는 생략합니다.**
 
 ```bash
 OMNI_KIT_ACCEPT_EULA=YES OMNI_KIT_ALLOW_ROOT=1 vla-check univtac
