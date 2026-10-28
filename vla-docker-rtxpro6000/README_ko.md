@@ -5,6 +5,30 @@
 GPU가 없어, 실제 의존성 해결·Docker 빌드·GPU 실행은 아직 확인하지 못했습니다.
 `VALIDATION.json`에 수행한 검사와 수행하지 못한 검사를 구분했습니다.
 
+## 운영진: 이번에는 `models` 이미지만 빌드·배포해 주세요
+
+**이번 요청의 기본 배포 대상은 `models` 하나입니다. 아래 명령으로 빌드한
+`vla-rtxpro6000:models` 이미지를 기존 인스턴스 시스템에 연결해 주세요.**
+`pi05`·`full` 타깃을 따로 빌드하거나 UniVTAC을 추가 설치할 필요는 없습니다.
+
+서버에서 다음 명령을 순서대로 실행합니다. 이미 저장소를 받았다면 `git clone`은
+생략하고 해당 저장소의 `vla-docker-rtxpro6000` 폴더로 이동해 빌드하면 됩니다.
+
+```bash
+git clone https://github.com/chlgkals07/SHAPE_UP_Tactile.git
+cd SHAPE_UP_Tactile/vla-docker-rtxpro6000
+docker build --target models -t vla-rtxpro6000:models .
+```
+
+- **포함:** π0.5와 FTP-1을 각각 독립된 Python 환경에 설치하고, UniVTAC 소스를 포함합니다.
+- **추후 선택 사항:** UniVTAC/Isaac Sim/Isaac Lab 실행 환경은 연구자가 필요할 때
+  별도 conda 환경으로 추가합니다. 이번 이미지 배포의 완료 조건이 아닙니다.
+- **배포 연결:** 기존 SSH 공개키 주입·승인·onstart 래퍼 적용 사항과 배포 후 확인 명령은
+  [OPERATOR_HANDOFF.md](OPERATOR_HANDOFF.md)를 참고하세요.
+
+아래의 다른 빌드 타깃과 UniVTAC 설치 설명은 참고용입니다. **`models` 빌드가
+성공하면 다른 타깃을 빌드하지 않고 해당 이미지로 배포를 진행해 주세요.**
+
 ## 선택한 구성
 
 NVIDIA RTX **PRO** 6000 Blackwell, Linux x86_64 서버를 대상으로 합니다.
@@ -33,28 +57,36 @@ GPU capability를 확인하세요. Blackwell PRO 6000의 목표 아키텍처는 
 | Docker target | 이미지에 설치되는 것 | 용도 |
 |---|---|---|
 | `pi05` | π0.5 환경 + 세 저장소 소스 | FTP-1 설치에도 문제가 생길 때의 우선순위 1 대안 |
-| `models` (권장 기본) | π0.5 + FTP-1 환경 + UniVTAC 소스 | 우선 두 모델을 사용하고 UniVTAC은 나중에 conda로 추가 |
+| `models` (**이번 배포 대상**) | π0.5 + FTP-1 환경 + UniVTAC 소스 | 우선 두 모델을 사용하고 UniVTAC은 나중에 conda로 추가 |
 | `full` | 위 구성 + UniVTAC/Isaac/TacEx/cuRobo 설치 시도 | 실험적인 Blackwell용 전체 빌드 |
 
-Docker target을 생략해도 `models`와 같은 최종 이미지를 만듭니다.
+Docker target을 생략하면 마지막 `default` 스테이지가 선택되며, 이는 `models`를 그대로
+상속합니다. 운영진은 혼동을 피하도록 위의 `--target models` 명령을 사용해 주세요.
 `models`에는 Isaac Sim/Isaac Lab/UniVTAC의 실행 의존성이 **아직 설치되지 않습니다.**
 `full` 실패를 무시하거나 설치 성공으로 표시하지 않습니다. 실패하면 `models`를 쓰세요.
 
-## 운영진에게 전달해서 빌드하기
+## 선택 사항: 대체·전체 빌드 (이번 배포에서는 생략)
 
-ZIP을 풀고 이 Dockerfile이 있는 폴더에서 다음을 실행합니다.
+**이 절은 필요할 때만 참고합니다. `models` 빌드가 성공했다면 아래 명령은
+실행하지 않아도 됩니다.**
 
-```bash
-docker build --target models -t vla-rtxpro6000:models .
-```
+### `pi05`: FTP-1 빌드 실패 시에만 쓰는 대안
 
-FTP-1 때문에 중단되면 π0.5만 먼저 만들 수 있습니다.
+`models` 빌드가 FTP-1 설치 단계에서 실패할 때만 π0.5 단독 이미지를 먼저
+배포하는 대안입니다. 정상적인 `models` 배포에 추가로 필요한 이미지가 아닙니다.
+앞서 이동한 Dockerfile 폴더에서 실행합니다.
 
 ```bash
 docker build --target pi05 -t vla-rtxpro6000:pi05 .
 ```
 
-실험적인 전체 이미지는 NVIDIA 라이선스를 검토한 뒤 빌드합니다.
+### `full`: 추후 별도 요청이 있을 때만 검토
+
+**운영진에게 이번 `full` 빌드를 요청하지 않습니다.** UniVTAC까지 미리 설치할
+필요가 생기면 검토할 수 있는 실험적 옵션입니다. 기본 배포 후 연구자가
+`/workspace`에 conda 환경을 추가하는 방법으로도 진행할 수 있습니다.
+
+전체 빌드를 선택하는 경우에만 NVIDIA 라이선스를 검토한 뒤 다음을 실행합니다.
 
 ```bash
 docker build --target full \
@@ -64,12 +96,14 @@ docker build --target full \
 ```
 
 `full`은 C++/CUDA 확장을 빌드하므로 시간·디스크·RAM이 많이 필요합니다.
-패키지 서버 및 GitHub 접근이 필요하고, 모델 가중치와 데이터셋은 별도로 내려받습니다.
-대형 데이터나 API 키, SSH 개인키를 이미지에 넣지 마세요.
+`full`의 설치·검증은 이번 `models` 배포의 완료 조건이 아닙니다.
+
+모든 빌드에는 패키지 서버 및 GitHub 접근이 필요하고, 모델 가중치와 데이터셋은
+별도로 내려받습니다. 대형 데이터나 API 키, SSH 개인키를 이미지에 넣지 마세요.
 
 학교 서버에서는 운영진이 기존 SSH 공개키 주입·승인·onstart 래퍼를 적용해야 합니다.
 이 이미지에 `openssh-server`는 있으나 임의 비밀번호나 공개키를 넣어 SSH를 열지 않습니다.
-자세한 전달 사항은 `OPERATOR_HANDOFF.md`에 있습니다.
+자세한 전달 사항은 [OPERATOR_HANDOFF.md](OPERATOR_HANDOFF.md)에 있습니다.
 
 ## 접속 후 환경 선택
 
