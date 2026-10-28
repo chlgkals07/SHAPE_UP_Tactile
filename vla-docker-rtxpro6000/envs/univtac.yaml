@@ -1,0 +1,13 @@
+name: univtac
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11
+  - pip
+  - cmake=3.26
+  - cuda-toolkit=12.8
+  - gcc_linux-64=12
+  - gxx_linux-64=12
+  - ninja
+  - pkgconfig

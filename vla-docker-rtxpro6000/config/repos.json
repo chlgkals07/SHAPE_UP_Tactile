@@ -1,0 +1,20 @@
+{
+  "pi05": {
+    "url": "https://github.com/Physical-Intelligence/openpi.git",
+    "ref": "215abfb217dbac7d5f1273282331b9b1866c0479",
+    "branch_at_review": "main",
+    "directory": "openpi"
+  },
+  "ftp1": {
+    "url": "https://github.com/michaelyuancb/ftp1-policy.git",
+    "ref": "89fa681d6c014cce28300946b7526db808e0b1c1",
+    "branch_at_review": "main",
+    "directory": "ftp1-policy"
+  },
+  "univtac": {
+    "url": "https://github.com/univtac/UniVTAC.git",
+    "ref": "d541e5568227ca3b66104d294f63c80acad7c52c",
+    "branch_at_review": "isaac51",
+    "directory": "UniVTAC"
+  }
+}

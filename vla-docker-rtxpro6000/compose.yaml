@@ -1,0 +1,15 @@
+services:
+  vla:
+    image: vla-rtxpro6000:models
+    build:
+      context: .
+      target: models
+    gpus: all
+    shm_size: '16gb'
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./workspace:/workspace
+    environment:
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics,display
+    command: bash

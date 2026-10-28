@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+project=${1:-pi05}
+shift || true
+set +u
+source /opt/vla/scripts/profile.sh
+vla-use "$project"
+set -u
+if [[ "$project" == univtac ]]; then
+    if [[ "${OMNI_KIT_ACCEPT_EULA:-NO}" != YES ]]; then
+        echo 'Set OMNI_KIT_ACCEPT_EULA=YES after reviewing NVIDIA terms.' >&2; exit 2
+    fi
+    # The upstream smoke test actually creates the renderer and tactile scene.
+    exec python scripts/smoke_isaac51.py --backend taxim --headless \
+        --output-dir /workspace/runs/univtac/smoke "$@"
+else
+    exec python /opt/vla/scripts/smoke_model.py --project "$project" "$@"
+fi

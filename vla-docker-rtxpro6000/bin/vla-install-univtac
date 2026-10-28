@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+exec bash /opt/vla/scripts/install-univtac.sh "${1:-/workspace/conda-envs}"

@@ -1,0 +1,7 @@
+# Blackwell adaptation: keep this environment independent from model packages.
+numpy==1.26.4
+torch==2.7.1+cu128
+torchvision==0.22.1+cu128
+opencv-python==4.11.0.86
+isaaclab==2.3.0
+isaacsim==5.1.0.0

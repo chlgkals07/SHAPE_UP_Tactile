@@ -1,0 +1,15 @@
+name: uipc_env
+channels:
+  - https://repo.anaconda.com/pkgs/main
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11
+  - pip
+  - cmake=3.26
+  - cuda-toolkit=12.6
+  - conda-forge::gcc_linux-64=12
+  - conda-forge::gxx_linux-64=12
+  - conda-forge::ninja
+  - conda-forge::pkgconfig
+

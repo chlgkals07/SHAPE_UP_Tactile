@@ -1,0 +1,9 @@
+.git
+workspace
+*.tar
+*.tar.gz
+*.zip
+__pycache__
+**/__pycache__
+tests
+VALIDATION.json
