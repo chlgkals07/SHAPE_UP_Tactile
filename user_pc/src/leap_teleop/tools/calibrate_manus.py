@@ -20,11 +20,9 @@ from leap_teleop.config import (
     load_postures,
     save_manus_calibration,
 )
-from leap_teleop.kinematics import Chain, load_chain
+from leap_teleop.kinematics import LEAP_URDF, Chain, load_chain
 from leap_teleop.retarget.manus_leap import ManusLeapRetargeter
 from leap_teleop.types import HumanHand
-
-ASSETS = Path(__file__).resolve().parents[3] / "assets"
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -95,7 +93,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     cfg = load_manus_leap(args.config)
     fist_pose = load_postures(args.postures)[1]
-    chain = load_chain(ASSETS / "leap_hand_right.urdf")
+    chain = load_chain(LEAP_URDF)
 
     from leap_teleop.sources.manus import Ros2ManusSource
 

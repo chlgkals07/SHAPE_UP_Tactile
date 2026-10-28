@@ -13,6 +13,9 @@ from pathlib import Path
 
 import numpy as np
 
+# Editable install / PYTHONPATH=src layout: user_pc/assets next to user_pc/src.
+LEAP_URDF = Path(__file__).resolve().parents[2] / "assets" / "leap_hand_right.urdf"
+
 
 def _rpy_matrix(roll: float, pitch: float, yaw: float) -> np.ndarray:
     cr, sr, cp, sp, cy, sy = (np.cos(roll), np.sin(roll), np.cos(pitch), np.sin(pitch),

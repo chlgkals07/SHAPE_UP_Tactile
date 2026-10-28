@@ -85,3 +85,43 @@ def test_safe_pose_fist_closes_the_hand_while_waiting(monkeypatch, capsys):
     assert code == 0
     _, fist_pose = load_postures(CONFIG_DIR / "postures.yaml")
     np.testing.assert_array_equal(commands[0], fist_pose)
+
+
+MANUS = [
+    "--source", "manus",
+    "--manus-config", str(CONFIG_DIR / "manus_leap.yaml"),
+    "--manus-calibration", str(CONFIG_DIR / "manus_calibration.example.yaml"),
+]
+
+
+def test_manus_parser_defaults():
+    args = cli.build_parser().parse_args(["--source", "manus"])
+    assert args.thumb == "ik"
+    assert args.glove_side == "Right"
+
+
+def test_manus_dry_run_uses_the_manus_retargeter(monkeypatch):
+    from leap_teleop.retarget.manus_leap import ManusLeapRetargeter
+
+    monkeypatch.setattr(cli, "build_source", lambda args: StoppedSource())
+    used = []
+    monkeypatch.setattr(cli, "run_teleop", lambda source, retarget, guard, driver, **kw: used.append(retarget))
+    assert cli.main(BASE + MANUS + ["--dry-run", "--thumb", "affine"]) == 0
+    assert isinstance(used[0], ManusLeapRetargeter)
+
+
+def test_hardware_mode_refuses_the_example_glove_calibration(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(cli, "build_source", lambda args: pytest.fail("touched ROS"))
+    monkeypatch.setattr(cli, "build_driver", lambda args: pytest.fail("touched the hand"))
+    motors = tmp_path / "hardware_motors.yaml"  # a "measured" file, so the motor check passes
+    motors.write_text((CONFIG_DIR / "hardware_motors.example.yaml").read_text())
+    code = cli.main(BASE + MANUS + ["--motor-calibration-file", str(motors)])
+    assert code == 2
+    assert "calibrate_manus" in capsys.readouterr().err
+
+
+def test_manus_requires_a_glove_calibration(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(cli, "build_source", lambda args: pytest.fail("touched ROS"))
+    args = BASE + MANUS[:-1] + [str(tmp_path / "missing.yaml"), "--dry-run"]
+    assert cli.main(args) == 2
+    assert "calibrate_manus" in capsys.readouterr().err
