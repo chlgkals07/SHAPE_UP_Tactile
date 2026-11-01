@@ -206,6 +206,8 @@ actor는 base policy가 생성한 chunk를 입력으로 받고 H’ (H’ < H)  
 
 > **피드백:** 짧은 chunk만으로 반응성이 보장되지는 않음. 매 actor 호출에 최신 tactile·proprioception을 넣고, encoding·fusion·inference가 목표 주기 안에 끝나야 함. Base chunk를 재사용할 때는 현재 실행 위치에 맞는 reference 구간 또는 offset을 제공하고, arm/hand 중 actor가 수정할 action 범위도 명시하면 좋겠음.
 
+![image.jpg](Tactile_RL_Token_initial.jpg)
+
 Design choices
 
 **(1) Tactile Representation을 어디에 통합할 것인가.** 
