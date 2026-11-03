@@ -15,8 +15,8 @@ import time
 from xml.etree import ElementTree
 
 from .end_layout import (
-    INDIRECT_TARGETS, READ_SIZE, READ_WINDOW, STATE_SIZE, WRITE_SIZE, WRITE_WINDOW,
-    HandSnapshot, decode_snapshot, encode_command,
+    INDIRECT_TARGETS, READ_SIZE, READ_WINDOW, STATE_SIZE, WRITE_WINDOW,
+    HandSnapshot, decode_snapshot, encode_command, encode_motor_goal,
 )
 from .end_proxy import (
     END_ID, END_MODEL, HAND_ID, LEFT_HAND_MODEL, READ_ADDRESS_1, READ_BUFFER,
@@ -562,7 +562,6 @@ class EndDirect(EndProxy):
             if self._alias_bytes(HAND_INDIRECT_BASE, len(alias_data)) != alias_data:
                 raise EndProxyError("HX5 direct aliases not installed")
             self._direct_active = False
-            self._direct_goals_started = False
             self._active_status32_verified = False
             try:
                 watchdog = self.read_hand(8, 1, stable=True)[0]
@@ -629,13 +628,29 @@ class EndDirect(EndProxy):
             raise EndProxyError("read-only Direct session rejects motor goals")
         if not getattr(self, "_direct_active", False):
             raise EndProxyError("direct session is not active")
-        payload = encode_command(positions, current)
-        if not self._direct_goals_started:
-            self.write_end(SYNC_ENABLE, 1, 0)
-            self.write_end(WRITE_ADDRESS_1, 2, WRITE_WINDOW)
-            self.write_end(WRITE_SIZE_1, 2, WRITE_SIZE)
-            self.write_end_buffer(payload)
-            self.write_end(SYNC_ENABLE, 1, 1)
-            self._direct_goals_started = True
-        else:
+        self._write_goal_payload(WRITE_WINDOW, encode_command(positions, current))
+
+    def write_one_goal(self, joint_index: int, position: float, current: int) -> None:
+        """Forward only one 4-byte motor slot through the END indirect window."""
+        if self.read_only:
+            raise EndProxyError("read-only Direct session rejects motor goals")
+        if not getattr(self, "_direct_active", False):
+            raise EndProxyError("direct session is not active")
+        if not isinstance(joint_index, int) or not 0 <= joint_index < 20:
+            raise ValueError("HX5 joint index must be 0..19")
+        self._write_goal_payload(
+            WRITE_WINDOW + 4 * joint_index,
+            encode_motor_goal(position, current))
+
+    def _write_goal_payload(self, address: int, payload: bytes) -> None:
+        if (self._current.get(SYNC_ENABLE) == 1 and
+                self._current.get(WRITE_ADDRESS_1) == address and
+                self._current.get(WRITE_SIZE_1) == len(payload)):
             self.write_end_buffer_live(payload)
+            return
+        self.write_end(SYNC_ENABLE, 1, 0)
+        self.write_end(WRITE_SIZE_1, 2, 0)
+        self.write_end(WRITE_ADDRESS_1, 2, address)
+        self.write_end(WRITE_SIZE_1, 2, len(payload))
+        self.write_end_buffer(payload)
+        self.write_end(SYNC_ENABLE, 1, 1)

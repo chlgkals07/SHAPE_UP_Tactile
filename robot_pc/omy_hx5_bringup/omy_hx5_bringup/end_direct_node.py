@@ -54,6 +54,7 @@ def main(argv=None) -> int:
             self.lock = Lock()
             self.positions = first.positions
             self.segment: Segment | None = None
+            self.jog_index: int | None = None
             self.currents = (100,) * 20
             self.last_tick = first.tick
             self.tick_changed = time.monotonic()
@@ -92,6 +93,7 @@ def main(argv=None) -> int:
             if self.count_publishers(self.command_topic) > 1:
                 with self.lock:
                     self.segment = None
+                    self.jog_index = None
                 self.get_logger().error("Multiple hand command publishers; trajectory ignored")
                 return
             with self.lock:
@@ -100,6 +102,7 @@ def main(argv=None) -> int:
                     return
                 try:
                     self.segment = self.segment_from_message(msg, self.positions)
+                    self.jog_index = None
                 except ValueError as exc:
                     self.get_logger().error(f"Rejected hand trajectory: {exc}")
 
@@ -133,6 +136,7 @@ def main(argv=None) -> int:
                 try:
                     self.segment = make_jog_segment(
                         msg.data[0], msg.data[1], self.positions, now)
+                    self.jog_index = int(msg.data[0]) - 1
                 except ValueError as exc:
                     self.get_logger().error(f"Rejected hand jog: {exc}")
                     return
@@ -162,6 +166,7 @@ def main(argv=None) -> int:
                 with self.lock:
                     self.segment = self.segment_from_message(
                         goal_handle.request.trajectory, self.positions)
+                    self.jog_index = None
                     owned = self.segment
                 deadline = owned.start_time + owned.duration + 3.0
                 while rclpy.ok():
@@ -206,6 +211,7 @@ def main(argv=None) -> int:
                         raise EndProxyError("HX5 controller tick stopped updating")
                     self.positions = snapshot.positions
                     segment = self.segment
+                    jog_index = self.jog_index
                     currents = self.currents
                 stamp = self.get_clock().now().to_msg()
                 joint_state = JointState()
@@ -225,11 +231,17 @@ def main(argv=None) -> int:
                     tactile.sensors.append(sensor)
                 self.pressure_pub.publish(tactile)
                 if segment is not None and not self.read_only:
-                    self.direct.write_goals(segment.sample(now), currents)
+                    positions = segment.sample(now)
+                    if jog_index is None:
+                        self.direct.write_goals(positions, currents)
+                    else:
+                        self.direct.write_one_goal(
+                            jog_index, positions[jog_index], currents[jog_index])
             except (EndProxyError, OSError, ValueError) as exc:
                 with self.lock:
                     self.fault = exc
                     self.segment = None
+                    self.jog_index = None
                 self.get_logger().error(f"END direct control stopped: {exc}")
                 rclpy.shutdown()
 

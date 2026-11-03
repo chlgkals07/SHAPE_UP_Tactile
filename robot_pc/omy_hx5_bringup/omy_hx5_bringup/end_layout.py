@@ -105,10 +105,15 @@ def encode_command(positions: tuple[float, ...], current: int | tuple[int, ...])
         raise ValueError("HX5 command requires 20 positions and currents 0..910")
     data = bytearray()
     for position, motor_current in zip(positions, currents):
-        if not isfinite(position) or not -pi <= position <= pi:
-            raise ValueError("HX5 goal position must be finite and within +/-pi")
-        raw = round((position + pi) / POSITION_SCALE)
-        raw = min(raw, 4095)
-        data.extend(motor_current.to_bytes(2, "little"))
-        data.extend(raw.to_bytes(2, "little"))
+        data.extend(encode_motor_goal(position, motor_current))
     return bytes(data)
+
+
+def encode_motor_goal(position: float, current: int) -> bytes:
+    """One HX5 TableSync motor slot: Goal Current, then Goal Position."""
+    if not isinstance(current, int) or not 0 <= current <= 910:
+        raise ValueError("HX5 motor current must be an integer in 0..910")
+    if not isfinite(position) or not -pi <= position <= pi:
+        raise ValueError("HX5 goal position must be finite and within +/-pi")
+    raw = min(round((position + pi) / POSITION_SCALE), 4095)
+    return current.to_bytes(2, "little") + raw.to_bytes(2, "little")

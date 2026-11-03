@@ -17,6 +17,7 @@ from omy_hx5_bringup.end_direct_core import (
 from omy_hx5_bringup.end_proxy import EndProxyError
 from omy_hx5_bringup.end_layout import (
     INDIRECT_TARGETS, POSITION_SCALE, READ_BLOCK_START, WRITE_BLOCK_START,
+    WRITE_WINDOW,
     encode_command,
 )
 
@@ -314,6 +315,31 @@ def test_vendor_configuration_and_20_goal_path_keep_persistent_aliases():
     assert bus.hand[70] == 0
     assert bus.hand[8] == 0
     assert bytes(bus.hand[122:462]) == pack("<170H", *INDIRECT_TARGETS)
+    assert bus.end == original_end
+    assert bytes(bus.buffer[:12]) == original_buffer[:12]
+
+
+def test_jog_writes_only_one_motor_slot_and_can_switch_back_to_full_trajectory():
+    bus = FakeBus()
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    proxy.prepare_direct(apply=True)
+    original_end = bus.end.copy()
+    original_buffer = bytes(bus.buffer)
+    with proxy.direct_session() as first:
+        assert bus.goals == {}
+        proxy.write_one_goal(5, first.positions[5] + 0.03, 100)
+        assert set(bus.goals) == {147}
+        assert bus.goals[147][0:2] == pack("<H", 100)
+        assert bus.end[56] == WRITE_WINDOW + 5 * 4
+        assert bus.end[60] == 4
+        proxy.write_one_goal(9, first.positions[9] + 0.03, 100)
+        assert set(bus.goals) == {147, 152}
+        assert bus.end[56] == WRITE_WINDOW + 9 * 4
+        assert bus.end[60] == 4
+        proxy.write_goals(first.positions, 100)
+        assert set(bus.goals) == set(MOTOR_IDS)
+        assert bus.end[56] == WRITE_WINDOW
+        assert bus.end[60] == 80
     assert bus.end == original_end
     assert bytes(bus.buffer[:12]) == original_buffer[:12]
 
