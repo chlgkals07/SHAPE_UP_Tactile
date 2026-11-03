@@ -8,7 +8,8 @@ from struct import pack
 import pytest
 
 from omy_hx5_bringup.direct_trajectory import (
-    JOINT_NAMES, make_segment, make_trajectory_segment, validate_currents,
+    JOINT_NAMES, make_jog_segment, make_segment, make_trajectory_segment,
+    validate_currents,
 )
 from omy_hx5_bringup.end_direct_core import (
     EndDirect, MOTOR_IDS, MOTOR_INDIRECT, SENSOR_IDS, load_vendor_motor_settings,
@@ -16,11 +17,32 @@ from omy_hx5_bringup.end_direct_core import (
 from omy_hx5_bringup.end_proxy import EndProxyError
 from omy_hx5_bringup.end_layout import (
     INDIRECT_TARGETS, POSITION_SCALE, READ_BLOCK_START, WRITE_BLOCK_START,
+    encode_command,
 )
 
 XACRO = (Path(__file__).resolve().parents[3] /
          "third_party/robotis_hand/robotis_hand_description/ros2_control/"
          "hx5_d20_rev2/hx5_d20_left.ros2_control.xacro")
+
+
+def test_first_jog_preserves_other_measured_goals_outside_keyboard_limits():
+    measured = (
+        -0.788466, 1.449612, 0.019942, -0.046019, 0.458660,
+        1.501767, -0.449456, -0.179475, -0.177942, 1.460350,
+        -0.069029, -0.403437, -0.116583, 1.472622, -0.029146,
+        0.019942, -0.648874, 1.613748, -0.026078, 0.455592,
+    )
+    segment = make_jog_segment(6.0, 0.03, measured, 1.0)
+    assert segment.goal[5] == pytest.approx(measured[5] + 0.03)
+    before = encode_command(measured, 100)
+    after = encode_command(segment.goal, 100)
+    assert before[20:24] != after[20:24]
+    assert all(before[i * 4:(i + 1) * 4] == after[i * 4:(i + 1) * 4]
+               for i in range(20) if i != 5)
+    with pytest.raises(ValueError, match="at most 0.05 rad"):
+        make_jog_segment(6, 0.08, measured, 1.0)
+    with pytest.raises(ValueError, match="official limit"):
+        make_jog_segment(7, 0.03, measured, 1.0)
 
 
 class FakeBus:

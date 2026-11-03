@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import isfinite
+from math import isfinite, pi
 
 JOINT_NAMES = tuple(f"finger_l_joint{i}" for i in range(1, 21))
 # Same left-hand limits as ROBOTIS hx5_d20_teleop.py.
@@ -15,6 +15,7 @@ JOINT_LIMITS = (
     (-0.6, 0.6), (0.0, 2.0), (0.0, 1.57), (0.0, 1.57),
 )
 MAX_SPEED = 1.0  # rad/s; lengthens unusually fast incoming trajectories
+MAX_JOG = 0.05  # rad; first physical trial must be a small single-joint move
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,30 @@ def make_segment(names, positions, duration: float, measured, now: float) -> Seg
     goal = tuple(positions)
     safe_duration = max(duration, max(abs(a - b) for a, b in zip(start, goal)) / MAX_SPEED)
     return Segment(start, goal, now, safe_duration)
+
+
+def make_jog_segment(joint_number: float, delta: float, measured, now: float) -> Segment:
+    """Move one joint relative to live state; preserve all other raw positions.
+
+    A real hand can report an idle position slightly outside the keyboard's
+    target limits. Clamping every joint on the first command would move other
+    fingers, so only the selected joint is checked against its target limit.
+    """
+    if (not isfinite(joint_number) or int(joint_number) != joint_number or
+            not 1 <= joint_number <= 20):
+        raise ValueError("jog joint number must be an integer from 1 to 20")
+    if not isfinite(delta) or not 0 < abs(delta) <= MAX_JOG:
+        raise ValueError("jog delta must be nonzero and at most 0.05 rad")
+    if len(measured) != 20 or any(not isfinite(value) or not -pi <= value <= pi
+                                  for value in measured):
+        raise ValueError("jog requires 20 finite live joint positions")
+    index = int(joint_number) - 1
+    goal = list(measured)
+    goal[index] += delta
+    low, high = JOINT_LIMITS[index]
+    if not low <= goal[index] <= high:
+        raise ValueError(f"joint {index + 1} jog target exceeds its official limit")
+    return Segment(tuple(measured), tuple(goal), now, 0.5)
 
 
 def make_trajectory_segment(names, points, measured, now: float) -> Segment:

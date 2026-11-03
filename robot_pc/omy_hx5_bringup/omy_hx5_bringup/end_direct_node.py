@@ -13,7 +13,8 @@ from pathlib import Path
 from threading import Lock
 
 from .direct_trajectory import (
-    JOINT_NAMES, Segment, make_trajectory_segment, validate_currents,
+    JOINT_NAMES, Segment, make_jog_segment, make_trajectory_segment,
+    validate_currents,
 )
 from .end_direct_core import EndDirect, load_vendor_motor_settings
 from .end_proxy import EndProxyError, acquire_end_bus_lock, make_fresh_rx_port
@@ -53,7 +54,7 @@ def main(argv=None) -> int:
             self.lock = Lock()
             self.positions = first.positions
             self.segment: Segment | None = None
-            self.currents = (300,) * 20
+            self.currents = (100,) * 20
             self.last_tick = first.tick
             self.tick_changed = time.monotonic()
             self.active_action = False
@@ -71,6 +72,8 @@ def main(argv=None) -> int:
             self.create_subscription(Float64MultiArray,
                                      "/effort_l_controller/commands",
                                      self.on_current, 10, callback_group=group)
+            self.create_subscription(Float64MultiArray, "/omy_hx5/jog",
+                                     self.on_jog, 10, callback_group=group)
             self.action = ActionServer(
                 self, FollowJointTrajectory, "/hand_l_controller/follow_joint_trajectory",
                 execute_callback=self.execute_goal, goal_callback=self.accept_goal,
@@ -110,6 +113,31 @@ def main(argv=None) -> int:
                 return
             with self.lock:
                 self.currents = currents
+
+        def on_jog(self, msg):
+            if self.read_only:
+                self.get_logger().warn("Read-only Direct bridge ignored jog")
+                return
+            if len(msg.data) != 2:
+                self.get_logger().error("Jog requires [joint_number, delta_rad]")
+                return
+            if self.count_publishers(self.command_topic):
+                self.get_logger().error("Jog rejected while a hand trajectory publisher is present")
+                return
+            with self.lock:
+                now = time.monotonic()
+                if self.active_action or (self.segment is not None and
+                                          not self.segment.done(now)):
+                    self.get_logger().error("Jog rejected while another hand command is active")
+                    return
+                try:
+                    self.segment = make_jog_segment(
+                        msg.data[0], msg.data[1], self.positions, now)
+                except ValueError as exc:
+                    self.get_logger().error(f"Rejected hand jog: {exc}")
+                    return
+            self.get_logger().info(
+                f"Accepted hand jog: joint {int(msg.data[0])}, {msg.data[1]:+.3f} rad")
 
         def accept_goal(self, request):
             if self.read_only:
