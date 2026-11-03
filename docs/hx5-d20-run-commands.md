@@ -88,4 +88,12 @@ ros2 run omy_hx5_bringup omy_hx5_end_proxy_probe --port /dev/ttyAMA4
 
 정상이면 `END 210: model 230 OK; left HX5 via END: ID 140, model 261 OK; voltage ...; status ...; No hand command sent.`가 출력된다. 오류가 나거나 END 설정 복원이 실패했다고 표시되면 **런치를 진행하지 말고 전체 출력**을 보내준다. 이후 손의 높은 주소에 있는 TableSync 데이터에 END를 통해 접근할 수 있는지 확인한 뒤 실제 손 제어 코드를 활성화한다.
 
+손 컨트롤러 ID 140이 위처럼 확인된 다음, 공식 문서의 Direct Control Mode에서 내부 모터가 END를 통해 보이는지 **왼손 엄지 첫 모터 ID 141 하나만** 읽을 수 있다. 이 명령도 손에 동작 명령은 보내지 않는다. 다만 END의 EEPROM에 있는 Tool ID를 141로 잠시 바꿨다가 복원하므로 반복 실행하지 않는다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_proxy_probe --port /dev/ttyAMA4 --motor-id 141
+```
+
+이 검사에서 `motor ID 141`과 모델 번호가 나오면 END 경유 내부 모터의 주소 지정 가능성을 확인한 것이다. 실패해도 ID 140 경유 통신 성공 결과는 유지된다. 출력 전체를 기록하고 손 동작 launch는 실행하지 않는다.
+
 현재 `omy_hx5_hand_live.launch.py`, `omy_hx5_official_hand.launch.py`, 실물 `omy_hx5_teleop.launch.py`는 직접 ID 140에 접근하는 이전 드라이버 경로를 사용하므로 시작 시 명시적으로 중단된다. 이 상태에서 키보드 원격 제어를 실행해도 손은 제어되지 않는다.

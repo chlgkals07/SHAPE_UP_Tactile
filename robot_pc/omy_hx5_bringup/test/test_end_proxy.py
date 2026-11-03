@@ -8,7 +8,8 @@ from omy_hx5_bringup.end_proxy import EndProxy, EndProxyError, SAVED_REGISTERS
 class FakePacket:
     def __init__(self, hand_model=261):
         self.hand = {0: hand_model & 255, 1: hand_model >> 8,
-                     102: 0x40, 103: 0x09, 106: 0}
+                     7: 140, 102: 0x40, 103: 0x09, 106: 0}
+        self.motor = {0: 0x34, 1: 0x12, 7: 141}
         self.end = {13: 1, 46: 1, 48: 634, 50: 0, 52: 16, 54: 0,
                     60: 12, 62: 0}
         self.writes = []
@@ -25,8 +26,9 @@ class FakePacket:
     def readTxRx(self, port, device_id, address, size):
         assert device_id == 210
         if address == 72:
-            assert self.end[13] == 140 and self.end[46] == 1
-            data = [self.hand.get(self.end[48] + i, 0) for i in range(size)]
+            assert self.end[13] in (140, 141) and self.end[46] == 1
+            device = self.hand if self.end[13] == 140 else self.motor
+            data = [device.get(self.end[48] + i, 0) for i in range(size)]
         else:
             value = self.end[address]
             data = list(value.to_bytes(size, "little"))
@@ -58,3 +60,12 @@ def test_end_proxy_restores_end_on_wrong_hand_model():
     with pytest.raises(EndProxyError, match="model"):
         EndProxy(None, packet, sleep=lambda _: None).probe()
     assert packet.end == original
+
+
+def test_end_proxy_reads_motor_via_end_without_motor_writes():
+    packet = FakePacket()
+    original = packet.end.copy()
+    model = EndProxy(None, packet, sleep=lambda _: None).probe_motor(141)
+    assert model == 0x1234
+    assert packet.end == original
+    assert all(address != 7 for address, _, _ in packet.writes)

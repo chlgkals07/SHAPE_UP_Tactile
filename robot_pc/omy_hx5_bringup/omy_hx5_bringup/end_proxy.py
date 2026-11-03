@@ -71,8 +71,10 @@ class EndProxy:
         self._current[address] = value
 
     @contextmanager
-    def temporary_read_window(self):
+    def temporary_read_window(self, *, tool_id: int = HAND_ID):
         """Save END settings; disable its write slots; always restore them."""
+        if not 0 <= tool_id <= 252:
+            raise ValueError("tool_id must be a valid DYNAMIXEL ID")
         original = {
             address: int.from_bytes(self.read(address, size), "little")
             for address, size in SAVED_REGISTERS
@@ -82,7 +84,7 @@ class EndProxy:
             self.write_end(SYNC_ENABLE, 1, 0)
             self.write_end(WRITE_SIZE_1, 2, 0)
             self.write_end(WRITE_SIZE_2, 2, 0)
-            self.write_end(TOOL_ID, 1, HAND_ID)
+            self.write_end(TOOL_ID, 1, tool_id)
             self.write_end(READ_SIZE_2, 2, 0)
             yield
         finally:
@@ -94,7 +96,7 @@ class EndProxy:
             self.write_end(SYNC_ENABLE, 1, original[SYNC_ENABLE])
 
     def read_hand(self, address: int, size: int, *, stable: bool = False) -> bytes:
-        """Map one HX5 control-table read into END's read-only buffer."""
+        """Read the selected END tool ID through its read-only buffer."""
         if not (0 <= address <= 1023 and 1 <= size <= 128
                 and address + size <= 1024):
             raise ValueError("END can proxy only 1..128 bytes within hand address 0..1023")
@@ -130,11 +132,30 @@ class EndProxy:
         return {"end_model": END_MODEL, "hand_model": model,
                 "hand_voltage_centivolts": voltage, "hand_status": status}
 
+    def probe_motor(self, motor_id: int) -> int:
+        """Check one internal hand actuator with no actuator register writes."""
+        if motor_id != 141:
+            raise ValueError("only motor ID 141 is allowed in this one-time probe")
+        model, result, error = self.packet.ping(self.port, END_ID)
+        if result != 0 or error or model != END_MODEL:
+            raise EndProxyError("END 210 did not respond before motor probe")
+        with self.temporary_read_window(tool_id=motor_id):
+            returned_id = self.read_hand(7, 1, stable=True)[0]
+            model = int.from_bytes(self.read_hand(0, 2, stable=True), "little")
+            if returned_id != motor_id or model in (0, LEFT_HAND_MODEL, 0xFFFF):
+                raise EndProxyError(
+                    f"motor ID {motor_id} did not reply through END: "
+                    f"read ID={returned_id}, model={model}"
+                )
+        return model
+
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", default="/dev/ttyAMA4")
     parser.add_argument("--baud", type=int, default=4_000_000)
+    parser.add_argument("--motor-id", type=int, choices=(141,),
+                        help="read only the left thumb actuator ID 141 through END")
     args = parser.parse_args(argv)
 
     try:
@@ -151,13 +172,19 @@ def main(argv=None) -> int:
     try:
         if not port.setBaudRate(args.baud):
             parser.exit(1, f"Cannot set {args.port} to {args.baud} baud\n")
-        result = EndProxy(port, PacketHandler(2.0)).probe()
-        print(
-            f"END {END_ID}: model {result['end_model']} OK; "
-            f"left HX5 via END: ID {HAND_ID}, model {result['hand_model']} OK; "
-            f"voltage {result['hand_voltage_centivolts'] / 100:.2f} V; "
-            f"status {result['hand_status']}. No hand command sent."
-        )
+        proxy = EndProxy(port, PacketHandler(2.0))
+        if args.motor_id is None:
+            result = proxy.probe()
+            print(
+                f"END {END_ID}: model {result['end_model']} OK; "
+                f"left HX5 via END: ID {HAND_ID}, model {result['hand_model']} OK; "
+                f"voltage {result['hand_voltage_centivolts'] / 100:.2f} V; "
+                f"status {result['hand_status']}. No hand command sent."
+            )
+        else:
+            model = proxy.probe_motor(args.motor_id)
+            print(f"END {END_ID} -> motor ID {args.motor_id}: "
+                  f"model {model} replied. No hand command sent.")
         return 0
     except EndProxyError as exc:
         parser.exit(1, f"END proxy probe failed: {exc}\n")
