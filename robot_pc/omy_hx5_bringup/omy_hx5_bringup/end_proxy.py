@@ -156,7 +156,7 @@ class EndProxy:
         return {"end_model": END_MODEL, "hand_model": model,
                 "hand_voltage_centivolts": voltage, "hand_status": status}
 
-    def probe_motor(self, motor_id: int) -> int:
+    def probe_motor(self, motor_id: int) -> dict[str, int | tuple[int, int]]:
         """Check one internal hand actuator with no actuator register writes."""
         if motor_id != 141:
             raise ValueError("only motor ID 141 is allowed in this one-time probe")
@@ -171,7 +171,19 @@ class EndProxy:
                     f"motor ID {motor_id} did not reply through END: "
                     f"read ID={returned_id}, model={model}"
                 )
-        return model
+            drive_mode, operating_mode = self.read_hand(10, 2, stable=True)
+            torque = self.read_hand(64, 1)[0]
+            indirect = self.read_hand(168, 4, stable=True)
+        return {
+            "model": model,
+            "drive_mode": drive_mode,
+            "operating_mode": operating_mode,
+            "torque_enabled": torque,
+            "indirect_address_1_2": (
+                int.from_bytes(indirect[:2], "little"),
+                int.from_bytes(indirect[2:], "little"),
+            ),
+        }
 
     def _write_hand_indirect(self, data: bytes) -> None:
         """One bounded EEPROM write to HX5 Indirect Address 1..5 via END."""
@@ -263,9 +275,13 @@ def main(argv=None) -> int:
                 f"status {result['hand_status']}. No hand command sent."
             )
         else:
-            model = proxy.probe_motor(args.motor_id)
+            motor = proxy.probe_motor(args.motor_id)
             print(f"END {END_ID} -> motor ID {args.motor_id}: "
-                  f"model {model} replied. No hand command sent.")
+                  f"model {motor['model']}, drive mode {motor['drive_mode']}, "
+                  f"operating mode {motor['operating_mode']}, "
+                  f"torque {motor['torque_enabled']}, "
+                  f"indirect address 1/2 {motor['indirect_address_1_2']}. "
+                  "No hand command sent.")
         return 0
     except EndProxyError as exc:
         parser.exit(1, f"END proxy probe failed: {exc}\n")

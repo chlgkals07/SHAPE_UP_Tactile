@@ -10,7 +10,8 @@ class FakePacket:
     def __init__(self, hand_model=261):
         self.hand = {0: hand_model & 255, 1: hand_model >> 8,
                      7: 140, 102: 0x40, 103: 0x09, 106: 0}
-        self.motor = {0: 0x34, 1: 0x12, 7: 141}
+        self.motor = {0: 0x34, 1: 0x12, 7: 141, 10: 13, 11: 5, 64: 1,
+                      168: 126, 169: 0, 170: 127, 171: 0}
         self.hand_indirect = bytearray(pack("<5H", 634, 635, 636, 637, 638))
         self.high = {1024 + i: 141 + i for i in range(5)}
         self.buffer = bytearray(128)
@@ -93,8 +94,11 @@ def test_end_proxy_restores_end_on_wrong_hand_model():
 def test_end_proxy_reads_motor_via_end_without_motor_writes():
     packet = FakePacket()
     original = packet.end.copy()
-    model = EndProxy(None, packet, sleep=lambda _: None).probe_motor(141)
-    assert model == 0x1234
+    motor = EndProxy(None, packet, sleep=lambda _: None).probe_motor(141)
+    assert motor == {
+        "model": 0x1234, "drive_mode": 13, "operating_mode": 5,
+        "torque_enabled": 1, "indirect_address_1_2": (126, 127),
+    }
     assert packet.end == original
     assert all(address != 7 for address, _, _ in packet.writes)
 

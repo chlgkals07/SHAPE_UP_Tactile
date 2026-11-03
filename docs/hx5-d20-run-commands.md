@@ -96,6 +96,8 @@ ros2 run omy_hx5_bringup omy_hx5_end_proxy_probe --port /dev/ttyAMA4 --motor-id 
 
 이 검사에서 `motor ID 141`과 모델 번호가 나오면 END 경유 내부 모터의 주소 지정 가능성을 확인한 것이다. 실패해도 ID 140 경유 통신 성공 결과는 유지된다. 출력 전체를 기록하고 손 동작 launch는 실행하지 않는다.
 
+최신 검사 코드는 모터 모델과 함께 Drive Mode, Operating Mode, Torque Enable, Indirect Address 1/2를 읽는다. 공식 왼손 Xacro의 첫 모터 설정과 비교하되, 한 모터만 정상이라고 20개 전체가 준비됐다고 판단하지 않는다.
+
 모터 ID 141이 공식 XM335-T323-T 모델 1710으로 응답했다면, 다음 단계는 손 컨트롤러의 **높은 TableSync 설정 주소**를 END를 통해 읽을 수 있는지 검사하는 것이다. 아래 명령은 손의 `Indirect Address 1..5` EEPROM 값을 먼저 저장하고, 잠시 `1024..1028`로 바꿔 TableSync1의 5개 ID를 읽은 다음 원래 값으로 복원·검증한다. END의 읽기·쓰기 창과 쓰기 버퍼도 복원한다. 손가락 목표·토크 명령은 보내지 않지만 **손과 END 양쪽 EEPROM을 일시적으로 쓴다**. 검사 중 전원을 끄거나 케이블을 빼지 말고, 반복 실행하지 않는다. 복원 오류가 나면 그대로 멈추고 전체 출력을 보낸다.
 
 손의 `Operating Mode`가 `1`(Preset Motion Mode)이어도 이 읽기 검사는 진행한다. 모드는 변경하지 않는다. 다만 손의 `TableSync Enable`이 `0`이어야 한다. 텔레옵용 직접 제어에는 나중에 별도의 모드 전환과 설정 확인이 필요하다.
@@ -105,5 +107,7 @@ ros2 run omy_hx5_bringup omy_hx5_end_proxy_probe --port /dev/ttyAMA4 --inspect-s
 ```
 
 `[141, 142, 143, 144, 145]`는 공식 왼손 Xacro의 첫 손가락 TableSync 설정과 일치한다. `[255, 255, 255, 255, 255]` 등 다른 값은 아직 해당 설정이 준비되지 않았다는 뜻일 수 있다. 이 결과만으로 손 동작을 실행하지 않는다.
+
+실측한 손 컨트롤러 `mode=1`은 Preset Motion Mode다. 이번 검사는 이 모드를 바꾸지 않았다. 직접 관절 텔레옵에는 `mode=0`과 모터·TableSync 설정이 필요하다. 또한 OMY END 출력 24 V / 1 A와 HX5 피크 전류 2.6 A의 차이가 해소되기 전에는 모드 변경·토크 활성화·손 이동 명령을 실행하지 않는다.
 
 현재 `omy_hx5_hand_live.launch.py`, `omy_hx5_official_hand.launch.py`, 실물 `omy_hx5_teleop.launch.py`는 직접 ID 140에 접근하는 이전 드라이버 경로를 사용하므로 시작 시 명시적으로 중단된다. 이 상태에서 키보드 원격 제어를 실행해도 손은 제어되지 않는다.
