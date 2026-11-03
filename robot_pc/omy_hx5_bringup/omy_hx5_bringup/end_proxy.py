@@ -137,7 +137,13 @@ def main(argv=None) -> int:
     parser.add_argument("--baud", type=int, default=4_000_000)
     args = parser.parse_args(argv)
 
-    from dynamixel_sdk import PacketHandler, PortHandler
+    try:
+        from dynamixel_sdk import PacketHandler, PortHandler
+    except ModuleNotFoundError as exc:
+        if exc.name == "serial":
+            parser.exit(1, "Missing pyserial in the Robot PC container; "
+                        "install python3-serial, then retry\n")
+        raise
 
     port = PortHandler(args.port)
     if not port.openPort():

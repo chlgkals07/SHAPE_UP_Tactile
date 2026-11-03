@@ -68,6 +68,8 @@ fi
 cd /workspace/omy_ws
 apt-get update
 rosdep install --from-paths src --ignore-src --rosdistro jazzy -y
+# dynamixel_sdk의 Python 포트 모듈. 이전 빌드 환경에는 없을 수 있음.
+apt-get install -y python3-serial
 # Robot PC 메모리 사용을 제한하기 위해 패키지 1개, 컴파일 작업 2개씩 실행.
 MAKEFLAGS=-j2 CMAKE_BUILD_PARALLEL_LEVEL=2 colcon build --symlink-install --parallel-workers 1 --packages-up-to omy_hx5_bringup
 source /workspace/omy_ws/install/setup.bash
