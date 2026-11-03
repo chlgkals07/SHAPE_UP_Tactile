@@ -141,3 +141,48 @@ def test_mode_changes_are_logged_once_each():
     lines = []
     run(source, clock, driver, log=lines.append)
     assert [line.split()[-1] for line in lines] == ["live", "hold", "release"]
+
+
+class FakePublisher:
+    def __init__(self):
+        self.calls, self.closed = [], False
+
+    def publish(self, command, feedback, mode, reading):
+        self.calls.append((np.array(command), feedback, mode, reading))
+
+    def close(self):
+        self.closed = True
+
+
+def test_publisher_gets_the_command_sent_to_the_driver_and_is_closed():
+    clock = FakeClock()
+    driver = FakeDriver(clock)
+    driver.read_feedback = lambda: "fb"
+    publisher = FakePublisher()
+    run_teleop(
+        FakeSource(lambda t: 1.0, stop_at=0.5),
+        ScalarPostureRetargeter(OPEN, FIST),
+        StaleGuard(OPEN),
+        driver,
+        rate_hz=10.0, clock=clock, sleep=clock.sleep, log=lambda _l: None,
+        publisher=publisher,
+    )
+    assert len(publisher.calls) == len(driver.commands)
+    command, feedback, mode, reading = publisher.calls[-1]
+    np.testing.assert_array_equal(command, driver.commands[-1][1])
+    assert (feedback, mode) == ("fb", "live") and reading.grasp == 1.0
+    assert publisher.closed
+
+
+def test_hand_state_units_are_radians_and_milliamps():
+    from types import SimpleNamespace as NS
+
+    from leap_teleop.ros_out import hand_state_units
+
+    fb = NS(
+        positions_degrees=np.full(16, 180.0),
+        velocities_degrees_per_second=np.full(16, 90.0),
+        currents_milliamps=np.full(16, 120.0),
+    )
+    pos, vel, eff = hand_state_units(fb)
+    assert pos[0] == pytest.approx(np.pi) and vel[0] == pytest.approx(np.pi / 2) and eff[0] == 120.0

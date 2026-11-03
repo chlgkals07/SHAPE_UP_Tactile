@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Manus 텔레옵 시험 가이드</title>
+<style>
+/* 레이아웃: 왼쪽 단계 목록 + 오른쪽 한 단계씩 표시. JS가 없으면 전체를 이어서 보여 준다. */
+:root{--ink:#192a32;--muted:#5b6d75;--line:#dce6e8;--paper:#f6f9f8;--white:#fff;--teal:#087c78;--teal-dark:#075b59;--mint:#e7f5f0;--amber:#b56a18;--amber-bg:#fff5e6;--red:#a33739;--red-bg:#fff0ef;--nav:#0f2c34;--code:#142b33;--shadow:0 12px 36px rgba(15,44,52,.08)}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;color:var(--ink);background:var(--paper);font-family:system-ui,-apple-system,"Segoe UI","Noto Sans KR",sans-serif;line-height:1.65}
+a{color:var(--teal-dark);text-underline-offset:3px}
+button{font:inherit;cursor:pointer}
+code,pre{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+code{font-size:.88em;background:#eaf1f1;padding:.1em .32em;border-radius:4px;overflow-wrap:anywhere}
+h1,h2,h3{line-height:1.25;letter-spacing:-.02em;text-wrap:balance}
+h2{font-size:1.65rem;margin:0 0 6px}
+h3{font-size:1.05rem;margin:24px 0 8px}
+p{margin:0 0 12px}
+ul,ol{padding-left:1.3rem;margin:8px 0 14px}
+li{margin:.28rem 0}
+.top{background:var(--nav);color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:0;z-index:5}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.08em;font-size:.78rem}
+.mark{width:20px;height:20px;border:5px solid #70d2c2;border-radius:50%}
+.bar{flex:1;max-width:340px;height:8px;border-radius:99px;background:#1f4852;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:#70d2c2;transition:width .25s}
+.count{font-size:.8rem;color:#bfe6de;white-space:nowrap}
+.wrap{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:272px minmax(0,1fr);gap:28px;padding:24px 20px 70px}
+nav.side{position:sticky;top:64px;align-self:start;max-height:calc(100vh - 84px);overflow:auto;padding-right:4px}
+.grp{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:800;margin:16px 0 6px}
+.grp:first-child{margin-top:0}
+nav.side button{display:flex;gap:9px;align-items:baseline;width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;padding:6px 8px;color:var(--ink);font-size:.9rem;border-radius:0 6px 6px 0}
+nav.side button:hover{background:#e9f2f1}
+nav.side button .n{color:var(--muted);font-variant-numeric:tabular-nums;min-width:1.6em}
+nav.side button.on{background:var(--mint);border-left-color:var(--teal);font-weight:700}
+nav.side button.done .n::after{content:"✓";color:var(--teal);margin-left:2px}
+main{min-width:0}
+.step{background:var(--white);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:26px 28px 28px;margin-bottom:22px}
+.js .step{display:none;margin-bottom:0}
+.js .step.on{display:block}
+.eyebrow{font-size:.74rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--teal)}
+.lead{color:var(--muted);margin-bottom:18px}
+.where{display:inline-block;font-size:.76rem;font-weight:700;padding:2px 9px;border-radius:99px;background:#e1ecee;color:#26454d;margin:0 6px 10px 0}
+.where.robot{background:#f3e6d3;color:#6c4310}
+.where.user{background:#d9efe9;color:#0c5a56}
+.where.web{background:#e8e3f4;color:#483777}
+pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--code);color:#e6f6f3;border-radius:10px;padding:15px 16px;font-size:.84rem;line-height:1.58}
+pre code{background:none;padding:0;color:inherit;font-size:inherit}
+.cmd{position:relative;margin:10px 0 14px}
+.cmd .cp{position:absolute;top:7px;right:7px;background:#264852;color:#d7f2ec;border:0;border-radius:6px;padding:3px 10px;font-size:.74rem}
+.cmd .cp:hover{background:#2f5b67}
+.note,.warn,.danger,.ok{border-radius:10px;padding:11px 14px;margin:12px 0;font-size:.93rem;border:1px solid}
+.note{background:#eef5f8;border-color:#cfe0e6}
+.warn{background:var(--amber-bg);border-color:#f0d3a6}
+.danger{background:var(--red-bg);border-color:#efc2bf}
+.ok{background:var(--mint);border-color:#bfe3d7}
+.note>:last-child,.warn>:last-child,.danger>:last-child,.ok>:last-child{margin-bottom:0}
+.tag{font-size:.72rem;font-weight:700;padding:1px 7px;border-radius:5px;background:#e6edef;color:#385058;white-space:nowrap}
+.tag.unk{background:#fbe3e1;color:#8a2f31}
+.tag.meas{background:#dff1e8;color:#1e6a4c}
+.chk{display:flex;gap:10px;align-items:flex-start;padding:7px 10px;border:1px solid var(--line);border-radius:9px;margin:6px 0;background:#fbfdfd;cursor:pointer}
+.chk input{margin-top:.28em;width:1.05rem;height:1.05rem;accent-color:var(--teal);flex:none}
+.chk:has(input:checked){background:var(--mint);border-color:#bfe3d7;color:#2c5d52}
+.tblw{overflow-x:auto;margin:10px 0 14px}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+th{background:#eef5f4;font-weight:700;white-space:nowrap}
+td.y{background:#e6f5ee;font-weight:700;color:#1d6a4b}
+td.n{color:var(--muted)}
+td.z{background:#fff1dd;font-weight:700;color:#8a5413}
+.pager{display:flex;justify-content:space-between;gap:12px;margin-top:26px;padding-top:18px;border-top:1px solid var(--line)}
+.pager button{border:1px solid var(--line);background:var(--white);border-radius:10px;padding:9px 18px;color:var(--ink);font-weight:600}
+.pager button.next{background:var(--teal);border-color:var(--teal);color:#fff}
+.pager button:hover{filter:brightness(.96)}
+.pager button:disabled{opacity:.35;cursor:default}
+button:focus-visible,.chk:focus-within{outline:3px solid #6fc8bd;outline-offset:2px}
+/* 구조도 */
+.diagram{display:grid;grid-template-columns:1fr 70px 1fr;gap:10px;align-items:stretch;margin:14px 0}
+.box{border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;background:#fbfdfd}
+.box h4{margin:0 0 8px;font-size:.92rem}
+.box.robot{border-color:#e3c79b;background:#fffaf1}
+.box.user{border-color:#a8d9cf;background:#f3fbf8}
+.box .item{background:#fff;border:1px solid var(--line);border-radius:8px;padding:5px 9px;margin:5px 0;font-size:.83rem}
+.link{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-size:.76rem;color:var(--muted)}
+.link b{color:var(--teal-dark);font-size:.82rem}
+.link::before,.link::after{content:"";width:2px;flex:1;background:var(--teal);opacity:.5}
+.foot{margin-top:30px;font-size:.84rem;color:var(--muted)}
+@media (max-width:860px){
+  .wrap{grid-template-columns:1fr;padding:16px}
+  nav.side{position:static;max-height:none;display:none}
+  nav.side.open{display:block;background:var(--white);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:12px}
+  .menu{display:inline-block}
+  .diagram{grid-template-columns:1fr}
+  .link{flex-direction:row;padding:4px}.link::before,.link::after{width:auto;height:2px;flex:1}
+  .step{padding:20px 16px}
+}
+.menu{display:none;background:#1f4852;color:#fff;border:0;border-radius:8px;padding:6px 12px;font-size:.82rem}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="mark"></span>OMY + LEAP + MANUS</div>
+  <div class="bar" aria-hidden="true"><i id="barfill"></i></div>
+  <span class="count" id="count">0 / 0 확인</span>
+  <button class="menu" id="menu" type="button">단계 목록</button>
+</header>
+
+<div class="wrap">
+<nav class="side" id="side" aria-label="단계 목록"></nav>
+<main id="main">
+
+<!-- ============ 이해 ============ -->
+<section class="step" data-group="이해" data-title="전체 구조">
+  <div class="eyebrow">이해</div>
+  <h2>전체 구조</h2>
+  <p class="lead">팔은 Robot PC 안에서, 손은 User PC에서 따로 돈다. 두 PC는 zenoh로 토픽을 주고받는다.</p>
+  <div class="diagram">
+    <div class="box robot">
+      <h4>ROBOT PC <small>(OMY 본체, 컨테이너)</small></h4>
+      <div class="item"><b>zenohd</b> 라우터 :7447</div>
+      <div class="item"><b>omy_ai</b><br>① follower(OMY-F3M)<br>② home → ready 이동<br>③ leader(OMY-L100) 동기화</div>
+      <div class="item">/leader/joint_trajectory · /joint_states</div>
+    </div>
+    <div class="link"><b>zenoh</b>client<br>ROS_DOMAIN_ID=30</div>
+    <div class="box user">
+      <h4>USER PC</h4>
+      <div class="item"><b>Manus 노드</b> → /manus_glove_0</div>
+      <div class="item"><b>leap_teleop</b> → LEAP Hand (USB, 5V)</div>
+      <div class="item">RealSense ×3 · Cyclo (5단계)</div>
+      <div class="item">/leap/* 기록용 발행</div>
+    </div>
+  </div>
+  <ul>
+    <li><b>팔의 텔레옵 루프</b>는 Robot PC 안에서 닫힌다. leader를 움직이면 follower가 따라간다. User PC는 관여하지 않는다.</li>
+    <li><b>손의 루프</b>는 <code>leap_teleop</code> 한 프로세스에서 닫힌다. Manus(또는 leader 트리거) 입력 → 리타겟팅 → LEAP.</li>
+    <li>팔과 손은 <b>서로 독립 프로세스</b>다. 그래서 팔 없이도 Manus → LEAP만 먼저 시험할 수 있다.</li>
+    <li>Cyclo용 <code>/leap/*</code> 발행은 <b>기록 전용</b>이다. 실패해도 손은 멈추지 않는다.</li>
+  </ul>
+  <div class="tblw"><table>
+    <tr><th>장치</th><th>역할</th></tr>
+    <tr><td>OMY-F3M (follower)</td><td>실제 움직이는 팔. 6축 + 끝단(원래 그리퍼, 우리는 LEAP으로 교체)</td></tr>
+    <tr><td>OMY-L100 (leader)</td><td>사람이 잡는 팔. 7모터(6축 + 트리거 <code>rh_r1_joint</code>)</td></tr>
+    <tr><td>LEAP Hand v1</td><td>16모터 손. 5V 전원 + FTDI USB(<code>/dev/ttyUSB0</code>). ROS 밖에서 직접 구동</td></tr>
+    <tr><td>Manus 글러브</td><td>사람 손 입력. 동글 USB, SDK ROS 2 노드</td></tr>
+  </table></div>
+</section>
+
+<section class="step" data-group="이해" data-title="단계별로 켜야 할 것">
+  <div class="eyebrow">이해</div>
+  <h2>단계별로 켜져 있어야 하는 것</h2>
+  <p class="lead">오늘 목표: 팔은 팔대로, 손은 Manus로, 그리고 Cyclo 기록까지.</p>
+  <div class="tblw"><table>
+    <tr><th>단계</th><th>하는 일</th><th>Robot PC<br>(zenohd, omy_ai)</th><th>Manus 노드</th><th>LEAP 5V</th><th>zenoh 환경</th></tr>
+    <tr><td><b>2</b></td><td>leader 트리거 → LEAP <small>(검증 끝)</small></td><td class="y">필요</td><td class="n">불필요</td><td class="y">필요</td><td class="y">켠다</td></tr>
+    <tr><td><b>3</b></td><td>Manus → LEAP, <b>팔 없음</b></td><td class="n">불필요</td><td class="y">필요</td><td class="y">필요<br><small>(dry-run은 불필요)</small></td><td class="z">끈다<br>LEAP_NO_ZENOH=1</td></tr>
+    <tr><td><b>4</b></td><td>Manus + 팔</td><td class="y">필요</td><td class="y">필요</td><td class="y">필요</td><td class="z">끈다</td></tr>
+    <tr><td><b>5</b></td><td>Cyclo 기록</td><td class="y">필요</td><td class="y">필요</td><td class="y">필요</td><td class="y">켠다</td></tr>
+  </table></div>
+  <div class="warn"><b>같은 RMW 규칙.</b> Manus 노드와 <code>leap_teleop</code>은 같은 RMW를 써야 서로 토픽이 보인다. 3·4단계는 둘 다 기본 RMW(zenoh 끔), 5단계는 둘 다 zenoh(켬). 한쪽만 zenoh이면 <code>[teleop] waiting</code>에서 멈춘다.</div>
+  <ul>
+    <li>3·4단계의 <code>leap_teleop</code>은 <code>/manus_glove_*</code>만 읽고 팔 토픽은 읽지 않는다.</li>
+    <li>5단계에서 zenoh를 켜는 이유: <code>/leap/*</code>를 Cyclo(컨테이너)가 받아야 한다.</li>
+    <li>Manus 노드와 LEAP이 <b>다른 PC</b>면 두 PC가 같은 토픽을 볼 수 있어야 한다. 같은 PC가 가장 단순하다.</li>
+  </ul>
+</section>
+
+<!-- ============ 준비 ============ -->
+<section class="step" data-group="준비" data-title="처음 한 번 설정">
+  <div class="eyebrow">준비</div>
+  <h2>처음 한 번 설정</h2>
+  <span class="where user">USER PC</span>
+  <h3>① 단축 함수와 환경 변수</h3>
+  <p><code>~/.bashrc</code> 끝에 넣는다 (이 User PC에는 11/03에 넣었다). 새 터미널부터는 <code>leap_env</code>만 치면 된다.</p>
+  <div class="cmd"><pre><code># --- SHAPE_UP_Tactile LEAP/Manus teleop ---
+source ~/SHAPE_UP_Tactile/user_pc/scripts/leap_aliases.sh
+export LEAP_ROS_DISTRO=humble       # 이 User PC는 Ubuntu 22.04 + ROS 2 Humble
+export OMY_ROBOT_IP=10.42.0.241     # ROBOT PC IP (44B1050)
+export LEAP_MANUS_WS="$HOME/SHAPE_UP_Tactile/third_party/manus/ROS2 package"
+export LEAP_NO_ZENOH=1              # 기본은 손만(3·4단계). 2·5단계 셸에서는 unset LEAP_NO_ZENOH
+export PYTEST_ADDOPTS="-p no:anyio" # ~/.local anyio 플러그인과 apt pytest(6.x) 충돌 회피</code></pre></div>
+  <div class="tblw"><table>
+    <tr><th>단축 명령</th><th>하는 일</th></tr>
+    <tr><td><code>leap_env</code></td><td>ROS + Manus msgs + PYTHONPATH, <code>user_pc/</code>로 이동. <code>LEAP_NO_ZENOH</code>가 있으면 남은 zenoh 변수도 지운다</td></tr>
+    <tr><td><code>leap_manus</code></td><td>Manus → LEAP (엄지 IK, 주먹 safe-pose). <code>--dry-run</code>, <code>--thumb affine</code></td></tr>
+    <tr><td><code>leap_glovecal --force</code></td><td>글러브 캘리브레이션 (편 손 → 주먹)</td></tr>
+    <tr><td><code>leap_check</code></td><td>LEAP 모터 ID 0~15 응답 확인</td></tr>
+    <tr><td><code>leap_leader</code> / <code>leap_record</code> / <code>leap_topics</code></td><td>2단계 leader 트리거 / 5단계 기록용 발행 / 토픽 목록</td></tr>
+  </table></div>
+  <h3>①-b Humble용 패키지 (한 번)</h3>
+  <p><code>dynamixel_sdk</code>는 <code>python3-serial</code>이 없으면 import가 안 된다 (pytest는 하드웨어 없이 돌아서 통과해 버린다). <span class="tag meas">실측 11/03</span> 설치함.</p>
+  <div class="cmd"><pre><code>sudo apt install ros-humble-rmw-zenoh-cpp ros-humble-dynamixel-sdk python3-serial</code></pre></div>
+  <p>Robot PC 컨테이너는 Jazzy다. Humble의 <code>rmw_zenoh_cpp</code>와 Jazzy <code>zenohd</code>가 서로 붙는지는 <b>[미검증]</b>이다. 2·5단계에서 <code>leap_topics</code>가 비어 있으면 이것부터 의심한다. 3·4단계(zenoh 끔)는 상관없다.</p>
+  <h3>①-c 영점 파일 (한 번)</h3>
+  <p><code>leap_env</code>는 <code>user_pc/</code>로 이동하므로 영점 파일은 <code>user_pc/config/hardware_motors.yaml</code>이어야 한다. 이 PC에는 아직 없고, 예전 작업 폴더에 하나 있다. 같은 LEAP 실물의 최신 파일인지 확인한 뒤 복사한다.</p>
+  <div class="cmd"><pre><code>cp ~/Documents/antigravity/charming-pascal/leap-hand/calibration/hardware_motors.yaml \
+   ~/SHAPE_UP_Tactile/user_pc/config/hardware_motors.yaml</code></pre></div>
+  <h3>② 테스트</h3>
+  <div class="cmd"><pre><code>leap_env &amp;&amp; python3 -m pytest -q -p no:anyio     # 하드웨어 없이 전부 통과해야 한다</code></pre></div>
+  <h3>③ Manus 노드 빌드 (Manus PC에서 한 번)</h3>
+  <div class="cmd"><pre><code>source /opt/ros/$LEAP_ROS_DISTRO/setup.bash
+sudo apt install libncurses-dev      # 없으면 ncursesw/ncurses.h 에러
+cd "$LEAP_MANUS_WS" &amp;&amp; colcon build</code></pre></div>
+  <ul>
+    <li>동글용 udev 규칙 <code>third_party/manus/70-manus-hid.rules</code>를 <code>/etc/udev/rules.d/</code>에 넣고 다시 꽂는다.</li>
+    <li>MANUS Core Dashboard(213 MB)는 git에 없다. integrated 모드에는 필요 없고, 글러브 펌웨어·캘리브레이션 등에 쓸 때만 MANUS 배포본을 받아 <code>third_party/manus/MANUS Core Dashboard (Linux build)/</code>에 둔다 (gitignore).</li>
+    <li>노드가 “SDK license” 에러를 내면 라이선스에 해당 기능이 없는 것이다.</li>
+    <li><b>노드는 integrated 모드(기본)로 동글을 직접 연다. 실행 전에 MANUS Core Dashboard를 반드시 끈다.</b> 켜져 있으면 <code>Resource busy</code>와 <code>No license found … Integrated</code>가 같이 뜬다.</li>
+  </ul>
+  <h3>④ LEAP 포트 권한 (한 번)</h3>
+  <div class="cmd"><pre><code>sudo usermod -aG dialout $USER     # 이후 재로그인. 또는 임시로: sudo chmod 666 /dev/ttyUSB0
+echo 1 | sudo tee /sys/bus/usb-serial/devices/ttyUSB0/latency_timer</code></pre></div>
+  <label class="chk"><input type="checkbox"><span>pytest 전부 통과</span></label>
+  <label class="chk"><input type="checkbox"><span><code>user_pc/config/hardware_motors.yaml</code> 있음 (1단계 영점 기록은 10/09에 끝)</span></label>
+</section>
+
+<section class="step" data-group="준비" data-title="안전 수칙">
+  <div class="eyebrow">준비</div>
+  <h2>안전 수칙 (매 단계)</h2>
+  <div class="danger">
+    <ul style="margin:0">
+      <li>LEAP <b>5V를 즉시 끊을 수단</b>을 손 닿는 곳에 둔다. 이상하면 <b>5V를 먼저 끊고</b> <code>Ctrl+C</code>.</li>
+      <li><b>5V는 항상 손을 편 상태에서 켠다.</b> 모터가 회전수를 누적해서, 접힌 채 켜면 다음 전원 투입 때 영점이 360° 어긋난다.</li>
+      <li>시험 중 손가락 주변에 손·케이블을 두지 않는다. LEAP Hand v1(16모터) 전용이다.</li>
+    </ul>
+  </div>
+  <div class="warn">
+    <ul style="margin:0">
+      <li><code>omy_ai</code>는 launch <b>즉시 팔이 움직인다</b>. 작업 공간을 비우고 비상 정지 수단을 확인한다.</li>
+      <li>팔이 움직이는 동안 <b>손은 주먹</b>으로 둔다. (<code>leap_*</code> 함수는 <code>--safe-pose fist</code>가 기본)</li>
+      <li>텔레옵 중에는 <b>leader를 반드시 손으로 잡는다.</b> 10/09에 leader가 갑자기 크게 튄 적이 있다.</li>
+    </ul>
+  </div>
+  <div class="note">처음 구동은 항상 <code>--dry-run</code> 먼저, 그다음 <code>leap_manus</code> (엄지 IK, 기본)로 간다. <code>--thumb affine</code>은 손가락·엄지 대응이 의심될 때 진단용으로만 쓴다. <span class="tag meas">실측 11/03</span> IK가 더 좋았다.</div>
+  <label class="chk"><input type="checkbox"><span>5V 차단 수단이 손 닿는 곳에 있다</span></label>
+  <label class="chk"><input type="checkbox"><span>LEAP이 편 손 상태다</span></label>
+</section>
+
+<!-- ============ 로봇 ============ -->
+<section class="step" data-group="로봇 켜기" data-title="전원과 연결">
+  <div class="eyebrow">로봇 켜기</div>
+  <h2>전원, 네트워크, SSH, 컨테이너</h2>
+  <p class="lead">단계 2와 4에서 팔이 필요하다. 3단계(Manus 단독)에서는 이 절차가 필요 없다.</p>
+  <ol>
+    <li>로봇 전원 버튼을 눌렀다 떼서 LED가 <b>흰색</b>이 될 때까지 기다린다.</li>
+    <li>이더넷으로 Robot PC ↔ User PC를 연결한다.</li>
+    <li>SSH 접속 (비밀번호 없음. 안 되면 <code>robotis@</code>):</li>
+  </ol>
+  <span class="where user">USER PC</span>
+  <div class="cmd"><pre><code>ssh root@omy-snpr44b1050.local     # = 10.42.0.241. 이름이 안 풀리면 ssh root@10.42.0.241</code></pre></div>
+  <span class="where robot">ROBOT PC</span>
+  <div class="cmd"><pre><code>hostname -I                                  # User PC에서 접속 가능한 IP 확인
+cd /data/docker/open_manipulator
+docker ps                                    # open_manipulator가 보이면 이미 실행 중
+./docker/container.sh start                  # 없을 때만 (인터넷 필요)
+./docker/container.sh enter                  # 터미널마다 반복</code></pre></div>
+  <div class="warn">
+    <b>컨테이너 .bashrc가 로드되지 않은 셸</b>이면 <code>zenohd: command not found</code>가 나고 환경변수도 같이 빠진다. 이 상태로 <code>omy_ai</code>를 띄우면 팔은 움직여도 zenoh에 안 붙어서 LEAP이 무반응이 된다. 터미널마다:
+    <div class="cmd"><pre><code>source /opt/ros/jazzy/setup.bash
+export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp</code></pre></div>
+  </div>
+  <div class="warn"><b>중복 실행 확인.</b> 컨테이너에는 follower/leader를 자동 실행하는 s6 서비스가 있다. <code>ros2 node list</code>와 <code>pgrep -a zenohd</code>가 <b>비어 있는지</b> 먼저 본다. 떠 있으면 그대로 쓰고 <code>omy_ai</code>는 실행하지 않는다.</div>
+  <div class="note"><b>SSH가 <code>banner exchange</code> 타임아웃</b>이면 ping과 TCP 22가 되어도 USB 랜 허브 문제다. 10/09에는 허브를 교체해 해결했다. <span class="tag meas">실측 10/09</span></div>
+  <label class="chk"><input type="checkbox"><span>LED 흰색, ssh 접속됨</span></label>
+</section>
+
+<section class="step" data-group="로봇 켜기" data-title="zenohd와 omy_ai">
+  <div class="eyebrow">로봇 켜기</div>
+  <h2>zenohd와 omy_ai</h2>
+  <span class="where robot">ROBOT PC · 터미널 A</span>
+  <div class="cmd"><pre><code>zenohd                                  # 종료하지 않는다
+# 컨테이너 .bashrc가 안 읽힌 셸이면:  ros2 run rmw_zenoh_cpp rmw_zenohd</code></pre></div>
+  <span class="where user">USER PC</span>
+  <div class="cmd"><pre><code>leap_topics        # 에러 없이 나오면 연결된 것 (leap_env가 zenoh 환경을 잡는다)</code></pre></div>
+  <label class="chk"><input type="checkbox"><span><code>ros2 topic list</code>가 에러 없이 나온다</span></label>
+  <span class="where robot">ROBOT PC · 터미널 B</span>
+  <div class="danger"><b>손은 주먹으로 대기</b>시킨 뒤 실행한다. 팔이 즉시 움직인다 (home → ready, 약 20초). leader 트리거를 쥔 채로 둔다.</div>
+  <div class="cmd"><pre><code>ssh root@omy-snpr44b1050.local
+cd /data/docker/open_manipulator &amp;&amp; ./docker/container.sh enter
+ros2 launch open_manipulator_bringup omy_ai.launch.py     # alias: omy_ai</code></pre></div>
+  <h3>omy_ai가 하는 일</h3>
+  <div class="tblw"><table>
+    <tr><th>순서</th><th>실행</th><th>하는 일</th></tr>
+    <tr><td>1</td><td><code>omy_f3m_follower_ai</code></td><td>follower(OMY-F3M) ros2_control 시작</td></tr>
+    <tr><td>2</td><td><code>joint_trajectory_executor</code></td><td>초기 자세로 이동. <b>home → ready</b> (각 10초). ready = [0, −90°, 152°, −62°, 90°, 0]</td></tr>
+    <tr><td>3</td><td><code>omy_l100_leader_ai</code></td><td>executor가 끝난 뒤 leader 시작. 중력 보상 + 동기화</td></tr>
+  </table></div>
+  <p>LEAP을 단 상태에서도 공식 <code>omy_ai</code>가 그대로 동작한다. <span class="tag meas">실측 10/09</span></p>
+  <div class="note">leader 로그에 <code>BULK_READ_FAIL</code>(−3001, −3002)이 몇 초마다 찍히지만 허용 안이라 동작은 계속된다. 원인은 미조사다.</div>
+  <h3>확인 (터미널 C)</h3>
+  <div class="cmd"><pre><code>ros2 control list_controllers                            # arm_controller, joint_state_broadcaster가 active
+ros2 topic echo /leader/joint_trajectory --field points  # 값 7개 (마지막이 leader 트리거)</code></pre></div>
+  <label class="chk"><input type="checkbox"><span>leader를 움직이면 follower가 따라온다</span></label>
+  <label class="chk"><input type="checkbox"><span>트리거를 쥐면 7번째 값이 변한다</span></label>
+</section>
+
+<!-- ============ 단계 2 ============ -->
+<section class="step" data-group="단계 2 · leader" data-title="leader 트리거로 LEAP 열고 닫기">
+  <div class="eyebrow">단계 2 · 이미 검증됨 (10/09)</div>
+  <h2>leader 트리거로 LEAP 열고 닫기</h2>
+  <p class="lead">오늘은 환경 확인용이다. 팔 + zenoh + LEAP 경로가 살아 있는지 본 뒤 3단계로 간다.</p>
+  <h3>leader 트리거 값 입력 (쥔 상태는 아직 미측정)</h3>
+  <p>편 상태와 쥔 상태에서 7번째 값을 읽어 <code>user_pc/config/leader_gripper.yaml</code>의 <code>open_value</code> / <code>closed_value</code>에 넣는다. 지금은 임시값 0.0 / 1.0이고, 편 상태 실측은 약 0.197이다.</p>
+  <span class="where user">USER PC</span>
+  <div class="cmd"><pre><code>leap_leader --dry-run     # 먼저 로그만. 트리거를 쥐고 펼 때 값이 따라가는지
+leap_leader               # 실물. 주먹 → [teleop] waiting → live</code></pre></div>
+  <label class="chk"><input type="checkbox"><span>(a) 팔을 천천히 움직이면 follower가 따라온다</span></label>
+  <label class="chk"><input type="checkbox"><span>(b) 트리거를 열고 닫으면 LEAP이 열리고 닫힌다</span></label>
+  <label class="chk"><input type="checkbox"><span>(c) 팔을 움직이면서 동시에 열고 닫아도 서로 간섭이 없다</span></label>
+  <div class="note">토픽이 0.5초 끊기면 마지막 자세를 유지(hold), 3초 끊기면 안전 자세(release). <code>Ctrl+C</code>로 종료하면 Torque OFF.</div>
+</section>
+
+<section class="step" data-group="단계 2 · leader" data-title="2단계 끝내고 3단계로">
+  <div class="eyebrow">전환</div>
+  <h2>2단계 정리, 3단계 준비</h2>
+  <p class="lead">3단계(Manus 단독)는 팔이 필요 없다. 아래 순서로 끄고 새로 시작한다.</p>
+  <ol>
+    <li><b>User PC</b>: <code>leap_leader</code> 셸에서 <code>Ctrl+C</code> (Torque OFF).</li>
+    <li><b>Robot PC 터미널 B</b>: <code>omy_ai</code> <code>Ctrl+C</code> — <b>팔이 처질 수 있으니 손으로 받친다.</b></li>
+    <li><b>Robot PC 터미널 A</b>: <code>zenohd</code> <code>Ctrl+C</code>.</li>
+    <li><b>LEAP 5V를 편 손으로 껐다 켠다</b> (모터 회전수 누적 초기화).</li>
+  </ol>
+  <div class="warn">3단계 셸은 모두 <code>LEAP_NO_ZENOH=1</code>이어야 한다 (<code>~/.bashrc</code> 기본값). 2단계에서 <code>unset</code> 했던 셸이면 <code>export LEAP_NO_ZENOH=1</code> 후 <code>leap_env</code>를 다시 한다. 확인: <code>echo "[$RMW_IMPLEMENTATION]"</code>이 <code>[]</code>.</div>
+  <label class="chk"><input type="checkbox"><span>leap_leader 종료, omy_ai 종료(팔 받침), zenohd 종료</span></label>
+  <label class="chk"><input type="checkbox"><span>LEAP 5V를 편 손으로 재투입</span></label>
+</section>
+
+<!-- ============ 단계 3 ============ -->
+<section class="step" data-group="단계 3 · Manus 단독" data-title="Manus 노드와 토픽 확인">
+  <div class="eyebrow">단계 3 · Manus 단독 (팔 없음)</div>
+  <h2>Manus 노드 실행과 확인</h2>
+  <p class="lead">코드가 SDK 소스에서 읽어 가정한 값이 맞는지 실제 echo로 확인한다. 글러브를 착용한다. <span class="tag meas">실측 11/03</span> 아래 항목 모두 확인됨.</p>
+  <span class="where user">셸 1 · Manus 노드 (이 User PC, 동글도 이 PC에)</span>
+  <div class="danger"><b>MANUS Core Dashboard를 먼저 끈다.</b> 노드는 integrated 모드(기본)로 동글을 직접 연다. Dashboard가 켜져 있으면 <code>Resource busy</code> + <code>No license found … Integrated</code>로 토픽이 안 나온다. 확인: <code>pgrep -a MANUS_Core</code>가 비어 있어야 한다. Dashboard에 붙는 local 모드(<code>-p connection_type:=local</code>)도 넣어 두었지만 Linux Dashboard는 SDK 연결을 받지 않아 쓸 수 없었다.</div>
+  <div class="cmd"><pre><code>leap_env
+echo "[$RMW_IMPLEMENTATION]"                    # [] 이어야 한다
+ros2 run manus_ros2 manus_data_publisher        # "running in integrated mode", Resource busy 없음</code></pre></div>
+  <span class="where user">셸 2 · 확인</span>
+  <div class="cmd"><pre><code>leap_env
+ros2 topic list | grep -i manus                 # /manus_glove_0, /manus_glove_0/vibration_cmd
+ros2 topic hz /manus_glove_0                    # 약 120 Hz (11/03: 119.9)
+ros2 topic echo /manus_glove_0 --once &gt; ~/echo.txt</code></pre></div>
+  <p><code>echo.txt</code>에서 확인한다. 하나라도 틀리면 키포인트가 빠져 엄지가 조용히 affine으로 돈다.</p>
+  <label class="chk"><input type="checkbox"><span>손목 raw node가 <code>chain_type=Hand</code>, <code>joint_type=Invalid</code> <span class="tag meas">실측 11/03</span></span></label>
+  <label class="chk"><input type="checkbox"><span>엄지에 <code>joint_type=DIP</code> 노드가 있다 <span class="tag meas">실측 11/03</span></span></label>
+  <label class="chk"><input type="checkbox"><span>ergonomics 값이 도(°) 단위다 (−35 ~ 42 범위) <span class="tag meas">실측 11/03</span></span></label>
+  <label class="chk"><input type="checkbox"><span>ergonomics 이름 20개 (<code>ThumbSpread, ThumbCMCStretch, ThumbMCPStretch, ThumbIPStretch, IndexSpread, IndexMCPStretch …</code>)가 모두 있다</span></label>
+  <div class="note">토픽이 <code>/manus_glove_0</code>이 아니면 <code>user_pc/config/manus_leap.yaml</code>의 <code>topic</code>을 바꾼다. 왼손이면 <code>--glove-side Left</code>. 오른손을 <code>/manus_glove_right</code>로 고정하려면 노드를 <code>-p glove_topic_template:=manus_glove_{side}</code>로 실행한다.</div>
+  <div class="note">노드는 120 Hz로 마지막 값을 반복 발행하고 timestamp가 없다. ergonomics가 0.5초 넘게 완전히 같으면 끊김으로 보고 hold한다.</div>
+</section>
+
+<section class="step" data-group="단계 3 · Manus 단독" data-title="글러브 캘리브레이션">
+  <div class="eyebrow">단계 3 · Manus 단독</div>
+  <h2>글러브 캘리브레이션</h2>
+  <p class="lead">작업자마다 한다. <b>글러브를 낀 손으로</b> 한다. LEAP은 필요 없다. 결과는 <code>config/manus_calibration.yaml</code> (gitignore).</p>
+  <div class="note"><b>편 손은 충분히 쭉 편다.</b> 덜 편 채로 기록하면 평소 편 손이 "편 손"으로 읽혀 LEAP이 덜 펴진다. <span class="tag meas">실측 11/03</span> 더 펴서 다시 하니 해결. 주먹은 엄지를 검지·중지 위로 감싼다 (주먹 안에 넣지 않는다).</div>
+  <span class="where user">USER PC</span>
+  <div class="cmd"><pre><code>leap_glovecal --force      # 편 손 Enter → 주먹 Enter</code></pre></div>
+  <label class="chk"><input type="checkbox"><span>마지막 줄 <code>fist thumb, mm in front of palm</code>의 두 값 부호가 같다</span></label>
+  <div class="warn">부호가 다르면 WARNING이다. <code>config/manus_leap.yaml</code>의 <code>thumb_ik.flip_normal</code>을 <code>true</code>로 바꾸고 다시 한다.</div>
+</section>
+
+<section class="step" data-group="단계 3 · Manus 단독" data-title="dry-run">
+  <div class="eyebrow">단계 3 · Manus 단독</div>
+  <h2>dry-run (LEAP을 건드리지 않음)</h2>
+  <span class="where user">USER PC</span>
+  <div class="cmd"><pre><code>leap_manus --dry-run</code></pre></div>
+  <label class="chk"><input type="checkbox"><span><code>[teleop] live</code>가 되고, 손을 움직이면 값이 바뀐다</span></label>
+  <label class="chk"><input type="checkbox"><span>로그가 <code>affine</code>으로 떨어지지 않는다 (키포인트를 찾았다)</span></label>
+  <div class="warn">
+    <b><code>waiting</code>에서 안 바뀌면</b> 순서대로:
+    <ol style="margin-bottom:0">
+      <li>노드가 도는가, <code>ros2 topic echo</code>로 값이 오는가</li>
+      <li>토픽 이름 (<code>manus_leap.yaml</code>), <code>--glove-side</code></li>
+      <li>두 셸의 RMW가 같은가 (<code>echo $RMW_IMPLEMENTATION</code>)</li>
+      <li>글러브가 멈춘 값만 반복 중이 아닌가 (0.5초 이상 동일하면 버림)</li>
+      <li>ergonomics 이름 20개가 다 있는가 (하나라도 빠지면 reading을 버림)</li>
+    </ol>
+  </div>
+</section>
+
+<section class="step" data-group="단계 3 · Manus 단독" data-title="LEAP 실물">
+  <div class="eyebrow">단계 3 · Manus 단독</div>
+  <h2>LEAP 실물 구동</h2>
+  <div class="danger">5V를 <b>편 손</b>으로 켰고, 차단 수단이 손 닿는 곳에 있는지 확인한다.</div>
+  <span class="where user">USER PC</span>
+  <div class="cmd"><pre><code>leap_check                    # ID 0~15 응답, 오류 0
+leap_manus                    # 엄지 IK (기본). 편 손, 주먹, 손가락 하나씩, 엄지, pinch 순서로 천천히
+# leap_manus --thumb affine   # 진단용: 엄지 대응이 이상할 때만</code></pre></div>
+  <p><code>manus_leap.yaml</code>은 시작할 때만 읽는다. 값을 바꾸면 <code>Ctrl+C</code> 후 다시 띄운다.</p>
+  <h3>엄지 방식 (11/03 수정)</h3>
+  <div class="tblw"><table>
+    <tr><th>관절</th><th>방식</th><th>설정</th></tr>
+    <tr><td>12·13·14번</td><td>IK: 엄지 끝 + IP 관절 위치를 맞춘다</td><td><code>thumb_ik.ip_weight: 0.3</code></td></tr>
+    <tr><td>15번 (엄지 맨 위 관절)</td><td>글러브 <code>ThumbIPStretch</code>를 그대로 따른다 (affine). 끝만 맞추는 IK에서는 15번이 거의 안 굽었다 <span class="tag meas">실측 11/03</span></td><td><code>thumb_ik.ip_joint: affine</code> (예전 방식은 <code>ik</code>)</td></tr>
+    <tr><td>15번 젖힘</td><td>편 손보다 더 젖히면 LEAP도 뒤로 젖힌다 (최대 20°). 전에는 0°에서 잘렸다 <span class="tag unk">미검증</span></td><td><code>thumb_ip_extend_max_deg: 20.0</code> (0 = 끔)</td></tr>
+  </table></div>
+  <label class="chk"><input type="checkbox"><span>손가락 5개가 글러브를 따라간다 (방향 정상)</span></label>
+  <label class="chk"><input type="checkbox"><span>엄지가 대응된다, 맨 위 관절도 같이 굽는다 <span class="tag meas">실측 11/03</span></span></label>
+  <label class="chk"><input type="checkbox"><span>엄지 맨 위 관절이 손등 쪽으로 젖혀진다 <span class="tag unk">미검증</span></span></label>
+  <label class="chk"><input type="checkbox"><span>엄지 끝–검지/중지/약지 끝 pinch</span></label>
+  <label class="chk"><input type="checkbox"><span>글러브를 벗거나 노드를 끄면 hold(0.5초) → release(3초)로 안전 자세</span></label>
+  <h3>안 맞을 때</h3>
+  <ul>
+    <li>손가락 방향이 반대 → <code>manus_leap.yaml</code>의 <code>side_gain</code> 또는 <code>joint_map</code></li>
+    <li>엄지가 이상함 → <code>--thumb affine</code>으로 대응표부터 맞춘 뒤 IK</li>
+    <li>엄지 맨 위 관절이 덜/더 젖혀짐 → <code>thumb_ip_extend_max_deg</code></li>
+    <li>pinch 틈이 큼 → 15번 고정 때문일 수 있다. <code>ip_joint: ik</code>와 비교</li>
+    <li><b>검지가 끊김</b> <span class="tag meas">실측 11/03</span>: 글러브 <code>IndexPIPStretch</code>가 MCP가 굽는 동안에도 0~1°에 붙어 있는 구간이 있었다 (수신은 120 Hz로 정상). 장갑을 다시 끼고 센서 위치를 확인, 그래도면 Dashboard에서 글러브 캘리브레이션 후 Dashboard를 끄고 노드 재실행. 계속되면 PIP=0이고 MCP가 굽었을 때 MCP 비율을 빌리는 보정을 검토 <span class="tag unk">미검증</span></li>
+    <li>IK에서 손끝 틈이 남음 → pinch snap 추가 검토 (spec 7절)</li>
+    <li>pinch 결과는 <code>docs/field-test/</code>에 10/09 형식으로 남긴다</li>
+  </ul>
+</section>
+
+<!-- ============ 단계 4 ============ -->
+<section class="step" data-group="단계 4 · Manus + 팔" data-title="Manus와 팔 함께">
+  <div class="eyebrow">단계 4 · Manus + 팔</div>
+  <h2>Manus + 팔</h2>
+  <p class="lead">팔은 leader, 손은 글러브. 두 프로세스는 독립이고 leader 트리거는 LEAP에 영향이 없다 (<code>--source manus</code>).</p>
+  <ol>
+    <li>3단계를 끝낸 뒤 <code>leap_manus</code>를 <code>Ctrl+C</code>로 종료하고, LEAP을 <b>주먹</b>으로 대기시킨다 (safe-pose가 주먹).</li>
+    <li><span class="where robot">ROBOT PC</span> 터미널 A <code>zenohd</code>, 터미널 B <code>omy_ai</code> (앞의 “zenohd와 omy_ai” 단계). leader 트리거를 쥔 채로.</li>
+    <li>Manus 노드(셸 1)는 그대로 두고:</li>
+  </ol>
+  <span class="where user">USER PC</span>
+  <div class="cmd"><pre><code>export LEAP_NO_ZENOH=1
+leap_manus</code></pre></div>
+  <label class="chk"><input type="checkbox"><span>팔을 움직이는 동안에도 손이 글러브를 따라간다</span></label>
+  <label class="chk"><input type="checkbox"><span>글러브를 벗으면 hold → release 된다</span></label>
+  <label class="chk"><input type="checkbox"><span>물체 하나를 집어 본다</span></label>
+  <div class="warn">leader를 <b>손으로 잡고</b> 한다. 팔이 움직이는 동안 LEAP은 주먹이어야 한다.</div>
+</section>
+
+<!-- ============ 단계 5 ============ -->
+<section class="step" data-group="단계 5 · Cyclo 기록" data-title="Cyclo 준비">
+  <div class="eyebrow">단계 5 · Cyclo 기록</div>
+  <h2>Cyclo 준비</h2>
+  <p class="lead">세화형의 <code>omy_demonstration_runbook.md</code>(카메라 3대 기록)를 그대로 쓰고, 달라지는 점만 더한다.</p>
+  <div class="tblw"><table>
+    <tr><th>무엇</th><th>토픽</th><th>Cyclo 역할</th></tr>
+    <tr><td>팔 state</td><td><code>/joint_states</code> (joint1..6)</td><td>observation.state.arm</td></tr>
+    <tr><td>팔 action</td><td><code>/leader/joint_trajectory</code></td><td>action.arm</td></tr>
+    <tr><td>손 state</td><td><code>/leap/joint_states</code> (rad, mA)</td><td>observation.state.hand</td></tr>
+    <tr><td>손 action</td><td><code>/leap/joint_command</code> (rad)</td><td>action.hand</td></tr>
+    <tr><td>부가</td><td><code>/leap/human_hand</code> · <code>/leap/human_keypoints</code> · <code>/leap/teleop_mode</code></td><td>extra_topics (bag에만)</td></tr>
+  </table></div>
+  <p>state·action 각각 팔 6 + 손 16 = <b>22차원</b>. action은 로봇에 <b>실제로 보낸 최종 명령</b>이다.</p>
+  <h3>로봇 config 복사</h3>
+  <span class="where user">USER PC 호스트</span>
+  <div class="cmd"><pre><code>cp ~/SHAPE_UP_Tactile/user_pc/config/omy_f3m_leap_config.yaml ~/cyclo_intelligence/shared/shared/robot_configs/
+nano ~/cyclo_intelligence/shared/shared/robot_configs/omy_f3m_leap_config.yaml</code></pre></div>
+  <ul>
+    <li><b>카메라 3개의 <code>topic</code></b>을 세화형 B6에서 확인한 실제 RGB 압축 토픽으로 바꾼다 (파일 값은 예시).</li>
+    <li>손 <code>joint_names</code> 16개는 <code>leap_teleop</code>이 내는 이름과 글자까지 같아야 한다. 바꾸지 않는다.</li>
+    <li>팔 <code>joint_names</code>는 <code>joint1..6</code>만 (<code>rh_r1_joint</code> 제외).</li>
+    <li>세화형 B7(<code>omy_f3m_config.yaml</code> 편집)은 하지 않는다. 새 로봇 타입이다.</li>
+  </ul>
+  <label class="chk"><input type="checkbox"><span>세화형 A, B1–B6 완료: 카메라 3대 동작, 토픽 경로 확인</span></label>
+  <label class="chk"><input type="checkbox"><span>config 복사, 카메라 topic 수정</span></label>
+</section>
+
+<section class="step" data-group="단계 5 · Cyclo 기록" data-title="기록하기">
+  <div class="eyebrow">단계 5 · Cyclo 기록</div>
+  <h2>leap_record와 녹화</h2>
+  <div class="warn"><b>zenoh를 켠다.</b> Manus 노드(셸 1)를 <code>Ctrl+C</code> 하고, <code>unset LEAP_NO_ZENOH</code> 한 셸에서 다시 띄운다. 둘 다 같은 환경이어야 한다.</div>
+  <span class="where user">셸 1 · Manus 노드</span>
+  <div class="cmd"><pre><code>unset LEAP_NO_ZENOH
+leap_env &amp;&amp; ros2 run manus_ros2 manus_data_publisher</code></pre></div>
+  <span class="where user">셸 2 · 기록용 발행</span>
+  <div class="cmd"><pre><code>unset LEAP_NO_ZENOH
+leap_record                      # leap_manus --publish
+leap_topics                      # /leap/joint_command, /leap/joint_states, /leap/human_*, /leap/teleop_mode
+ros2 topic hz /leap/joint_command /leap/joint_states     # 50 Hz 근처인지</code></pre></div>
+  <label class="chk"><input type="checkbox"><span><code>/leap/*</code> 토픽이 <b>컨테이너에서도</b> 보인다 <span class="tag unk">미검증</span></span></label>
+  <label class="chk"><input type="checkbox"><span><code>joint_states</code>가 50 Hz 근처 (16모터 피드백 비용)</span></label>
+  <span class="where web">브라우저 · Cyclo UI</span>
+  <ol>
+    <li>Cyclo 실행 후 <code>http://localhost:7080/</code>, 로봇 유형 <b>OMY F3M + LEAP</b> 선택.</li>
+    <li><code>Record → Topic Monitor</code>에서 <code>/leap/*</code>, 팔 두 토픽, 카메라 3개가 모두 수신되는지 본다.</li>
+    <li>시작 상태에 놓고 <code>Record Start</code> → 짧게 시연 → <code>Save Episode</code>.</li>
+  </ol>
+  <h3>기록 확인</h3>
+  <div class="cmd"><pre><code>ros2 bag info /workspace/rosbag2/&lt;데이터셋&gt;/0/</code></pre></div>
+  <label class="chk"><input type="checkbox"><span>토픽 5개(<code>/leap/*</code>)의 메시지 수가 0보다 크다</span></label>
+  <label class="chk"><input type="checkbox"><span><code>/leap/human_keypoints</code>가 0이 아니다 (0이면 키포인트를 못 찾은 것)</span></label>
+  <label class="chk"><input type="checkbox"><span><code>Convert Dataset</code> 후 state·action이 22차원 <span class="tag unk">미검증</span></span></label>
+</section>
+
+<!-- ============ 마무리 ============ -->
+<section class="step" data-group="마무리" data-title="종료 순서">
+  <div class="eyebrow">마무리</div>
+  <h2>종료 순서</h2>
+  <ol>
+    <li>녹화가 끝났는지 확인한다.</li>
+    <li><b><code>leap_*</code> 셸 <code>Ctrl+C</code></b> (Torque OFF). 손이 풀려 처지니 물체가 손에 없는지 본다.</li>
+    <li>카메라 터미널들, Cyclo 터미널.</li>
+    <li><b><code>omy_ai</code> <code>Ctrl+C</code></b> — <b>팔이 처질 수 있으니 손으로 받친다.</b></li>
+    <li><code>zenohd</code> <code>Ctrl+C</code>, Manus 노드 종료.</li>
+    <li><b>LEAP 5V OFF.</b></li>
+    <li>보관하려면 다음 단계의 pack, 그다음 로봇 전원 OFF.</li>
+  </ol>
+  <div class="note">켜는 순서: <code>LEAP 5V(편 손)</code> → <code>Manus 노드</code> → <code>zenohd</code> → <code>omy_ai</code> → <code>leap_*</code> → <code>Cyclo 녹화</code>. 끄는 순서는 반대.</div>
+</section>
+
+<section class="step" data-group="마무리" data-title="pack / unpack">
+  <div class="eyebrow">마무리</div>
+  <h2>pack / unpack</h2>
+  <p class="lead">OMY를 접어 보관하거나 펴는 launch다. <code>omy_3m.launch.py</code>에 목표 자세만 바꿔 넣는 래퍼다.</p>
+  <div class="tblw"><table>
+    <tr><th></th><th>명령</th><th>이동</th><th>자세</th></tr>
+    <tr><td><b>pack</b></td><td><code>ros2 launch open_manipulator_bringup omy_3m_pack.launch.py</code></td><td>home → pack (각 10초)</td><td>[0, 0, −150°, −30°, 0, 0]</td></tr>
+    <tr><td><b>unpack</b></td><td><code>ros2 launch open_manipulator_bringup omy_3m_unpack.launch.py</code></td><td>home</td><td>전부 0</td></tr>
+  </table></div>
+  <div class="danger">
+    <ul style="margin:0">
+      <li><code>omy_ai</code>와 <b>동시에 실행하지 않는다</b> (둘 다 follower ros2_control을 띄운다).</li>
+      <li><code>omy_3m</code>은 끝단 없는 6축 모델이다. <b>LEAP을 단 채로 접을 때 손이 베이스·바닥에 부딪히는지는 확인된 바 없다.</b> <span class="tag unk">미검증</span> 처음에는 손을 떼거나, 팔을 받치고 5V를 끈 채 천천히 한다.</li>
+      <li>접기 전 LEAP 5V를 끄고 케이블이 당기지 않는지 본다.</li>
+    </ul>
+  </div>
+  <div class="note">최초 수령 시 포장 해제(unpacking) 절차는 이 레포에 없다. ROBOTIS Setup Guide를 따른다: <a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/setup_guide">docs.robotis.com … setup_guide</a></div>
+</section>
+
+<section class="step" data-group="마무리" data-title="문제 해결">
+  <div class="eyebrow">마무리</div>
+  <h2>문제 해결</h2>
+  <div class="tblw"><table>
+    <tr><th>증상</th><th>원인 / 해결</th></tr>
+    <tr><td><code>No module named 'manus_ros2_msgs'</code></td><td><code>LEAP_MANUS_WS</code> export 했나, <code>colcon build</code> 했나</td></tr>
+    <tr><td><code>[teleop] waiting</code>에서 안 바뀜 (Manus)</td><td>노드 동작 / 토픽 이름 / 두 셸의 RMW / 값이 멈춤 / ergonomics 20개</td></tr>
+    <tr><td>엄지가 이상함, 로그에 <code>affine</code></td><td>손목 <code>Invalid</code>, 엄지 <code>DIP</code> 노드 이름. <code>KEYPOINT_NODES</code>는 <code>sources/manus.py</code></td></tr>
+    <tr><td>손가락 방향 반대</td><td><code>side_gain</code> 또는 <code>joint_map</code> (<code>manus_leap.yaml</code>)</td></tr>
+    <tr><td><code>No module named rclpy</code></td><td><code>PYTHONPATH</code>가 ROS 경로를 덮어씀. <code>leap_env</code>를 거쳤는지</td></tr>
+    <tr><td><code>ModuleNotFoundError: dynamixel_sdk</code></td><td>ROS를 source 하지 않은 셸</td></tr>
+    <tr><td><code>Missing or unresponsive DYNAMIXEL IDs</code></td><td>5V, USB, Dynamixel Wizard가 포트를 점유 중인지</td></tr>
+    <tr><td><code>error: … not found. Run calibrate_motors</code></td><td>영점 파일이 없다. 1단계 영점 기록을 먼저</td></tr>
+    <tr><td><code>ros2 topic list</code>가 비어 있음 (zenoh)</td><td>ROBOT_IP, 포트 7447, <code>zenohd</code> 실행 여부, <code>ZENOH_CONFIG_OVERRIDE</code></td></tr>
+    <tr><td>팔은 움직이는데 LEAP 무반응 (leader)</td><td><code>omy_ai</code>가 <code>RMW_IMPLEMENTATION</code>/<code>ROS_DOMAIN_ID</code> 없이 실행됨. export 후 재실행</td></tr>
+    <tr><td><code>zenohd: command not found</code></td><td>컨테이너 .bashrc 미로드. <code>ros2 run rmw_zenoh_cpp rmw_zenohd</code></td></tr>
+    <tr><td>bringup <code>0xc Multi-turn Error</code></td><td>Debug USB + Dynamixel Wizard로 Clear (10/09 문서 부록 A). <b>Factory Reset 금지</b></td></tr>
+    <tr><td><code>Resource busy</code> / <code>dongle interface is claimed by another program</code></td><td>MANUS Core Dashboard가 동글을 잡고 있음. Dashboard를 끄고 노드 재실행</td></tr>
+    <tr><td>노드 시작 시 “SDK license” 에러</td><td>먼저 Dashboard가 꺼졌는지. 꺼진 상태에서도 나면 라이선스에 Integrated 기능이 없음</td></tr>
+    <tr><td>노드가 <code>tcp/10.42.0.241:7447</code> 접속 실패 후 <code>bad_alloc</code></td><td>셸에 zenoh 환경이 남음. <code>export LEAP_NO_ZENOH=1</code> 후 <code>leap_env</code> 다시 (11/03부터 <code>leap_env</code>가 남은 변수를 지운다)</td></tr>
+    <tr><td><code>No module named 'serial'</code></td><td><code>sudo apt install python3-serial</code></td></tr>
+    <tr><td>pytest <code>No module named '_pytest.scope'</code></td><td><code>-p no:anyio</code> (또는 <code>PYTEST_ADDOPTS</code>)</td></tr>
+    <tr><td><code>ncursesw/ncurses.h</code> (Manus 빌드)</td><td><code>sudo apt install libncurses-dev</code></td></tr>
+    <tr><td>텔레옵 중 leader가 튐</td><td>원인 미확인. leader를 손으로 잡는다</td></tr>
+  </table></div>
+</section>
+
+<section class="step" data-group="마무리" data-title="아직 모르는 것">
+  <div class="eyebrow">마무리</div>
+  <h2>아직 모르는 것</h2>
+  <p class="lead">실물에서 처음 확인하는 항목. 틀리면 어디를 고치는지 같이 적었다.</p>
+  <div class="tblw"><table>
+    <tr><th>항목</th><th>확인 방법</th><th>틀리면</th></tr>
+    <tr><td><s>손목 <code>Invalid</code>, 엄지 <code>DIP</code>, ergonomics 도 단위, Integrated 라이선스</s></td><td colspan="2"><span class="tag meas">실측 11/03</span> 모두 맞음 (Dashboard를 끄면 Integrated 라이선스 OK)</td></tr>
+    <tr><td>엄지 IP 젖힘 (<code>thumb_ip_extend_max_deg</code> 20°)</td><td>3-4 편 손에서 엄지 젖히기</td><td>각도 조정, 0이면 끔</td></tr>
+    <tr><td>15번 affine 고정 시 pinch 정확도</td><td>3-4 pinch</td><td><code>ip_joint: ik</code>와 비교</td></tr>
+    <tr><td>검지 PIP가 0에 붙음 (센서? 착용?)</td><td>재착용 후 <code>ros2 topic echo</code></td><td>Dashboard 캘리브레이션 / MCP 비율 보정</td></tr>
+    <tr><td>Humble <code>rmw_zenoh</code>(User PC) ↔ Jazzy <code>zenohd</code>(Robot PC)</td><td>2·5단계 <code>leap_topics</code></td><td>User PC 쪽 버전 맞추기</td></tr>
+    <tr><td>호스트 <code>leap_teleop</code> 토픽이 컨테이너 Cyclo에 보이는가</td><td>5단계 <code>leap_topics</code></td><td>호스트 zenoh 환경을 맞춘다</td></tr>
+    <tr><td><code>/leap/joint_states</code> 주기 (16모터 피드백 비용)</td><td><code>ros2 topic hz</code></td><td>발행 주기를 낮춘다</td></tr>
+    <tr><td>UI에 <b>OMY F3M + LEAP</b>이 나타나는가</td><td>Cyclo 실행 후 Home</td><td>Cyclo 컨테이너 재시작</td></tr>
+    <tr><td>변환기가 <code>rh_r1_joint</code>를 걸러내는가 (22차원)</td><td>Convert 결과</td><td>config 팔 <code>joint_names</code> 확인</td></tr>
+    <tr><td>팔·손 <code>header.stamp</code> 대 bag 수신 시각</td><td>첫 에피소드</td><td>두 PC를 chrony로 맞춘다</td></tr>
+    <tr><td>LEAP을 단 채 pack/unpack, LEAP 하중</td><td>팔을 받치고 천천히</td><td>손을 떼고 접는다</td></tr>
+    <tr><td>leader 트리거 쥔 상태 값</td><td>단계 2</td><td><code>leader_gripper.yaml</code> 갱신</td></tr>
+  </table></div>
+  <p class="foot">자세한 내용: <code>user_pc/README.md</code> · <code>docs/field-test/2026-11-03-*.md</code> · <code>docs/data_preparation/omy_leap_cyclo_recording.md</code> · <code>docs/superpowers/specs/2026-10-29-ros-data-interface-design.md</code></p>
+</section>
+
+<div class="pager" id="pager">
+  <button type="button" id="prev">← 이전</button>
+  <button type="button" id="next" class="next">다음 →</button>
+</div>
+
+</main>
+</div>
+
+<script>
+(function () {
+  var doc = document.documentElement;
+  var steps = Array.prototype.slice.call(document.querySelectorAll('.step'));
+  var side = document.getElementById('side');
+  var prev = document.getElementById('prev');
+  var next = document.getElementById('next');
+  var pager = document.getElementById('pager');
+  var current = 0;
+
+  // localStorage는 이 브라우저에서만 남는 편의 기능이다. 막혀 있어도 페이지는 동작한다.
+  var KEY = 'manus-teleop-guide-v1';
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { saved = {}; }
+  function persist() { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} }
+
+  // 체크박스에 고정 id를 붙이고 저장된 상태를 되살린다.
+  var boxes = [];
+  steps.forEach(function (s, si) {
+    s.id = 'step-' + (si + 1);
+    Array.prototype.forEach.call(s.querySelectorAll('.chk input'), function (b, bi) {
+      b.id = 'c' + si + '-' + bi;
+      b.checked = !!saved[b.id];
+      boxes.push(b);
+      b.addEventListener('change', function () {
+        if (b.checked) saved[b.id] = 1; else delete saved[b.id];
+        persist(); refresh();
+      });
+    });
+  });
+
+  // 사이드 목록을 그룹별로 만든다.
+  var lastGroup = null, navBtns = [];
+  steps.forEach(function (s, i) {
+    var g = s.getAttribute('data-group');
+    if (g !== lastGroup) {
+      var h = document.createElement('div');
+      h.className = 'grp'; h.textContent = g; side.appendChild(h); lastGroup = g;
+    }
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.innerHTML = '<span class="n">' + (i + 1) + '</span><span>' + s.getAttribute('data-title') + '</span>';
+    b.addEventListener('click', function () { show(i); side.classList.remove('open'); });
+    side.appendChild(b); navBtns.push(b);
+  });
+
+  function stepDone(i) {
+    var bs = steps[i].querySelectorAll('.chk input');
+    if (!bs.length) return false;
+    for (var k = 0; k < bs.length; k++) if (!bs[k].checked) return false;
+    return true;
+  }
+
+  function refresh() {
+    var done = boxes.filter(function (b) { return b.checked; }).length;
+    document.getElementById('count').textContent = done + ' / ' + boxes.length + ' 확인';
+    document.getElementById('barfill').style.width = (boxes.length ? done / boxes.length * 100 : 0) + '%';
+    navBtns.forEach(function (b, i) { b.classList.toggle('done', stepDone(i)); });
+  }
+
+  function show(i, noScroll) {
+    current = Math.max(0, Math.min(steps.length - 1, i));
+    steps.forEach(function (s, k) { s.classList.toggle('on', k === current); });
+    navBtns.forEach(function (b, k) { b.classList.toggle('on', k === current); });
+    prev.disabled = current === 0;
+    next.disabled = current === steps.length - 1;
+    next.textContent = current === steps.length - 1 ? '끝' : '다음: ' + steps[current + 1].getAttribute('data-title') + ' →';
+    prev.textContent = current === 0 ? '← 이전' : '← ' + steps[current - 1].getAttribute('data-title');
+    if (location.hash !== '#' + steps[current].id) history.replaceState(null, '', '#' + steps[current].id);
+    if (!noScroll) window.scrollTo(0, 0);
+  }
+
+  // 코드 블록마다 복사 버튼.
+  Array.prototype.forEach.call(document.querySelectorAll('.cmd'), function (c) {
+    var btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'cp'; btn.textContent = '복사';
+    btn.addEventListener('click', function () {
+      var text = c.querySelector('pre').innerText;
+      function ok() { btn.textContent = '복사됨'; setTimeout(function () { btn.textContent = '복사'; }, 1200); }
+      function fail() { btn.textContent = '선택해서 복사'; setTimeout(function () { btn.textContent = '복사'; }, 1800); }
+      try { navigator.clipboard.writeText(text).then(ok, fail); } catch (e) { fail(); }
+    });
+    c.appendChild(btn);
+  });
+
+  prev.addEventListener('click', function () { show(current - 1); });
+  next.addEventListener('click', function () { show(current + 1); });
+  document.getElementById('menu').addEventListener('click', function () { side.classList.toggle('open'); });
+  document.addEventListener('keydown', function (e) {
+    var t = e.target && e.target.tagName;
+    if (t === 'INPUT' || t === 'TEXTAREA' || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === 'ArrowRight') show(current + 1);
+    if (e.key === 'ArrowLeft') show(current - 1);
+  });
+  window.addEventListener('hashchange', function () {
+    var i = steps.findIndex(function (s) { return '#' + s.id === location.hash; });
+    if (i >= 0) show(i);
+  });
+
+  doc.classList.add('js');
+  var start = steps.findIndex(function (s) { return '#' + s.id === location.hash; });
+  refresh();
+  show(start >= 0 ? start : 0, true);
+})();
+</script>
+</body>
+</html>

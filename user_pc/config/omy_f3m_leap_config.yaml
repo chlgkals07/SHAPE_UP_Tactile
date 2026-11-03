@@ -1,0 +1,49 @@
+# Cyclo Intelligence 로봇 config. 이 파일을 cyclo_intelligence/shared/shared/robot_configs/ 에 복사해 쓴다
+# (파일 이름 = 로봇 타입 omy_f3m_leap). 설계: docs/superpowers/specs/2026-10-29-ros-data-interface-design.md 5절.
+# 카메라 토픽은 세화형 실행표 B6에서 확인한 실제 값으로 바꿀 것 (미확인).
+# 손 토픽은 `leap-teleop --publish`가 낸다. 단위는 rad (effort만 mA).
+orchestrator:
+  ros__parameters:
+    omy_f3m_leap:
+      robot_name: "OMY F3M + LEAP"
+      urdf_path: urdf/omy_f3m.urdf
+      observation:
+        images:
+          cam_wrist: {topic: /camera/cam_wrist/color/image_rect_raw/compressed, msg_type: sensor_msgs/msg/CompressedImage}
+          cam_front: {topic: /camera/cam_front/color/image_raw/compressed, msg_type: sensor_msgs/msg/CompressedImage}
+          cam_side: {topic: /camera/cam_side/color/image_raw/compressed, msg_type: sensor_msgs/msg/CompressedImage}
+        state:
+          arm:
+            topic: /joint_states
+            msg_type: sensor_msgs/msg/JointState
+            joint_names: [joint1, joint2, joint3, joint4, joint5, joint6]
+          hand:
+            topic: /leap/joint_states
+            msg_type: sensor_msgs/msg/JointState
+            joint_names:
+              [leap_index_mcp_side, leap_index_mcp_flex, leap_index_pip_flex, leap_index_dip_flex,
+               leap_middle_mcp_side, leap_middle_mcp_flex, leap_middle_pip_flex, leap_middle_dip_flex,
+               leap_ring_mcp_side, leap_ring_mcp_flex, leap_ring_pip_flex, leap_ring_dip_flex,
+               leap_thumb_cmc_side, leap_thumb_cmc_flex, leap_thumb_mcp_flex, leap_thumb_ip_flex]
+      action:
+        arm:
+          topic: /leader/joint_trajectory
+          msg_type: trajectory_msgs/msg/JointTrajectory
+          joint_names: [joint1, joint2, joint3, joint4, joint5, joint6]
+        hand:
+          topic: /leap/joint_command
+          msg_type: sensor_msgs/msg/JointState
+          joint_names:
+              [leap_index_mcp_side, leap_index_mcp_flex, leap_index_pip_flex, leap_index_dip_flex,
+               leap_middle_mcp_side, leap_middle_mcp_flex, leap_middle_pip_flex, leap_middle_dip_flex,
+               leap_ring_mcp_side, leap_ring_mcp_flex, leap_ring_pip_flex, leap_ring_dip_flex,
+               leap_thumb_cmc_side, leap_thumb_cmc_flex, leap_thumb_mcp_flex, leap_thumb_ip_flex]
+      recording:
+        extra_topics:
+          - /tf
+          - /camera/cam_wrist/color/camera_info
+          - /camera/cam_front/color/camera_info
+          - /camera/cam_side/color/camera_info
+          - /leap/human_hand
+          - /leap/human_keypoints
+          - /leap/teleop_mode

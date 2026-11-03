@@ -8,25 +8,39 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from leap_teleop.app import run_teleop
-from leap_teleop.config import load_leader_gripper, load_postures
+from leap_teleop.config import (
+    load_leader_gripper,
+    load_manus_calibration,
+    load_manus_leap,
+    load_postures,
+)
 from leap_teleop.hand.base import HandDriver
 from leap_teleop.retarget.scalar_posture import ScalarPostureRetargeter
 from leap_teleop.safety import StaleGuard
 from leap_teleop.sources.base import Source
+from leap_teleop.types import Retargeter
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="leap-teleop",
-        description="Drive a LEAP Hand v1 from the keyboard or the OMY leader gripper.",
+        description="Drive a LEAP Hand v1 from the keyboard, the OMY leader gripper or a Manus glove.",
     )
-    parser.add_argument("--source", choices=("keyboard", "leader"), default="keyboard")
+    parser.add_argument("--source", choices=("keyboard", "leader", "manus"), default="keyboard")
     parser.add_argument("--port", default="/dev/ttyUSB0", help="LEAP Hand serial port")
     parser.add_argument(
         "--motor-calibration-file", type=Path, default=Path("config/hardware_motors.yaml")
     )
     parser.add_argument("--postures", type=Path, default=Path("config/postures.yaml"))
     parser.add_argument("--leader-gripper", type=Path, default=Path("config/leader_gripper.yaml"))
+    parser.add_argument("--manus-config", type=Path, default=Path("config/manus_leap.yaml"))
+    parser.add_argument(
+        "--manus-calibration", type=Path, default=Path("config/manus_calibration.yaml")
+    )
+    parser.add_argument(
+        "--thumb", choices=("ik", "affine"), default="ik", help="Manus thumb retargeting"
+    )
+    parser.add_argument("--glove-side", default="Right", help="Manus glove side to follow")
     parser.add_argument("--rate", type=float, default=50.0, help="control loop Hz (10-200)")
     parser.add_argument("--stale-timeout", type=float, default=0.5)
     parser.add_argument("--release-timeout", type=float, default=3.0)
@@ -37,11 +51,19 @@ def build_parser() -> argparse.ArgumentParser:
         default="open",
         help="pose while waiting for the first input and after the input is lost",
     )
+    parser.add_argument(
+        "--publish", action="store_true",
+        help="publish /leap/* topics for Cyclo recording (needs rclpy)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="log targets, do not touch hardware")
     return parser
 
 
 def build_source(args: argparse.Namespace) -> Source:
+    if args.source == "manus":
+        from leap_teleop.sources.manus import Ros2ManusSource
+
+        return Ros2ManusSource(args.manus.topic, side=args.glove_side)
     if args.source == "leader":
         from leap_teleop.sources.ros2_leader import Ros2LeaderSource
 
@@ -49,6 +71,34 @@ def build_source(args: argparse.Namespace) -> Source:
     from leap_teleop.sources.keyboard import KeyboardSource
 
     return KeyboardSource()
+
+
+def build_retargeter(
+    args: argparse.Namespace, open_pose, fist_pose
+) -> Retargeter:
+    if args.source != "manus":
+        return ScalarPostureRetargeter(open_pose, fist_pose)
+    from leap_teleop.kinematics import LEAP_URDF, load_chain
+    from leap_teleop.retarget.manus_leap import ManusLeapRetargeter
+
+    if not args.manus_calibration.exists():
+        raise FileNotFoundError(
+            f"{args.manus_calibration} not found. Run "
+            "`python3 -m leap_teleop.tools.calibrate_manus` first "
+            "(for --dry-run, config/manus_calibration.example.yaml also works)."
+        )
+    if not args.dry_run and args.manus_calibration.name.endswith(".example.yaml"):
+        raise ValueError(
+            f"{args.manus_calibration} is a nominal example, not this operator's hand. "
+            "Run `python3 -m leap_teleop.tools.calibrate_manus`."
+        )
+    return ManusLeapRetargeter(
+        args.manus,
+        load_manus_calibration(args.manus_calibration),
+        fist_pose,
+        load_chain(LEAP_URDF),
+        args.thumb,
+    )
 
 
 def build_driver(args: argparse.Namespace) -> HandDriver:
@@ -73,6 +123,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not 10.0 <= args.rate <= 200.0:
             raise ValueError("rate must be between 10 and 200 Hz (the bus watchdog is 500 ms)")
         open_pose, fist_pose = load_postures(args.postures)
+        args.manus = load_manus_leap(args.manus_config) if args.source == "manus" else None
         if not args.dry_run and not args.motor_calibration_file.exists():
             raise FileNotFoundError(
                 f"{args.motor_calibration_file} not found. Run "
@@ -86,15 +137,26 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         safe_pose = fist_pose if args.safe_pose == "fist" else open_pose
         guard = StaleGuard(safe_pose, args.stale_timeout, args.release_timeout)
-        retarget = ScalarPostureRetargeter(open_pose, fist_pose)
-        driver = build_driver(args)
+        retarget = build_retargeter(args, open_pose, fist_pose)
+        # Input first: a missing ROS / Manus package must fail before the hand is opened.
         source = build_source(args)
-    except (FileNotFoundError, ValueError, RuntimeError) as error:
+        try:
+            driver = build_driver(args)
+            if args.publish:
+                from leap_teleop.ros_out import RosPublisher
+
+                publisher = RosPublisher()
+            else:
+                publisher = None
+        except BaseException:
+            source.close()
+            raise
+    except (FileNotFoundError, ValueError, RuntimeError, ImportError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
 
     try:
-        run_teleop(source, retarget, guard, driver, rate_hz=args.rate)
+        run_teleop(source, retarget, guard, driver, rate_hz=args.rate, publisher=publisher)
     except KeyboardInterrupt:
         print("interrupted")
     return 0

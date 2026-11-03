@@ -23,6 +23,13 @@ class LeapHandDriver:
     def command(self, angles_degrees: np.ndarray) -> None:
         self._controller.command_degrees(angles_degrees)
 
+    def read_feedback(self):
+        """Feedback for recording only; None when a read fails (control must not stop)."""
+        try:
+            return self._controller.read_feedback()
+        except (OSError, RuntimeError):
+            return None
+
     def close(self) -> None:
         failed_ids = self._controller.close()
         if failed_ids:

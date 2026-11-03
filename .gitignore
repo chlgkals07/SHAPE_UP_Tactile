@@ -2,3 +2,11 @@
 ~$*.xlsx
 *.tmp
 
+
+# colcon outputs (Manus ROS 2 package)
+third_party/manus/ROS2 package/build/
+third_party/manus/ROS2 package/install/
+third_party/manus/ROS2 package/log/
+
+# MANUS Core Dashboard binaries (213 MB). Not needed for integrated mode; get it from MANUS.
+third_party/manus/MANUS Core Dashboard (Linux build)/

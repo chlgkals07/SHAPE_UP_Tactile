@@ -21,6 +21,7 @@ def run_teleop(
     clock: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
     log: Callable[[str], None] = print,
+    publisher=None,
 ) -> None:
     period = 1.0 / rate_hz
     try:
@@ -36,13 +37,21 @@ def run_teleop(
             reading = source.poll(tick_start)
             command = retarget(reading) if reading is not None else None
             command_time = reading.timestamp if reading is not None else None
-            driver.command(guard.resolve(tick_start, command, command_time))
+            resolved = guard.resolve(tick_start, command, command_time)
+            driver.command(resolved)
+            if publisher is not None:  # record-only (Cyclo); never affects the hand
+                read = getattr(driver, "read_feedback", None)
+                publisher.publish(resolved, read() if read else None, guard.mode, reading)
             if guard.mode != last_mode:
                 last_mode = guard.mode
                 log(f"[teleop] {guard.mode}")
             sleep(max(0.0, period - (clock() - tick_start)))
     finally:
         try:
-            source.close()
+            if publisher is not None:
+                publisher.close()
         finally:
-            driver.close()
+            try:
+                source.close()
+            finally:
+                driver.close()
