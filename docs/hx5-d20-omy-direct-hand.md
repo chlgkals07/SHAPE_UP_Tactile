@@ -9,7 +9,8 @@
 > 결과를 확인하기 전에는 Direct 준비·런치·키보드 명령을 실행하지 않는다.
 > 후속 실측에서 손 컨트롤러는 23.77 V·상태 0으로 응답했지만 20개 모터의
 > Torque Enable은 모두 0이었다. Direct 준비는 모든 모터의 토크 1을 요구하며
-> 현재 자동으로 켜지 않는다. 아래 작은 창의 상태 진단을 먼저 실행한다.
+> 현재 자동으로 켜지 않는다. 명시적인 토크 활성화 명령을 추가했으며 실물
+> 토크 활성화 결과는 아직 확인하지 않았다.
 
 이 경로는 OMY의 END ID 210을 통해 손 컨트롤러 ID 140으로 접근한다. 로봇 PC의
 별도 손 USB 포트나 외부 전원 제어 코드를 요구하지 않는다. 기존 Preset Mode 런치와
@@ -93,6 +94,22 @@ ros2 run omy_hx5_bringup omy_hx5_end_proxy_probe --port /dev/ttyAMA4 --hand-stat
 `tick_advanced=False` 또는 비정상적인 mode·watchdog·status가 나오면
 아래 Direct 준비·런치를 진행하지 않는다. 모터 141만 토크를 켜는 것으로
 20관절 초기화가 완료되지는 않는다.
+
+Direct 손 모드가 0이고 20개 모터가 토크 0인 현장 상태에서는 아래 명령으로
+토크를 켠다. 실행 전 모든 대상 모터의 ID·모드·영점·간접 주소·오류·watchdog을
+검사한다. 하나라도 검사에 실패하면 토크 쓰기를 시작하지 않는다. 각 모터의
+목표 위치를 실제 위치로 맞추고 Goal Current를 100으로 낮춘 뒤 Torque Enable을
+1로 설정한다. 도중 실패 시 이번 명령에서 켠 모터의 토크를 다시 끈다.
+첫 실물 시도는 ID 141 하나로 확인한 뒤 전체 20개를 실행한다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_torque_on --port /dev/ttyAMA4 --motor-id 141
+ros2 run omy_hx5_bringup omy_hx5_end_torque_on --port /dev/ttyAMA4
+```
+
+토크가 켜지면 손가락이 현재 위치를 잡으므로 손 주변을 비워 둔다. 위 명령은
+쥐기 궤적을 보내지 않는다. 실물 결과가 확인될 때까지 아래 Direct 런치는
+진행하지 않는다.
 
 먼저 손에 쓰지 않는 진단을 실행하고 `model=261`, `id=140`, 증가한 손
 `tick`, `mode`, `watchdog`, `status`, `voltage_centivolts`를 확인한다.

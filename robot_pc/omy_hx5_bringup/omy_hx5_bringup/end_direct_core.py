@@ -142,6 +142,122 @@ class EndDirect(EndProxy):
                     )
         return issues
 
+    def _motor_torque_state(self, motor_id: int, expected: MotorExpected) -> dict[str, int]:
+        """Inspect a selected motor before changing its torque."""
+        first = self.read_hand(0, 71)
+        rest = self.read_hand(98, 22)
+        present = int.from_bytes(self.read_hand(132, 4), "little", signed=True)
+        aliases = self.read_hand(168, 20, stable=True)
+        model = int.from_bytes(first[:2], "little")
+        homing = int.from_bytes(first[20:24], "little", signed=True)
+        drive, mode, torque, error = first[10], first[11], first[64], first[70]
+        watchdog = rest[0]
+        goal_current = int.from_bytes(rest[4:6], "little")
+        goal_position = int.from_bytes(rest[18:22], "little", signed=True)
+        mapped = tuple(int.from_bytes(aliases[i:i + 2], "little")
+                       for i in range(0, 20, 2))
+        if (model != 1710 or first[7] != motor_id or mode != 5 or
+                (drive & ~8) != (expected.drive_mode & ~8) or
+                homing != expected.homing_offset or mapped != MOTOR_INDIRECT or
+                torque not in (0, 1) or error or watchdog != 0 or
+                not 0 <= goal_current <= 910 or
+                not 0 <= goal_position <= 4095 or
+                not 0 <= present <= 4095 or
+                (torque == 0 and drive & 8)):
+            raise EndProxyError(
+                f"motor {motor_id} is not safe for torque enable: model={model}, "
+                f"id={first[7]}, drive={drive}, mode={mode}, homing={homing}, "
+                f"torque={torque}, error={error}, watchdog={watchdog}, "
+                f"goal_current={goal_current}, goal_position={goal_position}, "
+                f"present_position={present}, aliases={mapped}")
+        return {"torque": torque, "present": present,
+                "goal_position": goal_position, "goal_current": goal_current}
+
+    def _write_selected_motor(self, motor_id: int, address: int, data: bytes) -> None:
+        """Forward one verified RAM write to the selected motor via END."""
+        if (self._current.get(TOOL_ID) != motor_id or motor_id not in MOTOR_IDS or
+                (address, len(data)) not in ((64, 1), (102, 2), (116, 4))):
+            raise EndProxyError("invalid selected motor or torque-start register")
+        self.write_end(SYNC_ENABLE, 1, 0)
+        self.write_end(READ_ADDRESS_1, 2, address)
+        self.write_end(READ_SIZE_1, 2, len(data))
+        self.write_end(WRITE_ADDRESS_1, 2, address)
+        self.write_end(WRITE_SIZE_1, 2, len(data))
+        self.write_end_buffer(data)
+        try:
+            self.write_end(SYNC_ENABLE, 1, 1)
+            self.sleep(0.05)
+        finally:
+            self.write_end(SYNC_ENABLE, 1, 0)
+            self.write_end(WRITE_SIZE_1, 2, 0)
+        actual = EndProxy.read_hand(self, address, len(data), stable=True)
+        if actual != data:
+            raise EndProxyError(
+                f"motor {motor_id} register {address} did not verify: "
+                f"expected={list(data)}, actual={list(actual)}")
+
+    def enable_motor_torque(self, expected: dict[int, MotorExpected],
+                            *, motor_id: int | None = None) -> tuple[int, ...]:
+        """Prime current positions, then enable torque; roll back on failure.
+
+        Explicitly invoked only. All motors are checked before the first
+        torque write. Drive Mode bit 3 must be off so priming cannot itself
+        enable torque. The low startup current limits initial holding force.
+        """
+        selected = (motor_id,) if motor_id is not None else MOTOR_IDS
+        if not selected or any(item not in MOTOR_IDS for item in selected):
+            raise ValueError("motor_id must be one of the 20 left HX5 motor IDs")
+        enabled = []
+        with self.temporary_read_window():
+            self._check_hand(required_mode=0)
+            states = {}
+            for item in selected:
+                self.write_end(SYNC_ENABLE, 1, 0)
+                self.write_end(TOOL_ID, 1, item)
+                states[item] = self._motor_torque_state(item, expected[item])
+            try:
+                for item in selected:
+                    self.write_end(SYNC_ENABLE, 1, 0)
+                    self.write_end(TOOL_ID, 1, item)
+                    if states[item]["torque"]:
+                        continue
+                    before = int.from_bytes(
+                        self.read_hand(132, 4), "little", signed=True)
+                    self.sleep(0.05)
+                    current = int.from_bytes(
+                        self.read_hand(132, 4), "little", signed=True)
+                    if (not 0 <= current <= 4095 or abs(current - before) > 32):
+                        raise EndProxyError(
+                            f"motor {item} moved while preparing torque: {before}, {current}")
+                    self._write_selected_motor(item, 102, (100).to_bytes(2, "little"))
+                    self._write_selected_motor(item, 116, current.to_bytes(4, "little"))
+                    latest = int.from_bytes(
+                        self.read_hand(132, 4), "little", signed=True)
+                    if abs(latest - current) > 32:
+                        raise EndProxyError(
+                            f"motor {item} moved before torque enable: {current}, {latest}")
+                    enabled.append(item)  # Include uncertain writes in rollback.
+                    self._write_selected_motor(item, 64, b"\x01")
+                    after = int.from_bytes(
+                        self.read_hand(132, 4), "little", signed=True)
+                    if abs(after - current) > 64:
+                        raise EndProxyError(
+                            f"motor {item} moved unexpectedly after torque enable: "
+                            f"{current}, {after}")
+            except Exception as exc:
+                rollback_errors = []
+                for item in reversed(enabled):
+                    try:
+                        self.write_end(SYNC_ENABLE, 1, 0)
+                        self.write_end(TOOL_ID, 1, item)
+                        self._write_selected_motor(item, 64, b"\x00")
+                    except Exception as rollback_exc:
+                        rollback_errors.append(f"{item}: {rollback_exc}")
+                raise EndProxyError(
+                    f"motor torque enable stopped: {exc}; rollback errors={rollback_errors}"
+                ) from exc
+        return tuple(enabled)
+
     def _check_hand(self, *, required_mode: int | None = None,
                     allow_sync: bool = False) -> tuple[int, int]:
         model, result, error = self.packet.ping(self.port, END_ID)

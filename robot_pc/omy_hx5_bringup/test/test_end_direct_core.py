@@ -136,6 +136,67 @@ def test_motor_audit_keeps_one_end_session_and_two_read_windows_per_motor():
     assert bus.end_writes.count(48) == 41  # two reads per motor, restore
 
 
+def test_torque_on_primes_goal_at_measured_position_and_restores_end():
+    bus = FakeBus()
+    bus.hand[33] = 0
+    original_end = bus.end.copy()
+    original_buffer = bytes(bus.buffer)
+    for motor_id in MOTOR_IDS:
+        motor = bus.motors[motor_id]
+        motor[10] &= ~8  # Physical hand: goal updates do not turn torque on.
+        motor[64] = 0
+        motor[102:104] = pack("<H", 300)
+        motor[116:120] = pack("<I", 1500)
+        motor[132:136] = pack("<I", 1600 + motor_id)
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    enabled = proxy.enable_motor_torque(load_vendor_motor_settings(XACRO))
+    assert enabled == MOTOR_IDS
+    for motor_id in MOTOR_IDS:
+        motor = bus.motors[motor_id]
+        assert motor[64] == 1
+        assert motor[102:104] == pack("<H", 100)
+        assert motor[116:120] == motor[132:136]
+    assert bus.end == original_end
+    assert bytes(bus.buffer[:12]) == original_buffer[:12]
+    assert bus.goals == {}
+
+
+def test_torque_on_aborts_before_any_write_if_a_motor_watchdog_is_active():
+    bus = FakeBus()
+    bus.hand[33] = 0
+    for motor in bus.motors.values():
+        motor[10] &= ~8
+        motor[64] = 0
+        motor[132:136] = pack("<I", 2048)
+    bus.motors[164][98] = 100
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    with pytest.raises(EndProxyError, match="watchdog=100"):
+        proxy.enable_motor_torque(load_vendor_motor_settings(XACRO))
+    assert all(motor[64] == 0 for motor in bus.motors.values())
+    assert all(motor[102:104] == b"\x00\x00" for motor in bus.motors.values())
+
+
+def test_torque_on_rolls_back_motors_after_a_failed_enable():
+    class FaultBus(FakeBus):
+        def _write_target(self, address, value):
+            if self.end[13] == 143 and address == 64 and value == 1:
+                return  # Simulate a motor that never accepts Torque Enable.
+            super()._write_target(address, value)
+
+    bus = FaultBus()
+    bus.hand[33] = 0
+    for motor in bus.motors.values():
+        motor[10] &= ~8
+        motor[64] = 0
+        motor[132:136] = pack("<I", 2048)
+    original_end = bus.end.copy()
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    with pytest.raises(EndProxyError, match="motor 143 register 64 did not verify"):
+        proxy.enable_motor_torque(load_vendor_motor_settings(XACRO))
+    assert all(motor[64] == 0 for motor in bus.motors.values())
+    assert bus.end == original_end
+
+
 def test_vendor_configuration_and_20_goal_path_keep_persistent_aliases():
     bus = FakeBus()
     original_end = bus.end.copy()
