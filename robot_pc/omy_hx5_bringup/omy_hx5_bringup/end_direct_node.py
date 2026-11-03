@@ -16,7 +16,7 @@ from .direct_trajectory import (
     JOINT_NAMES, Segment, make_trajectory_segment, validate_currents,
 )
 from .end_direct_core import EndDirect, load_vendor_motor_settings
-from .end_proxy import EndProxyError, acquire_end_bus_lock
+from .end_proxy import EndProxyError, acquire_end_bus_lock, make_fresh_rx_port
 
 
 def main(argv=None) -> int:
@@ -30,7 +30,7 @@ def main(argv=None) -> int:
         import rclpy
         from ament_index_python.packages import get_package_share_directory
         from control_msgs.action import FollowJointTrajectory
-        from dynamixel_sdk import PacketHandler, PortHandler
+        from dynamixel_sdk import PacketHandler
         from rclpy.action import ActionServer, CancelResponse, GoalResponse
         from rclpy.callback_groups import ReentrantCallbackGroup
         from rclpy.executors import ExternalShutdownException, MultiThreadedExecutor
@@ -201,7 +201,7 @@ def main(argv=None) -> int:
         lock_fd = acquire_end_bus_lock()
     except EndProxyError as exc:
         parser.exit(1, f"END direct bringup failed: {exc}\n")
-    port = PortHandler(args.port)
+    port = make_fresh_rx_port(args.port)
     if not port.openPort():
         parser.exit(1, f"Cannot open {args.port}; stop other END owners first\n")
     node = None
