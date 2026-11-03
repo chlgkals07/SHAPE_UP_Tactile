@@ -47,7 +47,8 @@ def main(argv=None) -> int:
     except EndProxyError as exc:
         parser.exit(1, f"END direct preparation failed: {exc}\n")
     port = (make_fresh_rx_port(args.port)
-            if args.diagnose or args.torque_status else PortHandler(args.port))
+            if args.diagnose or args.torque_status or args.verify_direct
+            else PortHandler(args.port))
     if not port.openPort():
         parser.exit(1, f"Cannot open {args.port}; stop other END owners first\n")
     try:
