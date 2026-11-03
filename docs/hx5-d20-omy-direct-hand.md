@@ -103,6 +103,24 @@ ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --apply
 나중에 `--restore-preset`으로 모드 1에 되돌렸다면 Direct 모드를 시작하기 전에
 이 `--apply` 명령을 다시 실행해야 한다.
 
+END 설정 복원이 중단됐다는 오류가 나오면 손 준비·런치를 멈춘다. 먼저 현재
+END 값만 읽고, Tool ID 1·TableSync 0·Write Size 1/2 = 0인 이번 중단 상태가
+출력에 확인될 때만 `--apply`로 기존 OMY 설정을 복구한다. 이 복구 명령은
+손이나 모터의 목표값을 쓰지 않는다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_recover --port /dev/ttyAMA4
+```
+
+위 출력이 이번 중단 상태와 일치하는지 확인한 뒤에만 별도로 실행한다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_recover --port /dev/ttyAMA4 --apply
+```
+
+복구 출력의 `END 210 after`가 `Stock OMY END target`과 같아야 한다.
+응답 누락이나 복구 실패가 나오면 다음 손 준비·런치를 실행하지 않는다.
+
 ## 3. 실물 Direct Mode 런치
 
 Robot PC의 Zenoh 라우터가 실행 중이어야 한다. 이전 OMY 실행에서 계속 켜져

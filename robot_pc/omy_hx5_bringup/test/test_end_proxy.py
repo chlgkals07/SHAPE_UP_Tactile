@@ -132,6 +132,46 @@ def test_end_write_stops_when_timed_out_write_was_not_applied():
     assert packet.end == original
 
 
+def test_end_restoration_continues_after_one_tool_id_write_fails():
+    class DroppedRestorePacket(FakePacket):
+        def writeTxRx(self, port, device_id, address, size, data):
+            if address == 13 and data == [1] and self.end[13] != 1:
+                return COMM_RX_TIMEOUT, 0
+            return super().writeTxRx(port, device_id, address, size, data)
+
+    packet = DroppedRestorePacket()
+    with pytest.raises(EndProxyError, match="END restoration incomplete; TableSync left off"):
+        EndProxy(None, packet, sleep=lambda _: None).probe()
+    assert packet.end[13] == 140
+    assert packet.end[46] == 0
+    assert packet.end[48] == 634
+    assert packet.end[52] == 16
+    assert packet.end[60] == 12
+
+
+def test_end_restoration_verifies_late_tool_id_write_after_lost_ack():
+    class LateReadPacket(FakePacket):
+        lost_reads = 0
+
+        def writeTxRx(self, port, device_id, address, size, data):
+            result = super().writeTxRx(port, device_id, address, size, data)
+            if address == 13 and data == [1]:
+                self.lost_reads = 5
+                return COMM_RX_TIMEOUT, 0
+            return result
+
+        def readTxRx(self, port, device_id, address, size):
+            if address == 13 and self.lost_reads:
+                self.lost_reads -= 1
+                return [], COMM_RX_TIMEOUT, 0
+            return super().readTxRx(port, device_id, address, size)
+
+    packet = LateReadPacket()
+    original = packet.end.copy()
+    assert EndProxy(None, packet, sleep=lambda _: None).probe()["hand_model"] == 261
+    assert packet.end == original
+
+
 def test_end_proxy_restores_end_on_wrong_hand_model():
     packet = FakePacket(hand_model=260)
     original = packet.end.copy()

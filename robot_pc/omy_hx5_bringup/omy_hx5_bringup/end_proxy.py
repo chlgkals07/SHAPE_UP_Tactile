@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import os
+import sys
 import time
 from contextlib import contextmanager
 from struct import pack
@@ -78,6 +79,18 @@ class EndProxy:
             )
         return bytes(data)
 
+    def read_end_after_recovery(self, address: int, size: int) -> bytes:
+        """Allow a transient END pause during restoration, without any writes."""
+        last_error = None
+        for delay in (0, 0.1, 0.2, 0.4, 0.8):
+            if delay:
+                self.sleep(delay)
+            try:
+                return self.read(address, size)
+            except EndProxyError as exc:
+                last_error = exc
+        raise last_error
+
     def write_end(self, address: int, size: int, value: int) -> None:
         if self._current.get(address) == value:
             return
@@ -87,23 +100,26 @@ class EndProxy:
         if result == COMM_RX_TIMEOUT and not error:
             # An END register write can complete even if its status packet is lost.
             # Never retry an uncertain write: read the actual register first.
-            self.sleep(0.05)
-            try:
-                actual = int.from_bytes(self.read(address, size), "little")
-            except EndProxyError as exc:
-                raise EndProxyError(
-                    f"END 210 write {address} had no status packet and "
-                    f"readback failed: {exc}"
-                ) from exc
-            if actual == value:
-                self._current[address] = value
-                self.end_write_ack_timeouts += 1
-                return
+            self._current.pop(address, None)
+            last_observation = "no readback"
+            for delay in (0.05, 0.1, 0.2, 0.4, 0.8):
+                self.sleep(delay)
+                try:
+                    actual = int.from_bytes(self.read(address, size), "little")
+                except EndProxyError as exc:
+                    last_observation = str(exc)
+                    continue
+                if actual == value:
+                    self._current[address] = value
+                    self.end_write_ack_timeouts += 1
+                    return
+                last_observation = f"readback={actual}, requested={value}"
             raise EndProxyError(
                 f"END 210 write {address} had no status packet; "
-                f"readback={actual}, requested={value}"
+                f"{last_observation}"
             )
         if result != 0 or error:
+            self._current.pop(address, None)
             raise EndProxyError(
                 f"END 210 write {address} failed: "
                 f"result={self.packet.getTxRxResult(result)}, error={error}"
@@ -165,14 +181,67 @@ class EndProxy:
             self.write_end(READ_SIZE_2, 2, 0)
             yield
         finally:
-            # Disable forwarding first. Restore addresses and sizes while off.
-            self.write_end(SYNC_ENABLE, 1, 0)
+            # Keep forwarding disabled until every saved register and buffer
+            # has been checked. One failed EEPROM write must not skip the rest.
+            original_failure = sys.exc_info()[1]
+            try:
+                sync = int.from_bytes(self.read_end_after_recovery(SYNC_ENABLE, 1), "little")
+                if sync != 0:
+                    self._current.pop(SYNC_ENABLE, None)
+                    self.write_end(SYNC_ENABLE, 1, 0)
+                if self.read_end_after_recovery(SYNC_ENABLE, 1) != b"\x00":
+                    raise EndProxyError("END TableSync could not be disabled")
+                self._current[SYNC_ENABLE] = 0
+            except EndProxyError as exc:
+                raise EndProxyError(
+                    f"END restoration stopped: cannot verify TableSync off: {exc}; "
+                    f"original failure: {original_failure}"
+                ) from exc
             if self._original_write_buffer is not None:
-                self.write_end_buffer(self._original_write_buffer)
+                try:
+                    self.write_end_buffer(self._original_write_buffer)
+                except EndProxyError:
+                    # A write can have applied without an ACK. Verify below.
+                    pass
             for address, size in SAVED_REGISTERS:
                 if address != SYNC_ENABLE:
-                    self.write_end(address, size, original[address])
-            self.write_end(SYNC_ENABLE, 1, original[SYNC_ENABLE])
+                    try:
+                        actual = int.from_bytes(
+                            self.read_end_after_recovery(address, size), "little")
+                        if actual != original[address]:
+                            self._current.pop(address, None)
+                            self.write_end(address, size, original[address])
+                    except EndProxyError:
+                        # Continue restoring other addresses while sync is off.
+                        pass
+            differences = []
+            for address, size in SAVED_REGISTERS:
+                if address == SYNC_ENABLE:
+                    continue
+                try:
+                    actual = int.from_bytes(
+                        self.read_end_after_recovery(address, size), "little")
+                    if actual != original[address]:
+                        differences.append(f"{address}: {actual} != {original[address]}")
+                except EndProxyError as exc:
+                    differences.append(f"{address}: {exc}")
+            if self._original_write_buffer is not None:
+                try:
+                    if self.read_end_after_recovery(WRITE_BUFFER, 128) != self._original_write_buffer:
+                        differences.append("END write buffer differs from saved value")
+                except EndProxyError as exc:
+                    differences.append(f"END write buffer: {exc}")
+            if differences:
+                raise EndProxyError(
+                    "END restoration incomplete; TableSync left off; "
+                    + "; ".join(differences)
+                    + f"; original failure: {original_failure}"
+                )
+            if original[SYNC_ENABLE] != 0:
+                self._current.pop(SYNC_ENABLE, None)
+                self.write_end(SYNC_ENABLE, 1, original[SYNC_ENABLE])
+            if int.from_bytes(self.read_end_after_recovery(SYNC_ENABLE, 1), "little") != original[SYNC_ENABLE]:
+                raise EndProxyError("END TableSync restoration did not verify")
 
     def read_hand(self, address: int, size: int, *, stable: bool = False) -> bytes:
         """Read the selected END tool ID through its read-only buffer."""
