@@ -308,6 +308,41 @@ def test_direct_launch_sets_watchdog_only_while_active():
     assert bus.hand[8] == 0
 
 
+def test_undocumented_active_status_requires_opt_in_and_still_rejects_other_errors():
+    class ActiveStatusBus(FakeBus):
+        def _write_target(self, address, value):
+            super()._write_target(address, value)
+            if self.end[13] == 140 and address == 70:
+                self.hand[106] = 32 if value else 0
+
+    bus = ActiveStatusBus()
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    proxy.prepare_direct(apply=True)
+    original_end = bus.end.copy()
+    with pytest.raises(EndProxyError, match="undocumented active status 32"):
+        with proxy.direct_session():
+            pass
+    assert bus.hand[70] == 0 and bus.hand[8] == 0
+    assert bus.end == original_end
+
+    proxy = EndDirect(None, bus, sleep=lambda _: None,
+                      allow_active_status32=True, read_only=True)
+    with proxy.direct_session() as first:
+        assert first.status == 32
+        assert proxy.read_snapshot().status == 32
+        with pytest.raises(EndProxyError, match="read-only Direct session"):
+            proxy.write_goals((0.0,) * 20, 100)
+        assert bus.goals == {}
+    assert bus.hand[70] == 0 and bus.hand[8] == 0
+    assert bus.end == original_end
+
+    bus.hand[71] = 1
+    with pytest.raises(EndProxyError, match="hardware_error=1"):
+        with proxy.direct_session():
+            pass
+    assert bus.hand[70] == 0 and bus.hand[8] == 0
+
+
 def test_direct_verify_reports_unexpected_watchdog_value():
     bus = FakeBus()
     proxy = EndDirect(None, bus, sleep=lambda _: None)

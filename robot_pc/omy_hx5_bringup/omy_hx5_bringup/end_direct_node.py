@@ -23,6 +23,9 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", default="/dev/ttyAMA4")
     parser.add_argument("--baud", type=int, default=4_000_000)
+    parser.add_argument("--allow-active-status32", choices=("true", "false"),
+                        default="false")
+    parser.add_argument("--read-only", choices=("true", "false"), default="false")
     args, ros_args = parser.parse_known_args(argv)
     if ros_args and ros_args[0] != "--ros-args":
         parser.error(f"unrecognized arguments: {' '.join(ros_args)}")
@@ -43,9 +46,10 @@ def main(argv=None) -> int:
         parser.exit(1, f"Missing Robot PC ROS dependency: {exc.name}\n")
 
     class DirectNode(Node):
-        def __init__(self, direct: EndDirect, first):
+        def __init__(self, direct: EndDirect, first, *, read_only: bool):
             super().__init__("omy_hx5_end_direct")
             self.direct = direct
+            self.read_only = read_only
             self.lock = Lock()
             self.positions = first.positions
             self.segment: Segment | None = None
@@ -79,6 +83,9 @@ def main(argv=None) -> int:
                                            measured, time.monotonic())
 
         def on_keyboard(self, msg):
+            if self.read_only:
+                self.get_logger().warn("Read-only Direct bridge ignored hand trajectory")
+                return
             if self.count_publishers(self.command_topic) > 1:
                 with self.lock:
                     self.segment = None
@@ -94,6 +101,8 @@ def main(argv=None) -> int:
                     self.get_logger().error(f"Rejected hand trajectory: {exc}")
 
         def on_current(self, msg):
+            if self.read_only:
+                return
             try:
                 currents = validate_currents(msg.data)
             except ValueError as exc:
@@ -103,6 +112,8 @@ def main(argv=None) -> int:
                 self.currents = currents
 
         def accept_goal(self, request):
+            if self.read_only:
+                return GoalResponse.REJECT
             with self.lock:
                 if self.active_action:
                     return GoalResponse.REJECT
@@ -185,7 +196,7 @@ def main(argv=None) -> int:
                     sensor.pressure_values = list(values)
                     tactile.sensors.append(sensor)
                 self.pressure_pub.publish(tactile)
-                if segment is not None:
+                if segment is not None and not self.read_only:
                     self.direct.write_goals(segment.sample(now), currents)
             except (EndProxyError, OSError, ValueError) as exc:
                 with self.lock:
@@ -209,7 +220,10 @@ def main(argv=None) -> int:
     try:
         if not port.setBaudRate(args.baud):
             raise EndProxyError(f"cannot set {args.port} to {args.baud} baud")
-        direct = EndDirect(port, PacketHandler(2.0))
+        direct = EndDirect(
+            port, PacketHandler(2.0),
+            allow_active_status32=args.allow_active_status32 == "true",
+            read_only=args.read_only == "true")
         issues = direct.audit_motors(expected)
         if issues:
             raise EndProxyError("HX5 motor setup does not match official Xacro:\n" +
@@ -217,12 +231,17 @@ def main(argv=None) -> int:
         direct.verify_direct_setup()
         with direct.direct_session() as first:
             rclpy.init(args=ros_args)
-            node = DirectNode(direct, first)
+            node = DirectNode(direct, first, read_only=args.read_only == "true")
             executor = MultiThreadedExecutor(num_threads=3)
             executor.add_node(node)
+            interface_note = (
+                "Hand goals rejected; joint and tactile topics active."
+                if node.read_only else
+                "ROBOTIS left-hand keyboard trajectory and tactile topics are active.")
             node.get_logger().info(
                 "END 210 -> HX5 140 Direct Mode ready. No motion command sent. "
-                "ROBOTIS left-hand keyboard trajectory and tactile topics are active.")
+                f"read_only={node.read_only}, active_status={first.status}. "
+                + interface_note)
             try:
                 executor.spin()
             except (KeyboardInterrupt, ExternalShutdownException):

@@ -5,8 +5,9 @@
 > Torque Enable 1, Hardware Error 0으로 읽혔고 END 설정은 기존 OMY 값으로
 > 복원됐다. 첫 Direct 런치에서 `status=32`가 나와 중단됐다. 손 TableSync를
 > 켠 상태에서는 간접·직접 주소 106이 모두 32였고, 끄면 0이었다. 공식 문서의
-> bit 5 설명과 맞지 않아 의미를 확인 중이다. 아래 촉각 센서 ID 검사가
-> 끝나기 전에는 Direct 런치를 재시도하지 않는다.
+> bit 5 설명과 맞지 않아 의미는 여전히 미확정이다. 활성 중 주소 71의
+> Hardware Error는 0, watchdog은 100이었고 촉각 센서 5개 ID는 응답했다.
+> 먼저 아래의 명시적 읽기 전용 Direct 런치로 상태 토픽을 확인한다.
 
 이 경로는 OMY의 END ID 210을 통해 손 컨트롤러 ID 140으로 접근한다. 로봇 PC의
 별도 손 USB 포트나 외부 전원 제어 코드를 요구하지 않는다. 기존 Preset Mode 런치와
@@ -244,12 +245,27 @@ source /workspace/omy_ws/install/setup.bash
 export ROS_DOMAIN_ID=30
 export RMW_IMPLEMENTATION=rmw_zenoh_cpp
 unset ZENOH_CONFIG_OVERRIDE
-ros2 launch omy_hx5_bringup omy_hx5_end_direct_hand.launch.py end_port:=/dev/ttyAMA4
+ros2 launch omy_hx5_bringup omy_hx5_end_direct_hand.launch.py \
+  end_port:=/dev/ttyAMA4 allow_active_status32:=true read_only:=true
 ```
 
 런치가 팔 컨트롤러와 손 노드를 올리고 손의 첫 상태를 읽는다. **실행만으로 팔이나
-손에 목표 자세를 보내지 않는다.** `END 210 -> HX5 140 Direct Mode ready`가
-표시되면 키보드 입력을 받을 수 있다. 런치 터미널은 계속 유지한다.
+손에 목표 자세를 보내지 않는다.** 위 읽기 전용 설정은 키보드·action 명령도
+거부한다. `END 210 -> HX5 140 Direct Mode ready`가 표시되면 별도 터미널에서
+`/joint_states`와 `/left_hand/finger_pressures`가 갱신되는지 확인한다. 런치
+터미널은 계속 유지한다. `allow_active_status32`는 이 실물에서 재현된 정확한
+값 32만 허용한다. 시작 시 Hardware Error와 watchdog도 확인하며, 실행 중
+다른 손 상태값이 읽히면 중단한다.
+
+읽기 전용 토픽 확인 후 `Ctrl+C`로 종료하고, 손이 의도치 않게 움직이지 않았고
+종료 로그에 복구 오류가 없을 때에만 명령 허용 런치를 별도로 시작한다.
+
+```bash
+ros2 launch omy_hx5_bringup omy_hx5_end_direct_hand.launch.py \
+  end_port:=/dev/ttyAMA4 allow_active_status32:=true read_only:=false
+```
+
+새 런치에서 다시 `Direct Mode ready`가 출력된 뒤 다음 키보드 절로 진행한다.
 
 ## 4. 공식 키보드로 첫 동작
 

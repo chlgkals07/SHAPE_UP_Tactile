@@ -31,7 +31,11 @@ def generate_launch_description():
         arguments=["joint_state_broadcaster", "arm_controller"], output="screen")
     direct = Node(
         package="omy_hx5_bringup", executable="omy_hx5_end_direct",
-        arguments=["--port", LaunchConfiguration("end_port")], output="screen")
+        arguments=[
+            "--port", LaunchConfiguration("end_port"),
+            "--allow-active-status32", LaunchConfiguration("allow_active_status32"),
+            "--read-only", LaunchConfiguration("read_only"),
+        ], output="screen")
 
     def after_arm(event, context):
         if event.returncode:
@@ -43,6 +47,8 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument("end_port", default_value="/dev/ttyAMA4"),
+        DeclareLaunchArgument("allow_active_status32", default_value="false"),
+        DeclareLaunchArgument("read_only", default_value="false"),
         DeclareLaunchArgument("hand_mount_xyz", default_value="0 -0.006 0"),
         DeclareLaunchArgument("hand_mount_rpy", default_value="1.57079632679 1.57079632679 0"),
         Node(package="controller_manager", executable="ros2_control_node",

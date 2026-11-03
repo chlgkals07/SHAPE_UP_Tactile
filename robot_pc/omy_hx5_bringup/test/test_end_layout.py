@@ -66,3 +66,9 @@ def test_state_and_goal_byte_layout():
     assert snapshot.tick == 0x1234
     assert snapshot.voltage_centivolts == 2368
     assert snapshot.pressures == pressures
+    active_status = bytes(state) + bytes((0x34, 0x12, 0x40, 0x09, 32))
+    with pytest.raises(ValueError, match="status=32"):
+        decode_snapshot(active_status)
+    assert decode_snapshot(active_status, allow_active_status32=True).status == 32
+    with pytest.raises(ValueError, match="status=33"):
+        decode_snapshot(active_status[:-1] + b"\x21", allow_active_status32=True)

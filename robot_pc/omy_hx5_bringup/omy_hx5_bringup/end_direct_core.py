@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from struct import pack
+import time
 from xml.etree import ElementTree
 
 from .end_layout import (
@@ -81,6 +82,13 @@ def expected_channel_config(current: bytes, channel: int) -> bytes:
 
 
 class EndDirect(EndProxy):
+    def __init__(self, port, packet, *, sleep=time.sleep,
+                 allow_active_status32: bool = False, read_only: bool = False):
+        super().__init__(port, packet, sleep=sleep)
+        self.allow_active_status32 = allow_active_status32
+        self.read_only = read_only
+        self._active_status32_verified = False
+
     def read_hand(self, address: int, size: int, *, stable: bool = False) -> bytes:
         if self._current.get(TOOL_ID) == HAND_ID:
             return self.read_hand_fresh(address, size, stable=stable)
@@ -555,6 +563,7 @@ class EndDirect(EndProxy):
                 raise EndProxyError("HX5 direct aliases not installed")
             self._direct_active = False
             self._direct_goals_started = False
+            self._active_status32_verified = False
             try:
                 watchdog = self.read_hand(8, 1, stable=True)[0]
                 if watchdog == 0:
@@ -564,6 +573,22 @@ class EndDirect(EndProxy):
                     raise EndProxyError(
                         f"HX5 Bus Watchdog is {watchdog}; cannot start Direct Mode")
                 self.write_hand(70, b"\x01")
+                control = self.read_hand(70, 2)
+                active_watchdog = self.read_hand(8, 1)[0]
+                active_status = self.read_hand(106, 1)[0]
+                if control != b"\x01\x00" or active_watchdog != 100:
+                    raise EndProxyError(
+                        "HX5 active control not healthy: "
+                        f"table_sync={control[0]}, hardware_error={control[1]}, "
+                        f"watchdog={active_watchdog}")
+                if active_status == 32:
+                    if not self.allow_active_status32:
+                        raise EndProxyError(
+                            "HX5 reports undocumented active status 32; "
+                            "explicit allow_active_status32 is required")
+                    self._active_status32_verified = True
+                elif active_status != 0:
+                    raise EndProxyError(f"HX5 active status is {active_status}")
                 self.write_end(SYNC_ENABLE, 1, 0)
                 self.write_end(READ_ADDRESS_1, 2, READ_WINDOW)
                 self.write_end(READ_SIZE_1, 2, STATE_SIZE)
@@ -579,6 +604,7 @@ class EndDirect(EndProxy):
                 yield second
             finally:
                 self._direct_active = False
+                self._active_status32_verified = False
                 self.write_end(SYNC_ENABLE, 1, 0)
                 self.write_end(WRITE_SIZE_1, 2, 0)
                 self.write_hand(70, b"\x00")
@@ -592,11 +618,15 @@ class EndDirect(EndProxy):
                 self._current.get(SYNC_ENABLE) != 1:
             raise EndProxyError("END direct read window is not active")
         try:
-            return decode_snapshot(self.read(READ_BUFFER, STATE_SIZE))
+            return decode_snapshot(
+                self.read(READ_BUFFER, STATE_SIZE),
+                allow_active_status32=self._active_status32_verified)
         except ValueError as exc:
             raise EndProxyError(str(exc)) from exc
 
     def write_goals(self, positions: tuple[float, ...], current: int | tuple[int, ...]) -> None:
+        if self.read_only:
+            raise EndProxyError("read-only Direct session rejects motor goals")
         if not getattr(self, "_direct_active", False):
             raise EndProxyError("direct session is not active")
         payload = encode_command(positions, current)

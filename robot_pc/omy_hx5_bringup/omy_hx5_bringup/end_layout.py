@@ -69,14 +69,14 @@ class HandSnapshot:
     status: int
 
 
-def decode_snapshot(data: bytes) -> HandSnapshot:
+def decode_snapshot(data: bytes, *, allow_active_status32: bool = False) -> HandSnapshot:
     if len(data) != STATE_SIZE:
         raise ValueError(f"expected {STATE_SIZE} bytes of HX5 state and health")
     positions, pressures = decode_state(data[:READ_SIZE])
     tick = int.from_bytes(data[READ_SIZE:READ_SIZE + 2], "little")
     voltage = int.from_bytes(data[READ_SIZE + 2:READ_SIZE + 4], "little")
     status = data[READ_SIZE + 4]
-    if tick > 32767 or status:
+    if tick > 32767 or (status and not (allow_active_status32 and status == 32)):
         raise ValueError(f"HX5 health invalid: tick={tick}, status={status}")
     return HandSnapshot(positions, pressures, tick, voltage, status)
 
