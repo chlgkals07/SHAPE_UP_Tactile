@@ -264,7 +264,9 @@ def test_end_proxy_reads_motor_via_end_without_motor_writes():
     motor = EndProxy(None, packet, sleep=lambda _: None).probe_motor(141)
     assert motor == {
         "model": 0x1234, "drive_mode": 13, "operating_mode": 5,
-        "torque_enabled": 1, "indirect_address_1_2": (126, 127),
+        "torque_enabled": 1, "hardware_error": 0, "watchdog": 0,
+        "goal_current": 0, "goal_position": 0, "present_position": 0,
+        "indirect_address_1_2": (126, 127),
     }
     assert packet.end == original
     assert all(address != 7 for address, _, _ in packet.writes)

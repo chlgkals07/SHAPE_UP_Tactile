@@ -429,12 +429,22 @@ class EndProxy:
                 )
             drive_mode, operating_mode = self.read_hand(10, 2, stable=True)
             torque = self.read_hand(64, 1)[0]
+            hardware_error = self.read_hand(70, 1)[0]
+            watchdog = self.read_hand(98, 1)[0]
+            goal_current = int.from_bytes(self.read_hand(102, 2), "little")
+            goal_position = int.from_bytes(self.read_hand(116, 4), "little", signed=True)
+            present_position = int.from_bytes(self.read_hand(132, 4), "little", signed=True)
             indirect = self.read_hand(168, 4, stable=True)
         return {
             "model": model,
             "drive_mode": drive_mode,
             "operating_mode": operating_mode,
             "torque_enabled": torque,
+            "hardware_error": hardware_error,
+            "watchdog": watchdog,
+            "goal_current": goal_current,
+            "goal_position": goal_position,
+            "present_position": present_position,
             "indirect_address_1_2": (
                 int.from_bytes(indirect[:2], "little"),
                 int.from_bytes(indirect[2:], "little"),
@@ -611,6 +621,11 @@ def main(argv=None) -> int:
                   f"model {motor['model']}, drive mode {motor['drive_mode']}, "
                   f"operating mode {motor['operating_mode']}, "
                   f"torque {motor['torque_enabled']}, "
+                  f"error {motor['hardware_error']}, "
+                  f"watchdog {motor['watchdog']}, "
+                  f"goal current {motor['goal_current']}, "
+                  f"goal position {motor['goal_position']}, "
+                  f"present position {motor['present_position']}, "
                   f"indirect address 1/2 {motor['indirect_address_1_2']}. "
                   "No hand command sent.")
         return 0
