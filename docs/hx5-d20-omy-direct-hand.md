@@ -98,6 +98,8 @@ ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --apply
 `All 20 HX5 actuators identified`, `Direct Control Mode 0 ready`가
 나와야 한다. 모터 설정 차이가 나오면 여기서 멈추고 실제 출력과 공식 설정을
 대조한다. 손 모터 EEPROM은 이 프로그램이 자동으로 덮어쓰지 않는다.
+`END 210 write status packets missing ...`이 표시되면 END 설정값은 읽기로
+재확인됐더라도 손 동작 런치는 시작하지 말고 해당 출력으로 통신 상태를 검토한다.
 나중에 `--restore-preset`으로 모드 1에 되돌렸다면 Direct 모드를 시작하기 전에
 이 `--apply` 명령을 다시 실행해야 한다.
 

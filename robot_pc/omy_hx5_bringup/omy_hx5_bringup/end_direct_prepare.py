@@ -48,6 +48,9 @@ def main(argv=None) -> int:
             previous = direct.restore_preset_mode()
             print(f"HX5 Preset Motion Mode 1 ready; prior mode={previous}; "
                   "no motor goal sent.")
+            if direct.end_write_ack_timeouts:
+                print(f"END 210 write status packets missing {direct.end_write_ack_timeouts} "
+                      "time(s); each register value was confirmed by readback.")
             return 0
         issues = direct.audit_motors(expected)
         if issues:
@@ -61,6 +64,9 @@ def main(argv=None) -> int:
         else:
             print(f"HX5 mode={old_mode}; TableSync channels needing setup={changed}. "
                   "Use --apply to configure after reviewing this result.")
+        if direct.end_write_ack_timeouts:
+            print(f"END 210 write status packets missing {direct.end_write_ack_timeouts} "
+                  "time(s); each register value was confirmed by readback.")
         return 0
     except (EndProxyError, OSError, ValueError) as exc:
         parser.exit(1, f"END direct preparation failed: {exc}\n")

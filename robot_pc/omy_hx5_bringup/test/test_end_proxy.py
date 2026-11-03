@@ -3,7 +3,9 @@
 import pytest
 from struct import pack
 
-from omy_hx5_bringup.end_proxy import EndProxy, EndProxyError, SAVED_REGISTERS
+from omy_hx5_bringup.end_proxy import (
+    COMM_RX_TIMEOUT, EndProxy, EndProxyError, SAVED_REGISTERS,
+)
 
 
 class FakePacket:
@@ -91,6 +93,43 @@ def test_end_proxy_identifies_left_hand_and_restores_end():
                for address, _, _ in packet.writes)
     assert any(address == 60 and data == (0, 0)
                for address, _, data in packet.writes)
+
+
+def test_end_write_uses_readback_when_only_status_packet_is_lost():
+    class LostAckPacket(FakePacket):
+        lost_once = False
+
+        def writeTxRx(self, port, device_id, address, size, data):
+            result = super().writeTxRx(port, device_id, address, size, data)
+            if address == 60 and not self.lost_once:
+                self.lost_once = True
+                return COMM_RX_TIMEOUT, 0
+            return result
+
+    packet = LostAckPacket()
+    original = packet.end.copy()
+    proxy = EndProxy(None, packet, sleep=lambda _: None)
+    assert proxy.probe()["hand_model"] == 261
+    assert packet.lost_once
+    assert proxy.end_write_ack_timeouts == 1
+    assert packet.end == original
+
+
+def test_end_write_stops_when_timed_out_write_was_not_applied():
+    class DroppedWritePacket(FakePacket):
+        dropped_once = False
+
+        def writeTxRx(self, port, device_id, address, size, data):
+            if address == 60 and not self.dropped_once:
+                self.dropped_once = True
+                return COMM_RX_TIMEOUT, 0
+            return super().writeTxRx(port, device_id, address, size, data)
+
+    packet = DroppedWritePacket()
+    original = packet.end.copy()
+    with pytest.raises(EndProxyError, match="readback=12, requested=0"):
+        EndProxy(None, packet, sleep=lambda _: None).probe()
+    assert packet.end == original
 
 
 def test_end_proxy_restores_end_on_wrong_hand_model():

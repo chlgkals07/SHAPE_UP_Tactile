@@ -33,6 +33,7 @@ WRITE_SIZE_1 = 60
 WRITE_SIZE_2 = 62
 READ_BUFFER = 72
 WRITE_BUFFER = 200
+COMM_RX_TIMEOUT = -3001
 
 SAVED_REGISTERS = (
     (TOOL_ID, 1), (SYNC_ENABLE, 1),
@@ -65,6 +66,7 @@ class EndProxy:
         self.sleep = sleep
         self._current = {}
         self._original_write_buffer = None
+        self.end_write_ack_timeouts = 0
 
     def read(self, address: int, size: int, *, device_id: int = END_ID) -> bytes:
         data, result, error = self.packet.readTxRx(self.port, device_id, address, size)
@@ -82,6 +84,25 @@ class EndProxy:
         result, error = self.packet.writeTxRx(
             self.port, END_ID, address, size, list(value.to_bytes(size, "little"))
         )
+        if result == COMM_RX_TIMEOUT and not error:
+            # An END register write can complete even if its status packet is lost.
+            # Never retry an uncertain write: read the actual register first.
+            self.sleep(0.05)
+            try:
+                actual = int.from_bytes(self.read(address, size), "little")
+            except EndProxyError as exc:
+                raise EndProxyError(
+                    f"END 210 write {address} had no status packet and "
+                    f"readback failed: {exc}"
+                ) from exc
+            if actual == value:
+                self._current[address] = value
+                self.end_write_ack_timeouts += 1
+                return
+            raise EndProxyError(
+                f"END 210 write {address} had no status packet; "
+                f"readback={actual}, requested={value}"
+            )
         if result != 0 or error:
             raise EndProxyError(
                 f"END 210 write {address} failed: "
