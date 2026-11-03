@@ -172,6 +172,32 @@ def test_end_restoration_verifies_late_tool_id_write_after_lost_ack():
     assert packet.end == original
 
 
+def test_end_restore_checks_only_bytes_in_original_active_write_slot():
+    packet = FakePacket()
+    proxy = EndProxy(None, packet, sleep=lambda _: None)
+    with proxy.temporary_read_window():
+        proxy.write_end_buffer(b"\x31\x32")
+        packet.buffer[40] = 99  # outside the stock 12-byte write window
+    assert packet.end[46] == 1
+    assert packet.buffer[:12] == bytes(12)
+    assert packet.buffer[40] == 99
+
+
+def test_end_restore_stays_disabled_if_active_write_byte_does_not_restore():
+    class StuckBufferPacket(FakePacket):
+        def writeTxRx(self, port, device_id, address, size, data):
+            if address == 200 and size == 12:
+                return 0, 0  # falsely acknowledge the restoration
+            return super().writeTxRx(port, device_id, address, size, data)
+
+    packet = StuckBufferPacket()
+    proxy = EndProxy(None, packet, sleep=lambda _: None)
+    with pytest.raises(EndProxyError, match="write buffer active byte 0 differs"):
+        with proxy.temporary_read_window():
+            proxy.write_end_buffer(b"\x31\x32")
+    assert packet.end[46] == 0
+
+
 def test_end_proxy_restores_end_on_wrong_hand_model():
     packet = FakePacket(hand_model=260)
     original = packet.end.copy()

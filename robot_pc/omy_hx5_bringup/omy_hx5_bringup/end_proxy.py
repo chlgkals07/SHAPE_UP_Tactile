@@ -173,6 +173,12 @@ class EndProxy:
                 "recover it before probing or launching")
         self._current = original.copy()
         self._original_write_buffer = None
+        # Only bytes covered by the original active write slots can be
+        # forwarded to a tool after TableSync is restored.
+        active_write_bytes = (original[WRITE_SIZE_1] + original[WRITE_SIZE_2]
+                              if original[SYNC_ENABLE] else 0)
+        if active_write_bytes > 128:
+            raise EndProxyError("END active write window exceeds its 128-byte buffer")
         try:
             self.write_end(SYNC_ENABLE, 1, 0)
             self.write_end(WRITE_SIZE_1, 2, 0)
@@ -197,9 +203,10 @@ class EndProxy:
                     f"END restoration stopped: cannot verify TableSync off: {exc}; "
                     f"original failure: {original_failure}"
                 ) from exc
-            if self._original_write_buffer is not None:
+            if self._original_write_buffer is not None and active_write_bytes:
                 try:
-                    self.write_end_buffer(self._original_write_buffer)
+                    self.write_end_buffer(
+                        self._original_write_buffer[:active_write_bytes])
                 except EndProxyError:
                     # A write can have applied without an ACK. Verify below.
                     pass
@@ -225,10 +232,17 @@ class EndProxy:
                         differences.append(f"{address}: {actual} != {original[address]}")
                 except EndProxyError as exc:
                     differences.append(f"{address}: {exc}")
-            if self._original_write_buffer is not None:
+            if self._original_write_buffer is not None and active_write_bytes:
                 try:
-                    if self.read_end_after_recovery(WRITE_BUFFER, 128) != self._original_write_buffer:
-                        differences.append("END write buffer differs from saved value")
+                    actual_buffer = self.read_end_after_recovery(
+                        WRITE_BUFFER, active_write_bytes)
+                    saved_buffer = self._original_write_buffer[:active_write_bytes]
+                    if actual_buffer != saved_buffer:
+                        offset = next(i for i, (a, b) in enumerate(zip(actual_buffer, saved_buffer))
+                                      if a != b)
+                        differences.append(
+                            f"END write buffer active byte {offset} differs: "
+                            f"{actual_buffer[offset]} != {saved_buffer[offset]}")
                 except EndProxyError as exc:
                     differences.append(f"END write buffer: {exc}")
             if differences:

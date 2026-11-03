@@ -37,10 +37,11 @@ def restore_stock(proxy: EndProxy, *, apply: bool) -> tuple[dict[int, int], dict
     if not apply:
         return before, before.copy()
     if (before[TOOL_ID] != 1 or before[SYNC_ENABLE] != 0 or
-            before[WRITE_SIZE_1] != 0 or before[WRITE_SIZE_2] != 0):
+            before[WRITE_SIZE_1] not in (0, STOCK_END[WRITE_SIZE_1]) or
+            before[WRITE_SIZE_2] != 0):
         raise EndProxyError(
             "recovery requires the observed interrupted state: "
-            "Tool ID=1, TableSync=0, Write Size 1/2=0; "
+            "Tool ID=1, TableSync=0, Write Size 1=0 or 12, Write Size 2=0; "
             f"actual={before}"
         )
     proxy._current = before.copy()

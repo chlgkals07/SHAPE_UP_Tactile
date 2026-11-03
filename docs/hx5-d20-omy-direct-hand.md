@@ -104,7 +104,7 @@ ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --apply
 이 `--apply` 명령을 다시 실행해야 한다.
 
 END 설정 복원이 중단됐다는 오류가 나오면 손 준비·런치를 멈춘다. 먼저 현재
-END 값만 읽고, Tool ID 1·TableSync 0·Write Size 1/2 = 0인 이번 중단 상태가
+END 값만 읽고, Tool ID 1·TableSync 0·Write Size 1 = 0 또는 12·Write Size 2 = 0인 중단 상태가
 출력에 확인될 때만 `--apply`로 기존 OMY 설정을 복구한다. 이 복구 명령은
 손이나 모터의 목표값을 쓰지 않는다.
 
@@ -120,6 +120,12 @@ ros2 run omy_hx5_bringup omy_hx5_end_recover --port /dev/ttyAMA4 --apply
 
 복구 출력의 `END 210 after`가 `Stock OMY END target`과 같아야 한다.
 응답 누락이나 복구 실패가 나오면 다음 손 준비·런치를 실행하지 않는다.
+Direct 준비 출력이 END 버퍼 복원 단계에서 중단됐으면 복구 후 다음 명령으로
+손 컨트롤러 Mode 0·watchdog·간접 주소를 확인한다. 손 목표 자세를 보내지 않는다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --verify-direct
+```
 
 ## 3. 실물 Direct Mode 런치
 

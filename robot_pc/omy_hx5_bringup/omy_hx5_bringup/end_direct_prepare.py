@@ -23,6 +23,8 @@ def main(argv=None) -> int:
                       help="write HX5 TableSync configuration and select Direct Mode 0")
     mode.add_argument("--restore-preset", action="store_true",
                       help="return HX5 controller to Preset Mode 1 without a goal")
+    mode.add_argument("--verify-direct", action="store_true",
+                      help="check Direct Mode and persistent aliases without applying them")
     args = parser.parse_args(argv)
     try:
         from ament_index_python.packages import get_package_share_directory
@@ -47,6 +49,14 @@ def main(argv=None) -> int:
         if args.restore_preset:
             previous = direct.restore_preset_mode()
             print(f"HX5 Preset Motion Mode 1 ready; prior mode={previous}; "
+                  "no motor goal sent.")
+            if direct.end_write_ack_timeouts:
+                print(f"END 210 write status packets missing {direct.end_write_ack_timeouts} "
+                      "time(s); each register value was confirmed by readback.")
+            return 0
+        if args.verify_direct:
+            direct.verify_direct_setup()
+            print("HX5 Direct Control Mode 0, watchdog, and persistent aliases verified; "
                   "no motor goal sent.")
             if direct.end_write_ack_timeouts:
                 print(f"END 210 write status packets missing {direct.end_write_ack_timeouts} "

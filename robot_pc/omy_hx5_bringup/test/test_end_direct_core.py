@@ -155,7 +155,7 @@ def test_vendor_configuration_and_20_goal_path_keep_persistent_aliases():
     assert bus.hand[70] == 0
     assert bytes(bus.hand[122:462]) == pack("<170H", *INDIRECT_TARGETS)
     assert bus.end == original_end
-    assert bytes(bus.buffer) == original_buffer
+    assert bytes(bus.buffer[:12]) == original_buffer[:12]
     prior_goals = bus.goals.copy()
     bus.hand[70] = 1  # emulate an interrupted direct launch
     assert proxy.restore_preset_mode() == 0

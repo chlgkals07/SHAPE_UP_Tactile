@@ -25,6 +25,13 @@ def test_end_recovery_restores_stock_without_motor_command():
     assert packet.hand_goals == []
 
 
+def test_end_recovery_accepts_restored_sizes_with_sync_left_off():
+    packet = FakePacket()
+    packet.end[46] = 0
+    _, after = restore_stock(EndProxy(None, packet, sleep=lambda _: None), apply=True)
+    assert after == STOCK_END
+
+
 def test_end_recovery_rejects_unexpected_active_write_window():
     packet = FakePacket()
     packet.end[13] = 140
