@@ -1,0 +1,287 @@
+"""END 210 transport for the official HX5 left-hand 20-joint command layout.
+
+Configuration and motion are separate. ``prepare_direct`` programs the hand
+controller's EEPROM once but sends no motor goal. ``direct_session`` owns the
+bus, reads live state, and only forwards goals on an explicit command.
+"""
+
+from __future__ import annotations
+
+from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
+from struct import pack
+from xml.etree import ElementTree
+
+from .end_layout import (
+    INDIRECT_TARGETS, READ_WINDOW, STATE_SIZE, WRITE_SIZE, WRITE_WINDOW,
+    HandSnapshot, decode_snapshot, encode_command,
+)
+from .end_proxy import (
+    END_ID, END_MODEL, HAND_ID, LEFT_HAND_MODEL, READ_ADDRESS_1, READ_BUFFER,
+    READ_SIZE_1, SYNC_ENABLE, TOOL_ID, WRITE_ADDRESS_1, WRITE_SIZE_1, WRITE_SIZE_2,
+    EndProxy, EndProxyError,
+)
+
+MOTOR_IDS = tuple(141 + 5 * finger + joint for finger in range(5)
+                  for joint in range(4))
+MOTOR_INDIRECT = (126, 127, 128, 129, 132, 133, 102, 103, 116, 117)
+HAND_INDIRECT_BASE = 122
+HAND_INDIRECT_DATA = 634
+CHANNEL_SIZE = 198
+CONFIG_SIZE = 54
+
+
+@dataclass(frozen=True)
+class MotorExpected:
+    drive_mode: int
+    homing_offset: int
+
+
+def load_vendor_motor_settings(xacro_path: Path) -> dict[int, MotorExpected]:
+    """Load the rev2 left-hand motor settings from ROBOTIS's vendored Xacro."""
+    root = ElementTree.parse(xacro_path).getroot()
+    expected = {}
+    for gpio in root.iter("gpio"):
+        if not gpio.attrib.get("name", "").endswith("_init"):
+            continue
+        values = {p.attrib["name"]: p.text for p in gpio.iter("param")}
+        motor_id = int(values["ID"])
+        if motor_id not in MOTOR_IDS:
+            continue
+        if int(values["Operating Mode"]) != 5:
+            raise ValueError(f"vendor motor {motor_id} is not in current-position mode")
+        aliases = tuple(int(values[f"Indirect Address {i}"]) for i in range(1, 11))
+        if aliases != MOTOR_INDIRECT:
+            raise ValueError(f"vendor motor {motor_id} has unexpected indirect map")
+        expected[motor_id] = MotorExpected(
+            int(values["Drive Mode"]), int(values.get("Homing Offset", "0")))
+    if set(expected) != set(MOTOR_IDS):
+        raise ValueError("vendor left-hand Xacro does not define all 20 motors")
+    return expected
+
+
+def expected_channel_config(current: bytes, channel: int) -> bytes:
+    """Match the vendor's five active slots and disable the unused sixth."""
+    if len(current) != CONFIG_SIZE or not 0 <= channel < 5:
+        raise ValueError("expected one 54-byte HX5 TableSync channel")
+    desired = bytearray(current)
+    for slot in range(5):
+        desired[slot] = 141 + 5 * channel + slot
+        for offset, value in ((6, 224 if slot < 4 else 72),
+                              (18, 6 if slot < 4 else 9),
+                              (30, 230 if slot < 4 else 0),
+                              (42, 4 if slot < 4 else 0)):
+            desired[offset + 2 * slot:offset + 2 * slot + 2] = pack("<H", value)
+    desired[5] = 255
+    for offset in (6, 18, 30, 42):
+        desired[offset + 10:offset + 12] = b"\x00\x00"
+    return bytes(desired)
+
+
+class EndDirect(EndProxy):
+    def audit_motors(self, expected: dict[int, MotorExpected]) -> list[str]:
+        """Inspect the 20 actuators through END, without actuator writes."""
+        issues = []
+        for motor_id in MOTOR_IDS:
+            with self.temporary_read_window(tool_id=motor_id):
+                first = self.read_hand(0, 24)
+                torque = self.read_hand(64, 1)[0]
+                hardware_error = self.read_hand(70, 1)[0]
+                goal_raw = int.from_bytes(self.read_hand(116, 4), "little")
+                aliases = self.read_hand(168, 20, stable=True)
+            model = int.from_bytes(first[:2], "little")
+            actual_id = first[7]
+            drive, mode = first[10], first[11]
+            homing = int.from_bytes(first[20:24], "little", signed=True)
+            mapped = tuple(int.from_bytes(aliases[i:i + 2], "little")
+                           for i in range(0, 20, 2))
+            item = expected[motor_id]
+            if (model != 1710 or actual_id != motor_id or mode != 5 or
+                    (drive & ~8) != (item.drive_mode & ~8) or
+                    homing != item.homing_offset or mapped != MOTOR_INDIRECT or
+                    goal_raw > 4095 or hardware_error or
+                    torque != 1):
+                issues.append(
+                    f"ID {motor_id}: model={model}, id={actual_id}, drive={drive}, "
+                    f"mode={mode}, homing={homing}, torque={torque}, "
+                    f"goal_raw={goal_raw}, hardware_error={hardware_error}, "
+                    f"aliases={mapped}; "
+                    f"expected model=1710, drive={item.drive_mode} (bit 3 optional), "
+                    f"mode=5, homing={item.homing_offset}, torque=1, goal_raw<=4095, "
+                    f"aliases={MOTOR_INDIRECT}"
+                )
+        return issues
+
+    def _check_hand(self, *, required_mode: int | None = None,
+                    allow_sync: bool = False) -> tuple[int, int]:
+        model, result, error = self.packet.ping(self.port, END_ID)
+        if result != 0 or error or model != END_MODEL:
+            raise EndProxyError("END 210 did not identify as model 230")
+        hand_model = int.from_bytes(self.read_hand(0, 2, stable=True), "little")
+        mode = self.read_hand(33, 1, stable=True)[0]
+        sync = self.read_hand(70, 1, stable=True)[0]
+        status = self.read_hand(106, 1)[0]
+        if hand_model != LEFT_HAND_MODEL or status or mode not in (0, 1) or sync not in (0, 1):
+            raise EndProxyError(
+                f"left HX5 not healthy: model={hand_model}, mode={mode}, status={status}")
+        if required_mode is not None and mode != required_mode:
+            raise EndProxyError(f"HX5 mode={mode}; required Direct Control Mode 0")
+        if sync != 0 and not allow_sync:
+            raise EndProxyError("HX5 TableSync is already enabled; stop its owner first")
+        return mode, sync
+
+    def _alias_bytes(self, start: int, size: int) -> bytes:
+        chunks = []
+        for offset in range(0, size, 128):
+            chunks.append(self.read_hand(start + offset, min(128, size - offset)))
+        return b"".join(chunks)
+
+    def _set_alias_bytes(self, start: int, data: bytes) -> None:
+        for offset in range(0, len(data), 128):
+            self.write_hand(start + offset, data[offset:offset + 128])
+
+    def _read_channel_config(self, channel: int) -> bytes:
+        aliases = pack("<54H", *(1024 + CHANNEL_SIZE * channel + i
+                                   for i in range(CONFIG_SIZE)))
+        self.write_hand(HAND_INDIRECT_BASE, aliases)
+        return self.read_hand(HAND_INDIRECT_DATA, CONFIG_SIZE, stable=True)
+
+    def prepare_direct(self, *, apply: bool) -> tuple[int, list[int]]:
+        """Audit or configure HX5 TableSync, then select mode 0 if requested.
+
+        No actuator goal is written. The caller must separately audit motors.
+        """
+        with self.temporary_read_window():
+            mode, _ = self._check_hand()
+            original = self.read_hand(HAND_INDIRECT_BASE, 108, stable=True)
+            changed = []
+            completed = False
+            try:
+                for channel in range(5):
+                    actual = self._read_channel_config(channel)
+                    desired = expected_channel_config(actual, channel)
+                    if actual != desired:
+                        changed.append(channel + 1)
+                        if apply:
+                            self.write_hand(HAND_INDIRECT_DATA, desired)
+                            if self.read_hand(HAND_INDIRECT_DATA, CONFIG_SIZE,
+                                              stable=True) != desired:
+                                raise EndProxyError(
+                                    f"HX5 TableSync channel {channel + 1} did not verify")
+                if apply and mode != 0:
+                    self.write_hand(33, b"\x00")
+                    if self.read_hand(33, 1, stable=True) != b"\x00":
+                        raise EndProxyError("HX5 did not enter Direct Control Mode 0")
+                if apply:
+                    if self.read_hand(8, 1, stable=True) != b"\x64":
+                        self.write_hand(8, b"\x64")  # official 2 s bus watchdog
+                    final_aliases = pack(f"<{len(INDIRECT_TARGETS)}H", *INDIRECT_TARGETS)
+                    self._set_alias_bytes(HAND_INDIRECT_BASE, final_aliases)
+                    if self._alias_bytes(HAND_INDIRECT_BASE, len(final_aliases)) != final_aliases:
+                        raise EndProxyError("HX5 persistent direct aliases did not verify")
+                else:
+                    self.write_hand(HAND_INDIRECT_BASE, original)
+                    if self.read_hand(HAND_INDIRECT_BASE, 108,
+                                      stable=True) != original:
+                        raise EndProxyError("HX5 setup aliases did not restore")
+                completed = True
+            finally:
+                if not completed:
+                    self.write_end(SYNC_ENABLE, 1, 0)
+                    self.write_end(WRITE_SIZE_1, 2, 0)
+                    self.write_hand(HAND_INDIRECT_BASE, original)
+        return mode, changed
+
+    def verify_direct_setup(self) -> None:
+        """Read-only check used before every launch; no HX5 EEPROM writes."""
+        with self.temporary_read_window():
+            self._check_hand(required_mode=0)
+            if self.read_hand(8, 1, stable=True) != b"\x64":
+                raise EndProxyError("HX5 Bus Watchdog is not 100 (2 seconds)")
+            expected = pack(f"<{len(INDIRECT_TARGETS)}H", *INDIRECT_TARGETS)
+            if self._alias_bytes(HAND_INDIRECT_BASE, len(expected)) != expected:
+                raise EndProxyError(
+                    "HX5 direct aliases differ; run omy_hx5_end_direct_prepare --apply")
+
+    def restore_preset_mode(self) -> int:
+        """Switch the controller back to Preset Mode without a motor goal."""
+        # A previous process can leave END forwarding its old goal buffer.
+        # Neutralize that configuration before temporary_read_window() can
+        # restore it at the end of this operation.
+        tool_id = self.read(TOOL_ID, 1)[0]
+        sync = self.read(SYNC_ENABLE, 1)[0]
+        write_1 = int.from_bytes(self.read(WRITE_SIZE_1, 2), "little")
+        write_2 = int.from_bytes(self.read(WRITE_SIZE_2, 2), "little")
+        if tool_id == HAND_ID and sync == 1 and (write_1 or write_2):
+            self._current = {SYNC_ENABLE: 1, WRITE_SIZE_1: write_1,
+                             WRITE_SIZE_2: write_2}
+            self.write_end(SYNC_ENABLE, 1, 0)
+            self.write_end(WRITE_SIZE_1, 2, 0)
+            self.write_end(WRITE_SIZE_2, 2, 0)
+        with self.temporary_read_window():
+            old_mode, sync = self._check_hand(allow_sync=True)
+            if sync:
+                self.write_hand(70, b"\x00")
+            if old_mode != 1:
+                self.write_hand(33, b"\x01")
+                if self.read_hand(33, 1, stable=True) != b"\x01":
+                    raise EndProxyError("HX5 did not enter Preset Motion Mode 1")
+            return old_mode
+
+    @contextmanager
+    def direct_session(self):
+        """Enable read-only direct state on startup; forward goals only on request."""
+        with self.temporary_read_window():
+            self._check_hand(required_mode=0)
+            alias_data = pack(f"<{len(INDIRECT_TARGETS)}H", *INDIRECT_TARGETS)
+            if self._alias_bytes(HAND_INDIRECT_BASE, len(alias_data)) != alias_data:
+                raise EndProxyError("HX5 direct aliases not installed")
+            self._direct_active = False
+            self._direct_goals_started = False
+            try:
+                if self.read_hand(8, 1, stable=True) != b"\x64":
+                    raise EndProxyError("HX5 Bus Watchdog is not 100 (2 seconds)")
+                self.write_hand(70, b"\x01")
+                self.write_end(SYNC_ENABLE, 1, 0)
+                self.write_end(READ_ADDRESS_1, 2, READ_WINDOW)
+                self.write_end(READ_SIZE_1, 2, STATE_SIZE)
+                self.write_end(WRITE_SIZE_1, 2, 0)
+                self.write_end(SYNC_ENABLE, 1, 1)
+                self.sleep(0.2)
+                first = self.read_snapshot()
+                self.sleep(0.06)
+                second = self.read_snapshot()
+                if first.tick == second.tick:
+                    raise EndProxyError("HX5 state tick did not advance through END")
+                self._direct_active = True
+                yield second
+            finally:
+                self._direct_active = False
+                self.write_end(SYNC_ENABLE, 1, 0)
+                self.write_end(WRITE_SIZE_1, 2, 0)
+                self.write_hand(70, b"\x00")
+
+    def read_snapshot(self) -> HandSnapshot:
+        if self._current.get(READ_ADDRESS_1) != READ_WINDOW or \
+                self._current.get(READ_SIZE_1) != STATE_SIZE or \
+                self._current.get(SYNC_ENABLE) != 1:
+            raise EndProxyError("END direct read window is not active")
+        try:
+            return decode_snapshot(self.read(READ_BUFFER, STATE_SIZE))
+        except ValueError as exc:
+            raise EndProxyError(str(exc)) from exc
+
+    def write_goals(self, positions: tuple[float, ...], current: int | tuple[int, ...]) -> None:
+        if not getattr(self, "_direct_active", False):
+            raise EndProxyError("direct session is not active")
+        payload = encode_command(positions, current)
+        if not self._direct_goals_started:
+            self.write_end(SYNC_ENABLE, 1, 0)
+            self.write_end(WRITE_ADDRESS_1, 2, WRITE_WINDOW)
+            self.write_end(WRITE_SIZE_1, 2, WRITE_SIZE)
+            self.write_end_buffer(payload)
+            self.write_end(SYNC_ENABLE, 1, 1)
+            self._direct_goals_started = True
+        else:
+            self.write_end_buffer_live(payload)

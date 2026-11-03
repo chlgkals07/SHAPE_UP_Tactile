@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import argparse
 
-from .end_proxy import EndProxy, EndProxyError
+from .end_proxy import EndProxy, EndProxyError, acquire_end_bus_lock
 
 
 def main(argv=None) -> int:
@@ -31,6 +31,10 @@ def main(argv=None) -> int:
     except ModuleNotFoundError as exc:
         parser.exit(1, f"Missing Robot PC dependency: {exc.name}\n")
 
+    try:
+        lock_fd = acquire_end_bus_lock()
+    except EndProxyError as exc:
+        parser.exit(1, f"END preset bringup failed: {exc}\n")
     port = PortHandler(args.port)
     if not port.openPort():
         parser.exit(1, f"Cannot open {args.port}; stop other END owners first\n")
@@ -81,6 +85,8 @@ def main(argv=None) -> int:
         parser.exit(1, f"END preset bringup failed: {exc}\n")
     finally:
         port.closePort()
+        import os
+        os.close(lock_fd)
 
 
 if __name__ == "__main__":

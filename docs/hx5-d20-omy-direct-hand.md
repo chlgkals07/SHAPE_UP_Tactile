@@ -1,0 +1,178 @@
+# OMY 끝단 4핀으로 왼손 HX5 20관절 키보드 제어
+
+이 경로는 OMY의 END ID 210을 통해 손 컨트롤러 ID 140으로 접근한다. 로봇 PC의
+별도 손 USB 포트나 외부 전원 제어 코드를 요구하지 않는다. 기존 Preset Mode 런치와
+텔레옵 코드는 유지한다. **동시에 실행할 수는 없다.** 손에 연결된 실제 4핀 케이블의
+통신 경로에서 END 210→손 140→첫 모터 141은 현장 읽기로 확인되었다. 20관절
+Direct Mode의 물리 동작은 아직 검증 전이다.
+
+이 구현은 ROBOTIS 공식 키보드의 20관절 ROS 토픽과 초기 위치 action, 공식 촉각
+메시지 형식을 받는 **END 경유 ROS 노드**다. 공식 `hand_l_controller`를
+`controller_manager`에 올리는 방식은 아니다. 팔 6관절은 기존
+`arm_controller`가 맡고, 손은 이 노드가 `/dev/ttyAMA4`를 독점한다.
+
+## 1. 브랜치 갱신과 빌드
+
+User PC에서 OMY 호스트에 SSH 접속한다. IP는 현재 실제 값으로 바꾼다.
+
+```bash
+ssh root@10.42.0.241
+```
+
+Robot PC **호스트**에서:
+
+```bash
+cd /data/docker/open_manipulator/docker/workspace/SHAPE_UP_Tactile
+git switch codex/hx5-d20
+git pull --ff-only
+git submodule update --init third_party/robotis_hand
+cd /data/docker/open_manipulator
+./docker/container.sh enter
+```
+
+Robot PC **컨테이너**에서 (최초 소스 연결과 의존 패키지 설치는
+[기존 실행 명령어](hx5-d20-run-commands.md#robot-pc-컨테이너--최초-빌드)를 따른다):
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source /root/ros2_ws/install/setup.bash
+cd /workspace/omy_ws
+colcon build --symlink-install --packages-up-to omy_hx5_bringup
+source /workspace/omy_ws/install/setup.bash
+ros2 pkg prefix omy_hx5_bringup
+```
+
+## 2. 손 Direct Mode 준비 (한 번)
+
+기존 `omy_hx5_official_hand.launch.py`, 손 preset 노드, unpack/pack,
+다른 `/dev/ttyAMA4` 사용자들을 종료한 상태에서 수행한다. 로봇 팔이
+안정된 자세인지 확인한다. 명령은 END 경유로 20개 모터의 ID, 모델,
+운용 모드, 방향 설정, 영점, 간접 주소, 토크를 공식 왼손 Xacro와 비교한다.
+일치하지 않으면 **어느 모터가 다른지 보고하고 중단한다.** 모터 목표 위치는
+보내지 않는다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4
+```
+
+이 확인은 손의 높은 주소를 읽기 위해 간접 주소 EEPROM을 잠시 바꾸었다가
+복구한다. 반복 실행하지 않는다. 검사가 성공하면 다음 **한 번만** 실행한다.
+손 컨트롤러의 5개 TableSync 채널과 170개 간접 주소를 설정하고 손의
+Operating Mode를 `0`(Direct Control)으로 바꾼다. 이 설정은 손의 EEPROM에
+남는다. 모터 목표값은 보내지 않는다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --apply
+```
+
+`All 20 HX5 actuators identified`, `Direct Control Mode 0 ready`가
+나와야 한다. 모터 설정 차이가 나오면 여기서 멈추고 실제 출력과 공식 설정을
+대조한다. 손 모터 EEPROM은 이 프로그램이 자동으로 덮어쓰지 않는다.
+
+## 3. 실물 Direct Mode 런치
+
+Robot PC의 Zenoh 라우터가 실행 중이어야 한다. 이전 OMY 실행에서 계속 켜져
+있으면 그대로 사용한다. 꺼져 있다면 별도 컨테이너 터미널에서 같은 ROS 환경을
+적용한 뒤 아래 명령을 실행하고 그 터미널을 유지한다.
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source /root/ros2_ws/install/setup.bash
+source /workspace/omy_ws/install/setup.bash
+export ROS_DOMAIN_ID=30
+export RMW_IMPLEMENTATION=rmw_zenoh_cpp
+unset ZENOH_CONFIG_OVERRIDE
+ros2 run rmw_zenoh_cpp rmw_zenohd
+```
+
+ROS 환경을 적용한 새 Robot PC 컨테이너 터미널에서:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source /root/ros2_ws/install/setup.bash
+source /workspace/omy_ws/install/setup.bash
+export ROS_DOMAIN_ID=30
+export RMW_IMPLEMENTATION=rmw_zenoh_cpp
+unset ZENOH_CONFIG_OVERRIDE
+ros2 launch omy_hx5_bringup omy_hx5_end_direct_hand.launch.py end_port:=/dev/ttyAMA4
+```
+
+런치가 팔 컨트롤러와 손 노드를 올리고 손의 첫 상태를 읽는다. **실행만으로 팔이나
+손에 목표 자세를 보내지 않는다.** `END 210 -> HX5 140 Direct Mode ready`가
+표시되면 키보드 입력을 받을 수 있다. 런치 터미널은 계속 유지한다.
+
+## 4. 공식 키보드로 첫 동작
+
+두 번째 SSH/컨테이너 터미널에서 같은 ROS 환경을 적용한다. Robot PC 안에서
+키보드를 실행하면 사용자 PC와 Robot PC 사이의 Zenoh 연결을 별도로
+설정하지 않아도 된다. 같은 컨테이너의 ROS 노드끼리는 해당 시스템의
+Zenoh 라우터가 켜져 있어야 한다.
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source /root/ros2_ws/install/setup.bash
+source /workspace/omy_ws/install/setup.bash
+export ROS_DOMAIN_ID=30
+export RMW_IMPLEMENTATION=rmw_zenoh_cpp
+unset ZENOH_CONFIG_OVERRIDE
+ros2 run robotis_hand_teleop hx5_d20_teleop --hand-side left
+```
+
+공식 키보드에서 `q/a`는 검지 닫기/열기, `w/s`는 중지, `e/d`는 약지,
+`r/f`는 소지, `v/c`는 엄지다. `x/z`는 전체 쥐기/펴기, `ESC`는 키보드 종료다.
+처음에는 물체 없이 작은 손가락 입력부터 확인한다. 공식 키보드는 첫 명령에
+엄지의 기준 목표도 함께 넣으므로 엄지가 동시에 움직일 수 있다. 이 브리지는
+20관절 전체를 확인하고 제한 범위를 검사하며 최대 1 rad/s로 보간한다.
+
+이 ROS 노드는 공식 키보드 토픽
+`/leader/joint_trajectory_command_broadcaster_left_hand/joint_trajectory`,
+전류 토픽 `/effort_l_controller/commands`, 초기 자세 action
+`/hand_l_controller/follow_joint_trajectory`를 받는다. `JointState`와 공식
+`robotis_interfaces/msg/HandPressures` 형식을 발행한다. 기존
+`/omy_hx5/preset_percent`는 Direct Mode에 사용하지 않는다.
+
+공식 제공 초기 자세 명령도 같은 bridge의 action으로 전달할 수 있다. **손이
+움직이는 명령**이므로 키보드를 종료하고 주변을 비운 뒤 별도 터미널에서 실행한다.
+브리지는 20관절 목표를 최대 1 rad/s로 제한한다.
+공식 초기 자세 프로그램의 100개 경유점은 모두 범위와 시간 순서를 검사하고,
+END 경로에서는 마지막 자세까지 제한 속도로 직선 보간한다. 따라서 공식
+손 단독 드라이버의 원래 스플라인 궤적과 시간 경과가 완전히 같지는 않다.
+
+```bash
+ros2 run robotis_hand_bringup joint_trajectory_executor --ros-args \
+  --params-file /workspace/omy_ws/install/robotis_hand_bringup/share/robotis_hand_bringup/config/hx5_d20/hx5_d20_left_initial_positions.yaml
+```
+
+## 5. 상태 확인과 종료
+
+세 번째 컨테이너 터미널에서 ROS 환경을 적용한 뒤:
+
+```bash
+ros2 topic echo /joint_states --once
+ros2 topic echo /left_hand/finger_pressures --once
+ros2 topic hz /left_hand/finger_pressures
+```
+
+`finger_l_joint1..20`, 다섯 손가락의 3×3 촉각값, 손의 실제 움직임을 각각
+확인한다. 토픽만 보이고 실제 움직임이 없으면 성공으로 간주하지 않는다.
+종료는 키보드에서 `ESC`, 런치 터미널에서 `Ctrl+C` 순서다. 정상 종료 시
+손의 TableSync를 끄고 END의 기존 설정과 쓰기 버퍼를 복원한다. 강제 전원 차단
+또는 프로세스 강제 종료 후에는 다시 손 상태를 확인한다.
+
+Preset 런치로 되돌리려면 Direct 런치를 먼저 종료하고 같은 컨테이너에서
+아래 명령으로 손 컨트롤러를 Preset Mode `1`로 돌린다. 손 목표 위치는
+보내지 않고 모드만 바꾸며 간접 주소 설정은 유지된다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --restore-preset
+```
+
+Direct 런치가 비정상 종료되어 손의 TableSync가 남은 경우에도 위 명령은
+TableSync를 끄고 모드 1로 돌린다. `Preset Motion Mode 1 ready` 확인 후 기존
+`omy_hx5_official_hand.launch.py`를 실행한다.
+
+## 공식 자료
+
+- [HX5-D20 제어표: 간접 주소와 TableSync](https://docs.robotis.com/docs/systems/hx5_d20/specifications/control_table/)
+- [ROBOTIS 왼손 키보드 소스](https://github.com/ROBOTIS-GIT/robotis_hand/blob/jazzy/robotis_hand_teleop/robotis_hand_teleop/hx5_d20_teleop.py)
+- [ROBOTIS 촉각 메시지 형식](https://github.com/ROBOTIS-GIT/robotis_interfaces/tree/jazzy/msg)

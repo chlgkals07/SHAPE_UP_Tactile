@@ -6,6 +6,10 @@ Preset Mode bringup과 첫 작은 동작의 현재 실행 순서는
 `omy_hx5_hand_live.launch.py` 및 텔레옵 런치는 여전히 직접 ID 140 경로라
 실행이 차단된다.
 
+공식 왼손 **20관절 키보드**를 END 210 경유로 실행하는 새 경로는
+[Direct Mode 실행 순서](hx5-d20-omy-direct-hand.md)에 정리했다. 기존 Preset
+Mode와 서로 다른 손 모드를 사용한다.
+
 END 210의 Tool ID와 Table Sync 읽기 창을 임시로 바꾸고, 손 모델·전압·상태를 읽은 뒤 원래 값으로 복원한다. 손 목표 위치, 토크, 촉각 명령은 쓰지 않는다. END 설정은 EEPROM이므로 검사를 반복해서 실행하지 않는다.
 
 ## User PC 호스트 — Robot PC SSH 접속

@@ -1,14 +1,16 @@
-"""Read-only HX5 checks through the OMY END (ID 210) Table Sync buffer.
+"""HX5 access through the OMY END (ID 210) Table Sync buffer.
 
 The END controller is the only device directly addressed on /dev/ttyAMA4.
-Its Tool ID selects the downstream HX5 controller (ID 140). This probe never
-writes a hand register or sends a goal position. END settings are restored even
-if a read fails. Do not run while another process owns the END serial port.
+Its Tool ID selects the downstream HX5 controller (ID 140). The probe entry
+point never sends a motor goal. END settings are restored after a session.
+Do not run while another process owns the END serial port.
 """
 
 from __future__ import annotations
 
 import argparse
+import fcntl
+import os
 import time
 from contextlib import contextmanager
 from struct import pack
@@ -43,6 +45,17 @@ SAVED_REGISTERS = (
 
 class EndProxyError(RuntimeError):
     """A serial or proxy read did not return a valid response."""
+
+
+def acquire_end_bus_lock() -> int:
+    """Prevent this package's probes and hand controllers sharing the END port."""
+    fd = os.open("/tmp/omy_hx5_end_210.lock", os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError as exc:
+        os.close(fd)
+        raise EndProxyError("END 210 port is owned by another OMY/HX5 process") from exc
+    return fd
 
 
 class EndProxy:
@@ -91,6 +104,22 @@ class EndProxy:
                 f"error={error}"
             )
 
+    def write_end_buffer_live(self, data: bytes) -> None:
+        """Update an already configured END forwarding window."""
+        if (self._original_write_buffer is None or
+                self._current.get(SYNC_ENABLE) != 1 or
+                self._current.get(WRITE_SIZE_1) != len(data) or
+                not 1 <= len(data) <= 128):
+            raise EndProxyError("END live write window is not prepared")
+        result, error = self.packet.writeTxRx(
+            self.port, END_ID, WRITE_BUFFER, len(data), list(data)
+        )
+        if result != 0 or error:
+            raise EndProxyError(
+                f"END live write failed: result={self.packet.getTxRxResult(result)}, "
+                f"error={error}"
+            )
+
     @contextmanager
     def temporary_read_window(self, *, tool_id: int = HAND_ID):
         """Save END settings; disable its write slots; always restore them."""
@@ -100,6 +129,11 @@ class EndProxy:
             address: int.from_bytes(self.read(address, size), "little")
             for address, size in SAVED_REGISTERS
         }
+        if (original[TOOL_ID] == HAND_ID and original[SYNC_ENABLE] == 1 and
+                (original[WRITE_SIZE_1] or original[WRITE_SIZE_2])):
+            raise EndProxyError(
+                "END 210 has an active HX5 write window from a prior run; "
+                "recover it before probing or launching")
         self._current = original.copy()
         self._original_write_buffer = None
         try:
@@ -136,6 +170,36 @@ class EndProxy:
         if stable and first != second:
             raise EndProxyError("END proxy read was unstable; no hand state accepted")
         return second
+
+    def write_hand(self, address: int, data: bytes) -> None:
+        """Forward a bounded write to the selected tool, then read it back.
+
+        The caller must hold temporary_read_window(). This is for explicit
+        configuration and must never be called for a motor goal on startup.
+        """
+        if not (0 <= address <= 1023 and 1 <= len(data) <= 128
+                and address + len(data) <= 1024):
+            raise ValueError("END can proxy only 1..128 bytes within address 0..1023")
+        self.write_end(SYNC_ENABLE, 1, 0)
+        self.write_end(READ_ADDRESS_1, 2, address)
+        self.write_end(READ_SIZE_1, 2, len(data))
+        self.write_end(WRITE_ADDRESS_1, 2, address)
+        self.write_end(WRITE_SIZE_1, 2, len(data))
+        self.write_end_buffer(data)
+        try:
+            self.write_end(SYNC_ENABLE, 1, 1)
+            self.sleep(0.20)
+            self.read(READ_BUFFER, len(data))
+            self.sleep(0.05)
+            echoed = self.read(READ_BUFFER, len(data))
+        finally:
+            self.write_end(SYNC_ENABLE, 1, 0)
+            self.write_end(WRITE_SIZE_1, 2, 0)
+        if echoed != data:
+            raise EndProxyError(
+                f"ID {self._current[TOOL_ID]} write {address}+{len(data)} "
+                f"did not verify: {echoed.hex()} != {data.hex()}"
+            )
 
     def probe(self) -> dict[str, int]:
         model, result, error = self.packet.ping(self.port, END_ID)
@@ -319,6 +383,10 @@ def main(argv=None) -> int:
                         "install python3-serial, then retry\n")
         raise
 
+    try:
+        lock_fd = acquire_end_bus_lock()
+    except EndProxyError as exc:
+        parser.exit(1, f"END proxy probe failed: {exc}\n")
     port = PortHandler(args.port)
     if not port.openPort():
         parser.exit(1, f"Cannot open {args.port}; stop other END owners first\n")
@@ -351,6 +419,7 @@ def main(argv=None) -> int:
         parser.exit(1, f"END proxy probe failed: {exc}\n")
     finally:
         port.closePort()
+        os.close(lock_fd)
 
 
 if __name__ == "__main__":

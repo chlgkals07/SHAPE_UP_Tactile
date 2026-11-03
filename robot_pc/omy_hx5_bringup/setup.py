@@ -29,6 +29,8 @@ setup(
             "omy_hx5_unpack_and_hold = omy_hx5_bringup.unpack:main",
             "omy_hx5_end_proxy_probe = omy_hx5_bringup.end_proxy:main",
             "omy_hx5_end_preset = omy_hx5_bringup.end_preset:main",
+            "omy_hx5_end_direct_prepare = omy_hx5_bringup.end_direct_prepare:main",
+            "omy_hx5_end_direct = omy_hx5_bringup.end_direct_node:main",
         ],
     },
 )

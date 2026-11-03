@@ -4,13 +4,16 @@
 
 [실행 명령어 모음](../docs/hx5-d20-run-commands.md)
 
+[END 210 경유 공식 왼손 20관절 키보드 실행 순서](../docs/hx5-d20-omy-direct-hand.md)
+
 [OMY 끝단에서 END 경유 Preset Mode를 시험하는 bringup 순서](../docs/hx5-d20-omy-official-bringup.md)는 별도의 `omy_hx5_official_hand.launch.py`를 사용한다. 기존 텔레옵 launch는 그대로 유지한다.
 
 `omy_hx5_bringup` is a ROS 2 Jazzy overlay for an OMY-F3M follower with a
 planned left HX5-D20 in place of the gripper. The real-mode Xacro is configured
 to use the OMY END serial port `/dev/ttyAMA4` and the existing tool cable.
-Whether that cable provides a compatible electrical supply and a transparent
-RS-485 path to HX5 controller ID 140 has **not** been established on OMY.
+Field reads confirmed END 210, the HX5 controller ID 140, and the first motor
+ID 141 through the installed cable. The 20-joint Direct Mode bridge is
+implemented separately and still needs a live movement check.
 The software does not create a separate hand PC or USB serial adapter.
 
 ## Data path
@@ -28,8 +31,8 @@ The hand controller uses the official HX5 rev2 left-hand joint and sensor
 definitions: hand controller ID 140, 20 virtual motor IDs and five tactile
 sensor IDs in the 141–165 range. The OMY END board keeps its stock ID 210 and Tool ID 1 setting by
 default; `end_tool_id` is an override after its required value is confirmed.
-Whether the END tool path actually passes ID 140 to this hand remains a
-physical integration check; mock mode cannot establish it.
+The END tool path passing ID 140 has now been checked on the robot. The
+20-joint direct commands still require live validation.
 
 The official AI Worker SH5 configuration places the HX5 joint macro on its
 `/dev/follower` bus and runs separate arm, hand, and pressure controllers.

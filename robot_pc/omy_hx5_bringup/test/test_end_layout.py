@@ -7,8 +7,9 @@ from xml.etree import ElementTree
 import pytest
 
 from omy_hx5_bringup.end_layout import (
-    INDIRECT_TARGETS, READ_SIZE, READ_TARGETS, WRITE_SIZE, WRITE_TARGETS,
-    WRITE_WINDOW, decode_state, encode_command,
+    INDIRECT_TARGETS, MONITOR_TARGETS, READ_SIZE, READ_TARGETS, STATE_SIZE,
+    WRITE_SIZE, WRITE_TARGETS, WRITE_WINDOW, decode_snapshot, decode_state,
+    encode_command,
 )
 
 
@@ -40,8 +41,10 @@ def test_compact_layout_matches_vendor_table_sync_channels():
         assert values[f"SyncTable {finger} Write Size 5"] == 0
         assert values[f"SyncTable {finger} ID 5"] == 140 + 5 * finger
     assert READ_SIZE == 85 and WRITE_SIZE == 80
-    assert WRITE_WINDOW == 719
-    assert len(INDIRECT_TARGETS) == 165
+    assert WRITE_WINDOW == 724
+    assert MONITOR_TARGETS == (100, 101, 102, 103, 106)
+    assert STATE_SIZE == 90
+    assert len(INDIRECT_TARGETS) == 170
 
 
 def test_state_and_goal_byte_layout():
@@ -59,3 +62,7 @@ def test_state_and_goal_byte_layout():
     assert command[:4] == bytes((44, 1, 0, 8))
     with pytest.raises(ValueError):
         encode_command((float("nan"),) * 20, 300)
+    snapshot = decode_snapshot(bytes(state) + bytes((0x34, 0x12, 0x40, 0x09, 0)))
+    assert snapshot.tick == 0x1234
+    assert snapshot.voltage_centivolts == 2368
+    assert snapshot.pressures == pressures

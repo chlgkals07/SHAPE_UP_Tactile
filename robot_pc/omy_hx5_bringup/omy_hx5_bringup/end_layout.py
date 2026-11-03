@@ -2,14 +2,15 @@
 
 The hand controller stores five 198-byte TableSync channel blocks above
 address 1023. END can forward only addresses <=1023 and read/write at most
-128 bytes at a time. HX5's indirect table aliases the 85 bytes needed by
-the tactile grasp bridge into one END read window, and its 80 goal bytes into
+128 bytes at a time. HX5's indirect table aliases 85 joint/tactile bytes
+and 5 health bytes into one END read window, and its 80 goal bytes into
 one END write window. This module only computes addresses; it never writes a
 device. Configuration is a separate explicit hardware operation.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from math import isfinite, pi
 
 CHANNELS = 5
@@ -48,13 +49,36 @@ READ_TARGETS = read_targets()
 WRITE_TARGETS = write_targets()
 READ_SIZE = len(READ_TARGETS)
 WRITE_SIZE = len(WRITE_TARGETS)
+MONITOR_TARGETS = (100, 101, 102, 103, 106)  # tick, voltage, status
+STATE_SIZE = READ_SIZE + len(MONITOR_TARGETS)
 READ_WINDOW = HAND_INDIRECT_DATA_START
-WRITE_WINDOW = READ_WINDOW + READ_SIZE
-INDIRECT_TARGETS = READ_TARGETS + WRITE_TARGETS
+WRITE_WINDOW = READ_WINDOW + STATE_SIZE
+INDIRECT_TARGETS = READ_TARGETS + MONITOR_TARGETS + WRITE_TARGETS
 
-assert READ_SIZE == 85 and WRITE_SIZE == 80
+assert READ_SIZE == 85 and STATE_SIZE == 90 and WRITE_SIZE == 80
 assert len(INDIRECT_TARGETS) <= 256
 assert WRITE_WINDOW + WRITE_SIZE <= 890
+
+
+@dataclass(frozen=True)
+class HandSnapshot:
+    positions: tuple[float, ...]
+    pressures: tuple[tuple[int, ...], ...]
+    tick: int
+    voltage_centivolts: int
+    status: int
+
+
+def decode_snapshot(data: bytes) -> HandSnapshot:
+    if len(data) != STATE_SIZE:
+        raise ValueError(f"expected {STATE_SIZE} bytes of HX5 state and health")
+    positions, pressures = decode_state(data[:READ_SIZE])
+    tick = int.from_bytes(data[READ_SIZE:READ_SIZE + 2], "little")
+    voltage = int.from_bytes(data[READ_SIZE + 2:READ_SIZE + 4], "little")
+    status = data[READ_SIZE + 4]
+    if tick > 32767 or status:
+        raise ValueError(f"HX5 health invalid: tick={tick}, status={status}")
+    return HandSnapshot(positions, pressures, tick, voltage, status)
 
 
 def decode_state(data: bytes) -> tuple[tuple[float, ...], tuple[tuple[int, ...], ...]]:
@@ -73,15 +97,18 @@ def decode_state(data: bytes) -> tuple[tuple[float, ...], tuple[tuple[int, ...],
     return tuple(positions), tuple(pressures)
 
 
-def encode_command(positions: tuple[float, ...], current: int) -> bytes:
-    if len(positions) != 20 or not 0 <= current <= 910:
-        raise ValueError("HX5 command requires 20 positions and current 0..910")
+def encode_command(positions: tuple[float, ...], current: int | tuple[int, ...]) -> bytes:
+    currents = (current,) * 20 if isinstance(current, int) else tuple(current)
+    if (len(positions) != 20 or len(currents) != 20 or
+            any(not isinstance(value, int) or not 0 <= value <= 910
+                for value in currents)):
+        raise ValueError("HX5 command requires 20 positions and currents 0..910")
     data = bytearray()
-    for position in positions:
+    for position, motor_current in zip(positions, currents):
         if not isfinite(position) or not -pi <= position <= pi:
             raise ValueError("HX5 goal position must be finite and within +/-pi")
         raw = round((position + pi) / POSITION_SCALE)
         raw = min(raw, 4095)
-        data.extend(current.to_bytes(2, "little"))
+        data.extend(motor_current.to_bytes(2, "little"))
         data.extend(raw.to_bytes(2, "little"))
     return bytes(data)
