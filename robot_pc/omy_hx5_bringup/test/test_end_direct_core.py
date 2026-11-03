@@ -353,6 +353,8 @@ def test_active_health_probe_compares_paths_and_disables_hand_sync():
     assert len(samples) == 3
     assert [sample["indirect"]["status"] for sample in samples] == [32] * 3
     assert [sample["direct"]["status"] for sample in samples] == [0] * 3
+    assert all(sample["table_sync"] == 1 and sample["hardware_error"] == 0
+               and sample["watchdog"] == 100 for sample in samples)
     assert bus.hand[70] == 0 and bus.hand[8] == 0
     assert bus.end == original_end
     assert bus.goals == {}

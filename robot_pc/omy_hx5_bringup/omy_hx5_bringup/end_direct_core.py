@@ -133,7 +133,7 @@ class EndDirect(EndProxy):
                 },
             }
 
-    def compare_active_health(self) -> list[dict[str, dict[str, int]]]:
+    def compare_active_health(self) -> list[dict[str, object]]:
         """Compare active TableSync health paths without sending motor goals.
 
         Enable the hand watchdog and TableSync only while the END tool write
@@ -151,6 +151,8 @@ class EndDirect(EndProxy):
                 for _ in range(3):
                     indirect = EndProxy.read_hand(self, READ_WINDOW, STATE_SIZE)
                     direct = self.read_hand(100, 7)
+                    control = self.read_hand(70, 2)
+                    watchdog = self.read_hand(8, 1)[0]
                     samples.append({
                         "indirect": {
                             "tick": int.from_bytes(
@@ -164,6 +166,9 @@ class EndDirect(EndProxy):
                             "voltage_centivolts": int.from_bytes(direct[2:4], "little"),
                             "status": direct[6],
                         },
+                        "table_sync": control[0],
+                        "hardware_error": control[1],
+                        "watchdog": watchdog,
                     })
             finally:
                 try:
