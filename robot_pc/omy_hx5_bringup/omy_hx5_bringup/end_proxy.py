@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import time
 from contextlib import contextmanager
+from struct import pack
 
 END_ID = 210
 HAND_ID = 140
@@ -24,14 +25,18 @@ READ_ADDRESS_1 = 48
 READ_ADDRESS_2 = 50
 READ_SIZE_1 = 52
 READ_SIZE_2 = 54
+WRITE_ADDRESS_1 = 56
+WRITE_ADDRESS_2 = 58
 WRITE_SIZE_1 = 60
 WRITE_SIZE_2 = 62
 READ_BUFFER = 72
+WRITE_BUFFER = 200
 
 SAVED_REGISTERS = (
     (TOOL_ID, 1), (SYNC_ENABLE, 1),
     (READ_ADDRESS_1, 2), (READ_ADDRESS_2, 2),
     (READ_SIZE_1, 2), (READ_SIZE_2, 2),
+    (WRITE_ADDRESS_1, 2), (WRITE_ADDRESS_2, 2),
     (WRITE_SIZE_1, 2), (WRITE_SIZE_2, 2),
 )
 
@@ -46,6 +51,7 @@ class EndProxy:
         self.packet = packet
         self.sleep = sleep
         self._current = {}
+        self._original_write_buffer = None
 
     def read(self, address: int, size: int, *, device_id: int = END_ID) -> bytes:
         data, result, error = self.packet.readTxRx(self.port, device_id, address, size)
@@ -70,6 +76,21 @@ class EndProxy:
             )
         self._current[address] = value
 
+    def write_end_buffer(self, data: bytes) -> None:
+        """Fill END's local buffer while forwarding is disabled."""
+        if not 1 <= len(data) <= 128 or self._current.get(SYNC_ENABLE) != 0:
+            raise ValueError("END write buffer requires disabled Table Sync and 1..128 bytes")
+        if self._original_write_buffer is None:
+            self._original_write_buffer = self.read(WRITE_BUFFER, 128)
+        result, error = self.packet.writeTxRx(
+            self.port, END_ID, WRITE_BUFFER, len(data), list(data)
+        )
+        if result != 0 or error:
+            raise EndProxyError(
+                f"END write buffer failed: result={self.packet.getTxRxResult(result)}, "
+                f"error={error}"
+            )
+
     @contextmanager
     def temporary_read_window(self, *, tool_id: int = HAND_ID):
         """Save END settings; disable its write slots; always restore them."""
@@ -80,6 +101,7 @@ class EndProxy:
             for address, size in SAVED_REGISTERS
         }
         self._current = original.copy()
+        self._original_write_buffer = None
         try:
             self.write_end(SYNC_ENABLE, 1, 0)
             self.write_end(WRITE_SIZE_1, 2, 0)
@@ -90,6 +112,8 @@ class EndProxy:
         finally:
             # Disable forwarding first. Restore addresses and sizes while off.
             self.write_end(SYNC_ENABLE, 1, 0)
+            if self._original_write_buffer is not None:
+                self.write_end_buffer(self._original_write_buffer)
             for address, size in SAVED_REGISTERS:
                 if address != SYNC_ENABLE:
                     self.write_end(address, size, original[address])
@@ -149,6 +173,55 @@ class EndProxy:
                 )
         return model
 
+    def _write_hand_indirect(self, data: bytes) -> None:
+        """One bounded EEPROM write to HX5 Indirect Address 1..5 via END."""
+        if len(data) != 10:
+            raise ValueError("only five 2-byte indirect addresses are allowed")
+        self.write_end(SYNC_ENABLE, 1, 0)
+        self.write_end(READ_ADDRESS_1, 2, 122)
+        self.write_end(READ_SIZE_1, 2, 10)
+        self.write_end(WRITE_ADDRESS_1, 2, 122)
+        self.write_end(WRITE_SIZE_1, 2, 10)
+        self.write_end_buffer(data)
+        self.write_end(SYNC_ENABLE, 1, 1)
+        self.sleep(0.2)
+        forwarded = self.read(READ_BUFFER, 10)
+        self.write_end(SYNC_ENABLE, 1, 0)
+        self.write_end(WRITE_SIZE_1, 2, 0)
+        if forwarded != data:
+            raise EndProxyError(
+                f"HX5 indirect address write did not verify: {forwarded.hex()} "
+                f"!= {data.hex()}"
+            )
+
+    def inspect_sync_ids(self) -> tuple[int, ...]:
+        """Read HX5 high TableSync IDs, restoring its five EEPROM aliases."""
+        model, result, error = self.packet.ping(self.port, END_ID)
+        if result != 0 or error or model != END_MODEL:
+            raise EndProxyError("END 210 did not respond before TableSync inspection")
+        with self.temporary_read_window():
+            model = int.from_bytes(self.read_hand(0, 2, stable=True), "little")
+            if model != LEFT_HAND_MODEL:
+                raise EndProxyError(f"expected left HX5 model 261, got {model}")
+            mode = self.read_hand(33, 1)[0]
+            enabled = self.read_hand(70, 1)[0]
+            if mode != 0 or enabled != 0:
+                raise EndProxyError(
+                    f"hand is not idle Direct Control Mode: mode={mode}, "
+                    f"TableSync Enable={enabled}"
+                )
+            original = self.read_hand(122, 10, stable=True)
+            mapped = pack("<5H", 1024, 1025, 1026, 1027, 1028)
+            try:
+                self._write_hand_indirect(mapped)
+                ids = tuple(self.read_hand(634, 5, stable=True))
+            finally:
+                self._write_hand_indirect(original)
+                restored = self.read_hand(122, 10, stable=True)
+                if restored != original:
+                    raise EndProxyError("HX5 indirect address restoration did not verify")
+        return ids
+
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -156,7 +229,11 @@ def main(argv=None) -> int:
     parser.add_argument("--baud", type=int, default=4_000_000)
     parser.add_argument("--motor-id", type=int, choices=(141,),
                         help="read only the left thumb actuator ID 141 through END")
+    parser.add_argument("--inspect-sync-ids", action="store_true",
+                        help="temporarily map five hand EEPROM aliases to read high TableSync IDs")
     args = parser.parse_args(argv)
+    if args.motor_id is not None and args.inspect_sync_ids:
+        parser.error("choose only one inspection mode")
 
     try:
         from dynamixel_sdk import PacketHandler, PortHandler
@@ -173,7 +250,11 @@ def main(argv=None) -> int:
         if not port.setBaudRate(args.baud):
             parser.exit(1, f"Cannot set {args.port} to {args.baud} baud\n")
         proxy = EndProxy(port, PacketHandler(2.0))
-        if args.motor_id is None:
+        if args.inspect_sync_ids:
+            ids = proxy.inspect_sync_ids()
+            print(f"HX5 TableSync1 IDs via END 210: {list(ids)}. "
+                  "Five indirect addresses restored; no motor command sent.")
+        elif args.motor_id is None:
             result = proxy.probe()
             print(
                 f"END {END_ID}: model {result['end_model']} OK; "
