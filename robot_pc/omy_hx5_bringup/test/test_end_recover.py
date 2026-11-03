@@ -3,7 +3,9 @@
 import pytest
 
 from omy_hx5_bringup.end_proxy import EndProxy, EndProxyError
-from omy_hx5_bringup.end_recover import STOCK_END, restore_stock
+from omy_hx5_bringup.end_recover import (
+    INTERRUPTED_HAND_READ, STOCK_END, restore_stock,
+)
 from test_end_proxy import FakePacket
 
 
@@ -30,6 +32,15 @@ def test_end_recovery_accepts_restored_sizes_with_sync_left_off():
     packet.end[46] = 0
     _, after = restore_stock(EndProxy(None, packet, sleep=lambda _: None), apply=True)
     assert after == STOCK_END
+
+
+def test_end_recovery_restores_observed_hand_read_interruption():
+    packet = FakePacket()
+    packet.end = INTERRUPTED_HAND_READ.copy()
+    before, after = restore_stock(EndProxy(None, packet, sleep=lambda _: None), apply=True)
+    assert before == INTERRUPTED_HAND_READ
+    assert after == packet.end == STOCK_END
+    assert packet.hand_goals == []
 
 
 def test_end_recovery_rejects_unexpected_active_write_window():

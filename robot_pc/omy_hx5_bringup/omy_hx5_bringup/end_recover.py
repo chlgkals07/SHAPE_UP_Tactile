@@ -1,8 +1,8 @@
 """Inspect or restore the stock OMY 3M END settings after an interrupted probe.
 
 The target values come from the ROBOTIS omy_3m_end_unit ROS 2 control Xacro.
-Only the observed interrupted state (tool 1, sync off, write slots off) may be
-restored automatically. This command never writes a hand or motor goal.
+Only observed interrupted states with TableSync and both write slots off may
+be restored automatically. This command never writes a hand or motor goal.
 """
 
 from __future__ import annotations
@@ -21,6 +21,11 @@ STOCK_END = {
     56: 665, 58: 0, 60: 12, 62: 0,
 }
 
+INTERRUPTED_HAND_READ = {
+    13: 140, 46: 0, 48: 8, 50: 0, 52: 1, 54: 0,
+    56: 665, 58: 0, 60: 0, 62: 0,
+}
+
 
 def read_end_settings(proxy: EndProxy) -> dict[int, int]:
     return {
@@ -36,12 +41,14 @@ def restore_stock(proxy: EndProxy, *, apply: bool) -> tuple[dict[int, int], dict
     before = read_end_settings(proxy)
     if not apply:
         return before, before.copy()
-    if (before[TOOL_ID] != 1 or before[SYNC_ENABLE] != 0 or
-            before[WRITE_SIZE_1] not in (0, STOCK_END[WRITE_SIZE_1]) or
-            before[WRITE_SIZE_2] != 0):
+    safe_stock_interruption = (
+        before[TOOL_ID] == 1 and before[SYNC_ENABLE] == 0 and
+        before[WRITE_SIZE_1] in (0, STOCK_END[WRITE_SIZE_1]) and
+        before[WRITE_SIZE_2] == 0
+    )
+    if not safe_stock_interruption and before != INTERRUPTED_HAND_READ:
         raise EndProxyError(
-            "recovery requires the observed interrupted state: "
-            "Tool ID=1, TableSync=0, Write Size 1=0 or 12, Write Size 2=0; "
+            "recovery requires a known interrupted END state with TableSync off; "
             f"actual={before}"
         )
     proxy._current = before.copy()
