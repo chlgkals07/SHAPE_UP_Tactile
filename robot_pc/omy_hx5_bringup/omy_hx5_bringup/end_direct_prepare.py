@@ -55,8 +55,9 @@ def main(argv=None) -> int:
                       "time(s); each register value was confirmed by readback.")
             return 0
         if args.verify_direct:
-            direct.verify_direct_setup()
-            print("HX5 Direct Control Mode 0, watchdog, and persistent aliases verified; "
+            watchdog = direct.verify_direct_setup()
+            print(f"HX5 Direct Control Mode 0 and persistent aliases verified; "
+                  f"idle Bus Watchdog={watchdog}; "
                   "no motor goal sent.")
             if direct.end_write_ack_timeouts:
                 print(f"END 210 write status packets missing {direct.end_write_ack_timeouts} "

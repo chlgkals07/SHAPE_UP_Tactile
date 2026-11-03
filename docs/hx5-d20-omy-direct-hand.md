@@ -127,6 +127,10 @@ Direct 준비 출력이 END 버퍼 복원 단계에서 중단됐으면 복구 �
 ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --verify-direct
 ```
 
+유휴 Bus Watchdog는 `0` 또는 `100`일 수 있다. 런치가 시작될 때 `0`이면
+`100`(2초)으로 설정하고 읽어서 확인한 뒤 손 TableSync를 켠다. 다른 값이면
+동작을 시작하지 않는다.
+
 ## 3. 실물 Direct Mode 런치
 
 Robot PC의 Zenoh 라우터가 실행 중이어야 한다. 이전 OMY 실행에서 계속 켜져

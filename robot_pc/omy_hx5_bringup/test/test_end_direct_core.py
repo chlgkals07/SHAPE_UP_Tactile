@@ -156,6 +156,27 @@ def test_vendor_configuration_and_20_goal_path_keep_persistent_aliases():
     assert bytes(bus.hand[122:462]) == pack("<170H", *INDIRECT_TARGETS)
     assert bus.end == original_end
     assert bytes(bus.buffer[:12]) == original_buffer[:12]
+
+
+def test_direct_launch_sets_watchdog_after_idle_ram_value_resets():
+    bus = FakeBus()
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    proxy.prepare_direct(apply=True)
+    bus.hand[8] = 0  # RAM can return to its power-on value before launch
+    assert proxy.verify_direct_setup() == 0
+    with proxy.direct_session():
+        assert bus.hand[8] == 100
+        assert not bus.goals
+    assert bus.hand[70] == 0
+
+
+def test_direct_verify_reports_unexpected_watchdog_value():
+    bus = FakeBus()
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    proxy.prepare_direct(apply=True)
+    bus.hand[8] = 255
+    with pytest.raises(EndProxyError, match="Bus Watchdog is 255"):
+        proxy.verify_direct_setup()
     prior_goals = bus.goals.copy()
     bus.hand[70] = 1  # emulate an interrupted direct launch
     assert proxy.restore_preset_mode() == 0

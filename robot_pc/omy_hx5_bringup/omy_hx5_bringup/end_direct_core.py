@@ -196,16 +196,19 @@ class EndDirect(EndProxy):
                     self.write_hand(HAND_INDIRECT_BASE, original)
         return mode, changed
 
-    def verify_direct_setup(self) -> None:
-        """Read-only check used before every launch; no HX5 EEPROM writes."""
+    def verify_direct_setup(self) -> int:
+        """Check persistent Direct configuration; accept an idle watchdog of 0."""
         with self.temporary_read_window():
             self._check_hand(required_mode=0)
-            if self.read_hand(8, 1, stable=True) != b"\x64":
-                raise EndProxyError("HX5 Bus Watchdog is not 100 (2 seconds)")
+            watchdog = self.read_hand(8, 1, stable=True)[0]
+            if watchdog not in (0, 100):
+                raise EndProxyError(
+                    f"HX5 Bus Watchdog is {watchdog}; expected idle 0 or 100")
             expected = pack(f"<{len(INDIRECT_TARGETS)}H", *INDIRECT_TARGETS)
             if self._alias_bytes(HAND_INDIRECT_BASE, len(expected)) != expected:
                 raise EndProxyError(
                     "HX5 direct aliases differ; run omy_hx5_end_direct_prepare --apply")
+            return watchdog
 
     def restore_preset_mode(self) -> int:
         """Switch the controller back to Preset Mode without a motor goal."""
@@ -243,8 +246,13 @@ class EndDirect(EndProxy):
             self._direct_active = False
             self._direct_goals_started = False
             try:
-                if self.read_hand(8, 1, stable=True) != b"\x64":
-                    raise EndProxyError("HX5 Bus Watchdog is not 100 (2 seconds)")
+                watchdog = self.read_hand(8, 1, stable=True)[0]
+                if watchdog == 0:
+                    self.write_hand(8, b"\x64")
+                    watchdog = self.read_hand(8, 1, stable=True)[0]
+                if watchdog != 100:
+                    raise EndProxyError(
+                        f"HX5 Bus Watchdog is {watchdog}; cannot start Direct Mode")
                 self.write_hand(70, b"\x01")
                 self.write_end(SYNC_ENABLE, 1, 0)
                 self.write_end(READ_ADDRESS_1, 2, READ_WINDOW)
