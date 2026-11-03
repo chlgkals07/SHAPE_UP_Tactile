@@ -133,6 +133,14 @@ ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --diagno
 ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --compare-health-alias
 ```
 
+유휴 간접·직접 상태가 모두 정상이지만 Direct 런치에서만 `status=32`가 나온
+경우, 손 TableSync와 watchdog을 잠시 켠 상태에서 두 읽기 경로를 비교한다.
+이 진단은 손가락 목표값을 보내지 않고 종료 시 두 설정을 다시 끈다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --compare-active-health
+```
+
 기존 `omy_hx5_official_hand.launch.py`, 손 preset 노드, unpack/pack,
 다른 `/dev/ttyAMA4` 사용자들을 종료한 상태에서 수행한다. 로봇 팔이
 안정된 자세인지 확인한다. 명령은 END 경유로 20개 모터의 ID, 모델,

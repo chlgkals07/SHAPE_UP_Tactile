@@ -313,6 +313,28 @@ def test_indirect_health_probe_exposes_corrupt_full_window_without_hand_goals():
     assert bus.goals == {}
 
 
+def test_active_health_probe_compares_paths_and_disables_hand_sync():
+    class CorruptOnlyWhenActiveBus(FakeBus):
+        def readTxRx(self, port, device_id, address, size):
+            data, result, error = super().readTxRx(port, device_id, address, size)
+            if (address == 72 and self.end[48] == 634 and size == 90
+                    and self.hand[70] == 1):
+                data[89] = 32
+            return data, result, error
+
+    bus = CorruptOnlyWhenActiveBus()
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    proxy.prepare_direct(apply=True)
+    original_end = bus.end.copy()
+    samples = proxy.compare_active_health()
+    assert len(samples) == 3
+    assert [sample["indirect"]["status"] for sample in samples] == [32] * 3
+    assert [sample["direct"]["status"] for sample in samples] == [0] * 3
+    assert bus.hand[70] == 0 and bus.hand[8] == 0
+    assert bus.end == original_end
+    assert bus.goals == {}
+
+
 def test_direct_read_rejects_stale_end_buffer_and_restores_end():
     bus = FakeBus()
     bus.hand[33] = 0

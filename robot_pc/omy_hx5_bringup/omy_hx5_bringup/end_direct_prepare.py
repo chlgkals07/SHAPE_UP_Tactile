@@ -34,6 +34,8 @@ def main(argv=None) -> int:
                       help="read all 20 HX5 motor torque and hardware-error states")
     mode.add_argument("--compare-health-alias", action="store_true",
                       help="compare the full END indirect window with direct hand health bytes")
+    mode.add_argument("--compare-active-health", action="store_true",
+                      help="temporarily enable hand TableSync and compare health paths without motor goals")
     args = parser.parse_args(argv)
     try:
         from ament_index_python.packages import get_package_share_directory
@@ -50,7 +52,7 @@ def main(argv=None) -> int:
         parser.exit(1, f"END direct preparation failed: {exc}\n")
     port = (make_fresh_rx_port(args.port)
             if args.diagnose or args.torque_status or args.verify_direct
-            or args.compare_health_alias
+            or args.compare_health_alias or args.compare_active_health
             else PortHandler(args.port))
     if not port.openPort():
         parser.exit(1, f"Cannot open {args.port}; stop other END owners first\n")
@@ -58,6 +60,16 @@ def main(argv=None) -> int:
         if not port.setBaudRate(args.baud):
             raise EndProxyError(f"cannot set {args.port} to {args.baud} baud")
         direct = EndDirect(port, PacketHandler(2.0))
+        if args.compare_active_health:
+            settings = read_end_settings(direct)
+            if settings != STOCK_END:
+                raise EndProxyError(f"END 210 is not at stock OMY settings: {settings}")
+            samples = direct.compare_active_health()
+            for index, sample in enumerate(samples, start=1):
+                print(f"HX5 active health sample {index}: {sample}")
+            print("No hand or motor goal sent. Hand TableSync and watchdog "
+                  "disabled; END settings restored.")
+            return 0
         if args.compare_health_alias:
             health = direct.compare_indirect_health()
             print(f"HX5 indirect health through END 210: {health['indirect']}")

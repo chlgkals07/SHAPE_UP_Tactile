@@ -132,6 +132,45 @@ class EndDirect(EndProxy):
                 },
             }
 
+    def compare_active_health(self) -> list[dict[str, dict[str, int]]]:
+        """Compare active TableSync health paths without sending motor goals.
+
+        Enable the hand watchdog and TableSync only while the END tool write
+        slot is disabled. Always attempt to turn both off before END restore.
+        """
+        with self.temporary_read_window():
+            self._check_hand(required_mode=0)
+            if self.read_hand(8, 1)[0] != 0:
+                raise EndProxyError("active health probe requires idle watchdog 0")
+            samples = []
+            try:
+                self.write_hand(8, b"\x64")
+                self.write_hand(70, b"\x01")
+                self.sleep(0.2)
+                for _ in range(3):
+                    indirect = EndProxy.read_hand(self, READ_WINDOW, STATE_SIZE)
+                    direct = self.read_hand(100, 7)
+                    samples.append({
+                        "indirect": {
+                            "tick": int.from_bytes(
+                                indirect[READ_SIZE:READ_SIZE + 2], "little"),
+                            "voltage_centivolts": int.from_bytes(
+                                indirect[READ_SIZE + 2:READ_SIZE + 4], "little"),
+                            "status": indirect[READ_SIZE + 4],
+                        },
+                        "direct": {
+                            "tick": int.from_bytes(direct[0:2], "little"),
+                            "voltage_centivolts": int.from_bytes(direct[2:4], "little"),
+                            "status": direct[6],
+                        },
+                    })
+            finally:
+                try:
+                    self.write_hand(70, b"\x00")
+                finally:
+                    self.write_hand(8, b"\x00")
+            return samples
+
     def audit_motors(self, expected: dict[int, MotorExpected]) -> list[str]:
         """Inspect the 20 actuators through END, without actuator writes."""
         issues = []
