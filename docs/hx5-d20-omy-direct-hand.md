@@ -5,6 +5,9 @@
 > 기본 OMY 설정은 실물에서 복구됐다. END 읽기 버퍼의 오래된 값이 손 상태로
 > 오인되지 않도록 HX5 Realtime Tick 검증을 추가했다. 아래 `--diagnose`
 > 결과를 확인하기 전에는 Direct 준비·런치·키보드 명령을 실행하지 않는다.
+> 후속 실측에서 손 컨트롤러는 23.77 V·상태 0으로 응답했지만 모터 141의
+> Torque Enable은 0이었다. Direct 준비는 모든 모터의 토크 1을 요구하며
+> 현재 자동으로 켜지 않는다. 아래 작은 창의 상태 진단을 먼저 실행한다.
 
 이 경로는 OMY의 END ID 210을 통해 손 컨트롤러 ID 140으로 접근한다. 로봇 PC의
 별도 손 USB 포트나 외부 전원 제어 코드를 요구하지 않는다. 기존 Preset Mode 런치와
@@ -77,6 +80,17 @@ ros2 pkg prefix robotis_interfaces
 ```
 
 ## 2. 손 Direct Mode 준비
+
+현재 현장 상태를 읽을 때는 다음 명령을 먼저 실행한다. 손의 설정이나
+모터 목표값을 쓰지 않고, END 설정만 임시로 바꿨다가 복구한다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_proxy_probe --port /dev/ttyAMA4 --hand-state
+```
+
+`tick_advanced=False` 또는 비정상적인 mode·watchdog·status가 나오면
+아래 Direct 준비·런치를 진행하지 않는다. 모터 141만 토크를 켜는 것으로
+20관절 초기화가 완료되지는 않는다.
 
 먼저 손에 쓰지 않는 진단을 실행하고 `model=261`, `id=140`, 증가한 손
 `tick`, `mode`, `watchdog`, `status`, `voltage_centivolts`를 확인한다.

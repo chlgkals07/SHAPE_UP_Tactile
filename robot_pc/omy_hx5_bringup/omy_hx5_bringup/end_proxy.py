@@ -388,6 +388,36 @@ class EndProxy:
         return {"end_model": END_MODEL, "hand_model": model,
                 "hand_voltage_centivolts": voltage, "hand_status": status}
 
+    def probe_hand_state(self) -> dict[str, int | bool]:
+        """Read small HX5 windows without changing hand or motor registers."""
+        model, result, error = self.packet.ping(self.port, END_ID)
+        if result != 0 or error or model != END_MODEL:
+            raise EndProxyError("END 210 did not respond before hand-state probe")
+        with self.temporary_read_window():
+            identity = self.read_hand(0, 8, stable=True)
+            hand_model = int.from_bytes(identity[:2], "little")
+            hand_id = identity[7]
+            if hand_model != LEFT_HAND_MODEL or hand_id != HAND_ID:
+                raise EndProxyError(
+                    f"expected left HX5 model 261 ID 140, got model={hand_model} ID={hand_id}")
+            first_tick = int.from_bytes(self.read_hand(HAND_TICK_ADDRESS, 2), "little")
+            mode = self.read_hand(33, 1)[0]
+            table_sync = self.read_hand(70, 1)[0]
+            watchdog = self.read_hand(8, 1)[0]
+            voltage = int.from_bytes(self.read_hand(102, 2), "little")
+            status = self.read_hand(106, 1)[0]
+            second_tick = int.from_bytes(self.read_hand(HAND_TICK_ADDRESS, 2), "little")
+        return {
+            "mode": mode,
+            "table_sync": table_sync,
+            "watchdog": watchdog,
+            "tick_before": first_tick,
+            "tick_after": second_tick,
+            "tick_advanced": first_tick != second_tick,
+            "voltage_centivolts": voltage,
+            "status": status,
+        }
+
     def probe_motor(self, motor_id: int) -> dict[str, int | tuple[int, int]]:
         """Check one internal hand actuator with no actuator register writes."""
         if motor_id != 141:
@@ -539,8 +569,10 @@ def main(argv=None) -> int:
                         help="read only the left thumb actuator ID 141 through END")
     parser.add_argument("--inspect-sync-ids", action="store_true",
                         help="temporarily map five hand EEPROM aliases to read high TableSync IDs")
+    parser.add_argument("--hand-state", action="store_true",
+                        help="read hand mode, watchdog, voltage, and two realtime ticks")
     args = parser.parse_args(argv)
-    if args.motor_id is not None and args.inspect_sync_ids:
+    if sum((args.motor_id is not None, args.inspect_sync_ids, args.hand_state)) > 1:
         parser.error("choose only one inspection mode")
 
     try:
@@ -566,6 +598,11 @@ def main(argv=None) -> int:
             mode, ids = proxy.inspect_sync_ids()
             print(f"HX5 mode {mode}; TableSync1 IDs via END 210: {list(ids)}. "
                   "Five indirect addresses restored; no motor command sent.")
+        elif args.hand_state:
+            state = proxy.probe_hand_state()
+            print("HX5 ID 140 via END 210: " +
+                  ", ".join(f"{key}={value}" for key, value in state.items()) +
+                  ". No hand or motor command sent.")
         elif args.motor_id is None:
             result = proxy.probe()
             print(

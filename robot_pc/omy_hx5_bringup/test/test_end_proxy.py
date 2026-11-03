@@ -95,6 +95,36 @@ def test_end_proxy_identifies_left_hand_and_restores_end():
                for address, _, data in packet.writes)
 
 
+def test_hand_state_probe_reads_small_windows_without_hand_writes():
+    class TickingPacket(FakePacket):
+        def readTxRx(self, port, device_id, address, size):
+            if address == 72 and self.end[48] == 100:
+                tick = (self.hand.get(100, 0) + 1) % 32768
+                self.hand[100] = tick & 255
+                self.hand[101] = tick >> 8
+            return super().readTxRx(port, device_id, address, size)
+
+    packet = TickingPacket()
+    packet.hand.update({8: 0, 33: 0, 70: 0})
+    original = packet.end.copy()
+    state = EndProxy(None, packet, sleep=lambda _: None).probe_hand_state()
+    assert state == {
+        "mode": 0, "table_sync": 0, "watchdog": 0,
+        "tick_before": 2, "tick_after": 4, "tick_advanced": True,
+        "voltage_centivolts": 2368, "status": 0,
+    }
+    assert packet.end == original
+    assert all(address != 200 for address, _, _ in packet.writes)
+
+
+def test_hand_state_probe_reports_stale_tick_without_claiming_freshness():
+    packet = FakePacket()
+    packet.hand.update({8: 255, 33: 0, 70: 0, 100: 0, 101: 0})
+    state = EndProxy(None, packet, sleep=lambda _: None).probe_hand_state()
+    assert state["watchdog"] == 255
+    assert state["tick_advanced"] is False
+
+
 def test_end_write_uses_readback_when_only_status_packet_is_lost():
     class LostAckPacket(FakePacket):
         lost_once = False
