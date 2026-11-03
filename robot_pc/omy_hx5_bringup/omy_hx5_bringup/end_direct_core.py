@@ -173,6 +173,33 @@ class EndDirect(EndProxy):
         return {"torque": torque, "present": present,
                 "goal_position": goal_position, "goal_current": goal_current}
 
+    def inspect_motor_torques(self) -> dict[int, tuple[int, int]]:
+        """Read each motor's torque and hardware error without motor writes."""
+        states = {}
+        with self.temporary_read_window(tool_id=MOTOR_IDS[0]):
+            for motor_id in MOTOR_IDS:
+                if motor_id != MOTOR_IDS[0]:
+                    self.write_end(SYNC_ENABLE, 1, 0)
+                    self.write_end(TOOL_ID, 1, motor_id)
+                last_error = None
+                for _ in range(3):
+                    try:
+                        data = self.read_hand(0, 71)
+                        model = int.from_bytes(data[:2], "little")
+                        if model != 1710 or data[7] != motor_id or data[64] not in (0, 1):
+                            raise EndProxyError(
+                                f"motor {motor_id} identity/torque mismatch: "
+                                f"model={model}, id={data[7]}, torque={data[64]}")
+                        states[motor_id] = (data[64], data[70])
+                        break
+                    except EndProxyError as exc:
+                        last_error = exc
+                        self.sleep(0.1)
+                else:
+                    raise EndProxyError(
+                        f"motor {motor_id} status could not be verified: {last_error}")
+        return states
+
     def _write_selected_motor(self, motor_id: int, address: int, data: bytes) -> None:
         """Forward one verified RAM write to the selected motor via END."""
         if (self._current.get(TOOL_ID) != motor_id or motor_id not in MOTOR_IDS or
@@ -190,11 +217,21 @@ class EndDirect(EndProxy):
         finally:
             self.write_end(SYNC_ENABLE, 1, 0)
             self.write_end(WRITE_SIZE_1, 2, 0)
-        actual = EndProxy.read_hand(self, address, len(data), stable=True)
-        if actual != data:
-            raise EndProxyError(
-                f"motor {motor_id} register {address} did not verify: "
-                f"expected={list(data)}, actual={list(actual)}")
+        # The END read buffer can contain the preceding forwarding cycle's
+        # value. Retry reads only; never repeat an uncertain motor write.
+        last_observation = "no readback"
+        for _ in range(4):
+            try:
+                actual = EndProxy.read_hand(self, address, len(data), stable=True)
+                if actual == data:
+                    return
+                last_observation = f"actual={list(actual)}"
+            except EndProxyError as exc:
+                last_observation = str(exc)
+            self.sleep(0.1)
+        raise EndProxyError(
+            f"motor {motor_id} register {address} did not verify: "
+            f"expected={list(data)}, {last_observation}")
 
     def enable_motor_torque(self, expected: dict[int, MotorExpected],
                             *, motor_id: int | None = None) -> tuple[int, ...]:
@@ -254,7 +291,8 @@ class EndDirect(EndProxy):
                     except Exception as rollback_exc:
                         rollback_errors.append(f"{item}: {rollback_exc}")
                 raise EndProxyError(
-                    f"motor torque enable stopped: {exc}; rollback errors={rollback_errors}"
+                    f"motor torque enable stopped: {exc}; "
+                    f"rollback attempted={enabled}; rollback errors={rollback_errors}"
                 ) from exc
         return tuple(enabled)
 

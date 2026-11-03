@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .end_direct_core import EndDirect, load_vendor_motor_settings
 from .end_proxy import EndProxyError, acquire_end_bus_lock, make_fresh_rx_port
+from .end_recover import STOCK_END, read_end_settings
 
 
 def main(argv=None) -> int:
@@ -29,6 +30,8 @@ def main(argv=None) -> int:
                       help="clear an idle HX5 Bus Watchdog error without a motor goal")
     mode.add_argument("--diagnose", action="store_true",
                       help="read one tick-verified HX5 status snapshot without hand writes")
+    mode.add_argument("--torque-status", action="store_true",
+                      help="read all 20 HX5 motor torque and hardware-error states")
     args = parser.parse_args(argv)
     try:
         from ament_index_python.packages import get_package_share_directory
@@ -43,13 +46,24 @@ def main(argv=None) -> int:
         lock_fd = acquire_end_bus_lock()
     except EndProxyError as exc:
         parser.exit(1, f"END direct preparation failed: {exc}\n")
-    port = make_fresh_rx_port(args.port) if args.diagnose else PortHandler(args.port)
+    port = (make_fresh_rx_port(args.port)
+            if args.diagnose or args.torque_status else PortHandler(args.port))
     if not port.openPort():
         parser.exit(1, f"Cannot open {args.port}; stop other END owners first\n")
     try:
         if not port.setBaudRate(args.baud):
             raise EndProxyError(f"cannot set {args.port} to {args.baud} baud")
         direct = EndDirect(port, PacketHandler(2.0))
+        if args.torque_status:
+            settings = read_end_settings(direct)
+            if settings != STOCK_END:
+                raise EndProxyError(f"END 210 is not at stock OMY settings: {settings}")
+            states = direct.inspect_motor_torques()
+            print("HX5 motor torque and hardware error via END 210:")
+            for motor_id, (torque, error) in states.items():
+                print(f"ID {motor_id}: torque={torque}, hardware_error={error}")
+            print("No hand or motor goal sent. END settings restored.")
+            return 0
         if args.diagnose:
             state = direct.diagnose_hand()
             print("HX5 via END 210, fresh hand tick: " +

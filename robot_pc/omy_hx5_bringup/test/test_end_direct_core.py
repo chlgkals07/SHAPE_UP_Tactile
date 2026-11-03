@@ -161,6 +161,51 @@ def test_torque_on_primes_goal_at_measured_position_and_restores_end():
     assert bus.goals == {}
 
 
+def test_torque_status_reads_all_motors_without_motor_writes():
+    bus = FakeBus()
+    for motor_id, motor in bus.motors.items():
+        motor[64] = int(motor_id == 141)
+    original_end = bus.end.copy()
+    original_motors = {motor_id: bytes(motor)
+                       for motor_id, motor in bus.motors.items()}
+    states = EndDirect(None, bus, sleep=lambda _: None).inspect_motor_torques()
+    assert states == {motor_id: (int(motor_id == 141), 0)
+                      for motor_id in MOTOR_IDS}
+    assert bus.end == original_end
+    assert {motor_id: bytes(motor) for motor_id, motor in bus.motors.items()} == original_motors
+
+
+def test_torque_write_verification_retries_a_stale_end_read_without_rewriting():
+    class StaleOnceBus(FakeBus):
+        stale_reply = False
+        stale_reads = 0
+
+        def writeTxRx(self, port, device_id, address, size, data):
+            result, error = super().writeTxRx(port, device_id, address, size, data)
+            if (address == 46 and data == [1] and self.end[13] == 141
+                    and self.end[60] == 2 and self.end[56] == 102):
+                self.stale_reply = True
+            return result, error
+
+        def readTxRx(self, port, device_id, address, size):
+            data, result, error = super().readTxRx(port, device_id, address, size)
+            if address == 72 and self.end[48] == 102 and self.stale_reply:
+                self.stale_reply = False
+                self.stale_reads += 1
+                return [0, 0], result, error
+            return data, result, error
+
+    bus = StaleOnceBus()
+    bus.motors[141][64] = 0
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    with proxy.temporary_read_window(tool_id=141):
+        proxy._write_selected_motor(141, 102, pack("<H", 100))
+        assert bus.end_writes.count(200) == 1
+    assert bus.stale_reads == 1
+    assert bus.motors[141][102:104] == pack("<H", 100)
+    assert bus.end_writes.count(200) == 2  # Saved END buffer restoration.
+
+
 def test_torque_on_aborts_before_any_write_if_a_motor_watchdog_is_active():
     bus = FakeBus()
     bus.hand[33] = 0

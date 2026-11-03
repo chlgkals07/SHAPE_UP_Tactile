@@ -103,6 +103,14 @@ Direct 손 모드가 0이고 20개 모터가 토크 0인 현장 상태에서는 
 목표 위치를 실제 위치로 맞추고 Goal Current를 100으로 낮춘 뒤 Torque Enable을
 1로 설정한다. 도중 실패 시 이번 명령에서 켠 모터의 토크를 다시 끈다.
 첫 실물 시도는 ID 141 하나로 확인한 뒤 전체 20개를 실행한다.
+개별 명령을 실행할 때는 한 줄씩 입력하고, 하나라도 실패하면 다음 모터로
+진행하지 않는다. 실패 후 현재 토크 상태는 아래 명령으로 확인한다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --torque-status
+```
+
+이 명령은 END 설정을 잠시 바꿨다가 복구하며 손·모터 목표값은 쓰지 않는다.
 
 ```bash
 ros2 run omy_hx5_bringup omy_hx5_end_torque_on --port /dev/ttyAMA4 --motor-id 141
