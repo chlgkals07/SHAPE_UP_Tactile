@@ -173,8 +173,9 @@ ros2 topic pub --once /omy_hx5/preset_percent std_msgs/msg/Int32 '{data: 5}'
 
 터미널 B에서 `Ctrl+C`로 종료한다. 정상 종료 시 END와 HX5 간접 주소가
 이전 값으로 복원된다. 강제 종료나 전원 차단으로 복원이 중단되었다면
-다음 명령 전 상태를 다시 검사한다. 기존 텔레옵 런치는 여전히 직접 ID 140에
-접속하려 하므로 이 Preset bringup과 동시에 실행할 수 없다.
+다음 명령 전 상태를 다시 검사한다. 현재 [리더 텔레옵](hx5-d20-omy-teleop.md)은
+END 210을 경유하는 Direct Mode(0)를 사용한다. 이 Preset Mode(1) bringup과
+손 모드·END 포트가 겹치므로 동시에 실행할 수 없다.
 
 ## 공식 자료
 
