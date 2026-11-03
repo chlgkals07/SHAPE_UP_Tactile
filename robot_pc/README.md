@@ -1,5 +1,7 @@
 # OMY robot PC + left HX5-D20
 
+> Real HX5 launches are blocked while the END ID 210 proxy control path is being verified. The current safe hardware step is the [END proxy read probe](../docs/hx5-d20-run-commands.md). The old live commands below are retained as design history; they cannot run on the current 4-pin END wiring.
+
 [실행 명령어 모음](../docs/hx5-d20-run-commands.md)
 
 [OMY 끝단에서 공식 손 컨트롤러·키보드를 시험하는 bringup 순서](../docs/hx5-d20-omy-official-bringup.md)는 별도의 `omy_hx5_official_hand.launch.py`를 사용한다. 기존 텔레옵 launch는 그대로 유지한다.

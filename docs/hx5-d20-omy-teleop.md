@@ -1,5 +1,7 @@
 # HX5-D20 × OMY 촉각 보조 텔레오퍼레이션 준비
 
+> **실물 손 런치 중단:** 기존 드라이버는 손 ID 140에 직접 접근한다. OMY END 210 경유 배선에서는 이 경로로 손을 제어할 수 없다. 현재는 [END 경유 읽기 검사](hx5-d20-run-commands.md)만 진행한다.
+
 [실행 명령어 모음](hx5-d20-run-commands.md)
 
 이 문서는 OMY-F3M follower의 RH-P12-RN 그리퍼를 제거하고 HX5-D20을 장착해, OMY-L100 leader의 그리퍼 입력으로 손을 연속 개폐하기 위한 준비 및 현장 검증 순서다. 목표 배선은 **기존 그리퍼 케이블을 HX5에 재사용**하는 것이다. [AI Worker 공식 장착 절차](https://docs.robotis.com/docs/systems/aiworker/quick_start_guide/setup_overview/hardware/#optional-robotis-hand-installation)는 같은 RH-P12-RN 제거 후 기존 4핀 JST 케이블을 HX5에 연결하는 사례이지만, OMY에서도 그 케이블의 전원·통신 경로가 HX5에 적합한지는 아직 확인되지 않았다. **HX5 장착·통전·실물 구동은 아직 검증하지 않았다.** 2026-10-09의 LEAP Hand 실물 성공은 leader 입력과 OMY 팔의 선행 근거이며, HX5의 기구·전기 호환성을 입증하지 않는다.

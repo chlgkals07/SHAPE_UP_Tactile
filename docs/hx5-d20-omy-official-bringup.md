@@ -1,5 +1,7 @@
 # OMY 끝단에 장착한 왼손 HX5-D20: 공식 손 bringup 시험
 
+> **현재 실물 실행 중단:** 아래 명령은 ID 140 직접 접속을 전제로 작성되었다. 실제 OMY 배선에서는 END ID 210을 통해 손에 접근해야 하므로 실물 launch는 시작 시 차단된다. 현재 실행 가능한 읽기 검사는 [END 경유 검사 명령](hx5-d20-run-commands.md)을 따른다. 손 이동 절차는 END 경유 제어를 검증한 뒤 갱신한다.
+
 이 절차는 텔레옵 전에 **Robot PC의 OpenMANIPULATOR 컨테이너**에서 손 자체를
 확인한다. `omy_hx5_official_hand.launch.py`는 ROBOTIS의 왼손 관절·촉각 정의,
 `hand_l_controller`, `effort_l_controller`, 초기 자세 파일과 키보드 입력 토픽을

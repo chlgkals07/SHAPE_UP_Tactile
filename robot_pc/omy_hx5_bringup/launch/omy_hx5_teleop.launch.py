@@ -5,7 +5,7 @@ mock_arm:=false mock_hand:=false and a verified OMY-to-HX5 installation.
 """
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution, PythonExpression
@@ -45,6 +45,15 @@ def generate_launch_description():
         "--pressure-hard-cap", LaunchConfiguration("pressure_hard_cap"),
     ]
     hand_enabled = LaunchConfiguration("enable_hand_teleop")
+
+    def validate_hardware(context):
+        if LaunchConfiguration("mock_hand").perform(context).lower() == "false":
+            raise RuntimeError(
+                "The HX5 is behind OMY END ID 210. This launch's vendor "
+                "driver still pings ID 140 directly and cannot control the hand. "
+                "Run omy_hx5_end_proxy_probe first; live motion is blocked.")
+        return []
+
     return LaunchDescription([
         DeclareLaunchArgument("mock_arm", default_value="true"),
         DeclareLaunchArgument("mock_hand", default_value="true"),
@@ -61,6 +70,7 @@ def generate_launch_description():
         DeclareLaunchArgument("leader_closed", default_value="nan"),
         DeclareLaunchArgument("contact_threshold", default_value="10.0"),
         DeclareLaunchArgument("pressure_hard_cap", default_value="30.0"),
+        OpaqueFunction(function=validate_hardware),
         Node(
             package="controller_manager", executable="ros2_control_node",
             parameters=[{"robot_description": robot_description}, config], output="screen",

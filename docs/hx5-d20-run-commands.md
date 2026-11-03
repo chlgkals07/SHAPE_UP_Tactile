@@ -1,7 +1,8 @@
 # OMY + 왼손 HX5-D20 실행 명령어
 
-ROBOTIS 공식 손 키보드·초기 자세 동작을 OMY 끝단에서 먼저 시험하려면
-[OMY 끝단 공식 손 bringup 실행 순서](hx5-d20-omy-official-bringup.md)를 따른다.
+현재 단계는 **END ID 210을 통한 손 ID 140 읽기 검사**다. 기존 실물 손/텔레옵 런치는 손 ID 140에 직접 접속하려 하므로 실행이 차단된다. 손을 움직이는 명령은 아직 제공하지 않는다. 이 문서의 검사 결과로 다음 설정을 결정한다.
+
+END 210의 Tool ID와 Table Sync 읽기 창을 임시로 바꾸고, 손 모델·전압·상태를 읽은 뒤 원래 값으로 복원한다. 손 목표 위치, 토크, 촉각 명령은 쓰지 않는다. END 설정은 EEPROM이므로 검사를 반복해서 실행하지 않는다.
 
 ## User PC 호스트 — Robot PC SSH 접속
 
@@ -72,165 +73,17 @@ MAKEFLAGS=-j2 CMAKE_BUILD_PARALLEL_LEVEL=2 colcon build --symlink-install --para
 source /workspace/omy_ws/install/setup.bash
 ```
 
-## User PC 호스트 — 터미널 A / B / C마다 새 SSH 접속
+## Robot PC 컨테이너 — END 210 경유 손 통신 확인
 
-```bash
-export OMY_ROBOT_HOST="10.42.0.241"
-ssh root@"$OMY_ROBOT_HOST"
-```
-
-## Robot PC 호스트 — 터미널마다 컨테이너 진입
-
-```bash
-cd /data/docker/open_manipulator
-./docker/container.sh enter
-```
-
-## Robot PC 컨테이너 — 터미널마다 공통 환경
+다른 bringup/unpack/손 프로그램이 `/dev/ttyAMA4`를 사용 중이면 먼저 해당 터미널에서 Ctrl+C로 종료한다. 아래 명령은 **Robot PC 컨테이너 안**에서, 빌드 후 실행한다. 손의 4핀 전원 용량과 핀 배열 확인 전에는 이 읽기 검사까지만 진행한다.
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 source /root/ros2_ws/install/setup.bash
 source /workspace/omy_ws/install/setup.bash
-export OMY_HX5_REPO="/workspace/SHAPE_UP_Tactile"
-export ROS_DOMAIN_ID=30
-export RMW_IMPLEMENTATION=rmw_zenoh_cpp
-# 이 컨테이너에서 띄운 라우터를 사용한다. 이전 원격 client 설정이 남아 있으면 제거.
-unset ZENOH_CONFIG_OVERRIDE
+ros2 run omy_hx5_bringup omy_hx5_end_proxy_probe --port /dev/ttyAMA4
 ```
 
-## Robot PC 컨테이너 · 터미널 A — Zenoh 라우터
+정상이면 `END 210: model 230 OK; left HX5 via END: ID 140, model 261 OK; voltage ...; status ...; No hand command sent.`가 출력된다. 오류가 나거나 END 설정 복원이 실패했다고 표시되면 **런치를 진행하지 말고 전체 출력**을 보내준다. 이후 손의 높은 주소에 있는 TableSync 데이터에 END를 통해 접근할 수 있는지 확인한 뒤 실제 손 제어 코드를 활성화한다.
 
-```bash
-# 이미 라우터가 실행 중이면 생략. 이 터미널은 계속 유지.
-# main의 zenohd alias 대신 .bashrc 의존성이 없는 명령 사용.
-ros2 run rmw_zenoh_cpp rmw_zenohd
-```
-
-## Robot PC 컨테이너 · 터미널 B — 실물 손 직접 제어
-
-```bash
-# 별도 포트/ID ping 명령 없이 실물 드라이버와 손 명령 브리지를 실행.
-# 실제 팔이 10초 동안 unpack 영점으로 이동함.
-# 시작 자세는 공식 포장 자세 또는 이미 unpack된 자세여야 함.
-# unpack 완료 후 팔 컨트롤러가 자세를 유지. 손 명령은 열린 키보드 입력과
-# 실제 관절 상태·촉각 baseline이 준비된 뒤 발행됨.
-# 기존 omy_3m_unpack.launch.py 또는 omy_ai는 원래 터미널에서 종료한 뒤 실행.
-ros2 launch omy_hx5_bringup omy_hx5_hand_live.launch.py
-```
-
-## Robot PC 컨테이너 · 터미널 C — 손 명령만 중지
-
-```bash
-# 팔의 unpack 자세 유지는 계속됨. 손 컨트롤러는 마지막 목표를 유지.
-ros2 param set /hx5_left_omy_teleop command_enabled false
-# 전체 launch를 Ctrl+C로 종료하면 팔 토크가 꺼지고 OMY 관절 브레이크가 자세를 유지함.
-# 종료한 launch의 /dev/ttyAMA4 소유권도 해제되므로 다른 bringup은 종료 후 시작.
-```
-
-## Robot PC 컨테이너 · 터미널 C — 상태 확인
-
-```bash
-# 새 SSH 세션 → 컨테이너 진입 → 앞의 공통 환경 source 후 실행.
-ros2 control list_hardware_components
-ros2 control list_controllers
-ros2 topic echo /hx5/arm_unpack_ready --once
-# 실물 손 드라이버의 상태.
-ros2 topic echo /omy_hx5_end/dxl_state --once
-ros2 topic echo /joint_states --once
-ros2 topic echo /left_hand/finger_pressures --once
-ros2 topic hz /left_hand/finger_pressures
-```
-
-## User PC — 키보드 원격 제어
-
-```bash
-# User PC 호스트 터미널. Robot PC SSH 셸 밖에서 실행.
-export OMY_HX5_REPO="/home/jiwoo/.codex/worktrees/hx5-d20/SHAPE_UP_Tactile"
-source /opt/ros/jazzy/setup.bash
-# 마지막으로 확인된 IP. 현재 Robot PC IP가 다르면 이 값을 수정.
-export OMY_ROBOT_IP="10.42.0.241"
-export ROS_DOMAIN_ID=30
-export RMW_IMPLEMENTATION=rmw_zenoh_cpp
-export ZENOH_CONFIG_OVERRIDE="mode=\"client\";connect/endpoints=[\"tcp/${OMY_ROBOT_IP}:7447\"]"
-ros2 daemon stop
-
-# Robot PC의 팔 준비 토픽이 실제로 도착하고 data: true인지 확인.
-# 시간 초과, false, 또는 토픽 미발견이면 키보드를 시작하지 말고 라우터·IP·launch를 확인.
-timeout 10s ros2 topic echo /hx5/arm_unpack_ready --once
-# Publisher count가 1 이상이어야 촉각 baseline을 수집할 수 있음.
-ros2 topic info /left_hand/finger_pressures
-```
-
-`data: true`와 압력 토픽의 `Publisher count`가 1 이상인 것을 확인한 다음, **같은 User PC 터미널**에서 실행한다.
-
-```bash
-# ]: 5% 닫기, [: 5% 열기, z: 모두 열기, x: 모두 닫기, ESC: 종료.
-# 먼저 z로 열린 요청을 유지하고, 실물 첫 동작은 ]로 5%부터 확인.
-python3 "$OMY_HX5_REPO/user_pc/omy_hx5_keyboard.py" --step 0.05
-```
-
-## User PC — 촉각 히트맵 / RViz
-
-```bash
-# User PC 호스트의 별도 터미널. Robot PC SSH 셸 밖에서 실행.
-export OMY_HX5_REPO="/home/jiwoo/.codex/worktrees/hx5-d20/SHAPE_UP_Tactile"
-source /opt/ros/jazzy/setup.bash
-source /home/jiwoo/Projects/hx5_tactile_viz_ws/install/setup.bash
-# 키보드 터미널과 동일한 현재 Robot PC IP를 사용.
-export OMY_ROBOT_IP="10.42.0.241"
-export ROS_DOMAIN_ID=30
-export RMW_IMPLEMENTATION=rmw_zenoh_cpp
-export ZENOH_CONFIG_OVERRIDE="mode=\"client\";connect/endpoints=[\"tcp/${OMY_ROBOT_IP}:7447\"]"
-ros2 daemon stop
-bash "$OMY_HX5_REPO/user_pc/run_hx5_tactile_viz.sh"
-```
-
-## Robot PC 컨테이너 — 팔·손 리더 텔레옵 전 방아쇠 값 측정
-
-```bash
-# 손 전용 launch와 기존 omy_ai를 종료한 뒤, 터미널 B에서 리더만 실행.
-# 터미널 A의 Zenoh 라우터는 유지하고 터미널마다 앞의 공통 환경을 설정.
-ros2 launch open_manipulator_bringup omy_l100_leader_ai.launch.py use_mock_hardware:=false
-```
-
-```bash
-# 별도 Robot PC 컨테이너 터미널 C에서 실행. 리더를 완전히 연 상태와
-# 완전히 닫은 상태에서 각각 한 번씩 입력해 joint_names의 rh_r1_joint와
-# 같은 순서에 있는 positions 값을 기록. 배열의 7번째라고 가정하지 않음.
-ros2 topic echo /leader/joint_trajectory --once
-ros2 topic echo /leader/joint_trajectory --once
-```
-
-측정을 마치면 터미널 B의 리더 단독 launch를 `Ctrl+C`로 종료한다. 아래 텔레옵 launch가 리더를 다시 실행하므로 기존 `omy_ai`나 리더 단독 launch를 동시에 켜지 않는다.
-
-## Robot PC 컨테이너 · 터미널 B — 팔·손 리더 텔레옵 드라이런
-
-```bash
-# 손 전용 launch를 종료한 뒤, 팔까지 시험할 때만 실행.
-# 팔은 리더를 따라 움직이며 손 궤적만 드라이런.
-# 위에서 측정한 leader 열린 값·닫힌 값 및 장착 좌표를 입력.
-# 팔 텔레옵은 시작 후 리더를 따라 움직이므로 리더를 잡고 시작.
-read -r -p 'leader open rh_r1_joint: ' MEASURED_OPEN
-read -r -p 'leader closed rh_r1_joint: ' MEASURED_CLOSED
-read -r -p 'hand mount xyz (X Y Z): ' MEASURED_MOUNT_XYZ
-read -r -p 'hand mount rpy (ROLL PITCH YAW): ' MEASURED_MOUNT_RPY
-
-ros2 launch omy_hx5_bringup omy_hx5_teleop.launch.py \
-  mock_arm:=false mock_hand:=false start_leader:=true mock_leader:=false \
-  enable_arm_teleop:=true enable_hand_teleop:=true hand_dry_run:=true \
-  leader_open:="$MEASURED_OPEN" leader_closed:="$MEASURED_CLOSED" \
-  hand_mount_xyz:="$MEASURED_MOUNT_XYZ" hand_mount_rpy:="$MEASURED_MOUNT_RPY"
-```
-
-## Robot PC 컨테이너 · 터미널 B — 팔·손 리더 텔레옵 실행
-
-```bash
-# 앞 단계 launch를 유지하고, 별도 터미널 C에서 실행.
-# 리더 방아쇠를 열고 손이 열린 무접촉 상태에서 전환. 새 baseline 수집 후 손 명령 발행.
-ros2 param set /hx5_left_omy_teleop command_enabled true
-```
-
-## 참고한 main 실행 순서
-
-[최신 main의 OMY 실행표](https://github.com/chlgkals07/SHAPE_UP_Tactile/blob/254084dbff5e0b1bfc85020403ec88999a7159e3/docs/data_preparation/omy_demonstration_runbook.md) · [10/09 SSH·컨테이너·Zenoh 현장 기록](field-test/2026-10-09-omy-leap-field-test.md)
+현재 `omy_hx5_hand_live.launch.py`, `omy_hx5_official_hand.launch.py`, 실물 `omy_hx5_teleop.launch.py`는 직접 ID 140에 접근하는 이전 드라이버 경로를 사용하므로 시작 시 명시적으로 중단된다. 이 상태에서 키보드 원격 제어를 실행해도 손은 제어되지 않는다.

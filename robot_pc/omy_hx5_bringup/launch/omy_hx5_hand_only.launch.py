@@ -80,6 +80,13 @@ def generate_launch_description():
         if arm not in ("true", "false") or hand not in ("true", "false") or arm != hand:
             raise RuntimeError("Use mock_arm:=true mock_hand:=true for simulation, or "
                                "mock_arm:=false mock_hand:=false for physical unpack/hold")
+        if arm == "false":
+            raise RuntimeError(
+                "Live HX5 launch is blocked: the vendor DynamixelHardware driver "
+                "pings hand ID 140 directly, but this OMY wiring reaches it through "
+                "END ID 210. Run omy_hx5_end_proxy_probe with all END owners stopped; "
+                "do not start hand motion until the END proxy control path and power "
+                "capacity have been verified.")
         return []
 
     return LaunchDescription([

@@ -86,6 +86,11 @@ def generate_launch_description():
         if arm not in ("true", "false") or hand not in ("true", "false") or arm != hand:
             raise RuntimeError(
                 "Use mock_arm:=true mock_hand:=true, or mock_arm:=false mock_hand:=false")
+        if arm == "false":
+            raise RuntimeError(
+                "The official direct-ID hand driver cannot reach ID 140 behind "
+                "OMY END ID 210. Use omy_hx5_end_proxy_probe first; physical "
+                "motion is blocked until an END proxy control path is verified.")
         return []
 
     return LaunchDescription([
