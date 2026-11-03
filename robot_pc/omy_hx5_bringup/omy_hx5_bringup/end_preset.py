@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import argparse
 
-from .end_proxy import EndProxy, EndProxyError, acquire_end_bus_lock
+from .end_proxy import EndProxy, EndProxyError, acquire_end_bus_lock, make_fresh_rx_port
 
 
 def main(argv=None) -> int:
@@ -16,7 +16,9 @@ def main(argv=None) -> int:
     parser.add_argument("--port", default="/dev/ttyAMA4")
     parser.add_argument("--baud", type=int, default=4_000_000)
     parser.add_argument("--preset-index", type=int, choices=range(3), default=0)
-    parser.add_argument("--motion-time-ms", type=int, default=1000)
+    parser.add_argument("--motion-time-ms", type=int, default=1000,
+                        help="HX5 Preset Motion Time (2018); the control table "
+                             "describes it as the delay between motion playback")
     args, ros_args = parser.parse_known_args(argv)
     if ros_args and ros_args[0] != "--ros-args":
         parser.error(f"unrecognized arguments: {' '.join(ros_args)}")
@@ -26,7 +28,7 @@ def main(argv=None) -> int:
     try:
         import rclpy
         from rclpy.executors import ExternalShutdownException
-        from dynamixel_sdk import PacketHandler, PortHandler
+        from dynamixel_sdk import PacketHandler
         from std_msgs.msg import Int32
     except ModuleNotFoundError as exc:
         parser.exit(1, f"Missing Robot PC dependency: {exc.name}\n")
@@ -35,7 +37,7 @@ def main(argv=None) -> int:
         lock_fd = acquire_end_bus_lock()
     except EndProxyError as exc:
         parser.exit(1, f"END preset bringup failed: {exc}\n")
-    port = PortHandler(args.port)
+    port = make_fresh_rx_port(args.port)
     if not port.openPort():
         parser.exit(1, f"Cannot open {args.port}; stop other END owners first\n")
     try:
@@ -57,7 +59,8 @@ def main(argv=None) -> int:
                                       duration_ms=args.motion_time_ms)
                     node.get_logger().info(
                         f"END 210 -> HX5 140 preset {args.preset_index}: "
-                        f"{message.data}% in {args.motion_time_ms} ms; register echo OK. "
+                        f"{message.data}%, Preset Motion Time {args.motion_time_ms} ms; "
+                        "register echo OK. "
                         "Observe the physical hand to verify motion.")
                 except (EndProxyError, OSError) as exc:
                     callback_error = exc

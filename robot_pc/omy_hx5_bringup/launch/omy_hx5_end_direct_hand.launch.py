@@ -35,7 +35,12 @@ def generate_launch_description():
             "--port", LaunchConfiguration("end_port"),
             "--allow-active-status32", LaunchConfiguration("allow_active_status32"),
             "--read-only", LaunchConfiguration("read_only"),
-        ], output="screen")
+            "--goal-current", LaunchConfiguration("goal_current"),
+        ],
+        # Shutdown turns the hand watchdog and TableSync off, then restores
+        # END. Missing END ACKs add readback waits; do not SIGTERM mid-restore.
+        sigterm_timeout="20", sigkill_timeout="10",
+        output="screen")
 
     def after_arm(event, context):
         if event.returncode:
@@ -49,6 +54,8 @@ def generate_launch_description():
         DeclareLaunchArgument("end_port", default_value="/dev/ttyAMA4"),
         DeclareLaunchArgument("allow_active_status32", default_value="false"),
         DeclareLaunchArgument("read_only", default_value="false"),
+        # Official ROBOTIS left-hand launch publishes Goal Current 300.
+        DeclareLaunchArgument("goal_current", default_value="300"),
         DeclareLaunchArgument("hand_mount_xyz", default_value="0 -0.006 0"),
         DeclareLaunchArgument("hand_mount_rpy", default_value="1.57079632679 1.57079632679 0"),
         Node(package="controller_manager", executable="ros2_control_node",

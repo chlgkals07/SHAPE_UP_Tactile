@@ -37,7 +37,11 @@ WRITE_BUFFER = 200
 COMM_RX_TIMEOUT = -3001
 HAND_TICK_ADDRESS = 100
 MAX_FRESH_PAYLOAD = 126  # END's two read slots share a 128-byte buffer.
-SAFE_HAND_READ_CHUNK = 16  # Stock OMY END uses a 16-byte first read slot.
+# 2026-11-03: single-slot 90-byte hand reads (indirect health window) and
+# 120-byte motor reads were consistent; only the two-slot window read zeros.
+SAFE_HAND_READ_CHUNK = 90
+# A forwarded write must stay enabled for the same refresh time as a read.
+FORWARD_SETTLE = 0.15
 
 SAVED_REGISTERS = (
     (TOOL_ID, 1), (SYNC_ENABLE, 1),
@@ -359,14 +363,12 @@ class EndProxy:
         self.write_end(SYNC_ENABLE, 1, 0)
         self.write_end(READ_ADDRESS_1, 2, address)
         self.write_end(READ_SIZE_1, 2, len(data))
-        self.write_end(READ_ADDRESS_2, 2, HAND_TICK_ADDRESS)
-        self.write_end(READ_SIZE_2, 2, 2)
         self.write_end(WRITE_ADDRESS_1, 2, address)
         self.write_end(WRITE_SIZE_1, 2, len(data))
         self.write_end_buffer(data)
         try:
             self.write_end(SYNC_ENABLE, 1, 1)
-            self.sleep(0.05)
+            self.sleep(FORWARD_SETTLE)
         finally:
             self.write_end(SYNC_ENABLE, 1, 0)
             self.write_end(WRITE_SIZE_1, 2, 0)
@@ -387,7 +389,8 @@ class EndProxy:
                 f"model={model}, result={self.packet.getTxRxResult(result)}, error={error}"
             )
         with self.temporary_read_window():
-            model = int.from_bytes(self.read_hand(0, 2, stable=True), "little")
+            identity = self.read_hand(0, 8, stable=True)
+            model = int.from_bytes(identity[:2], "little")
             if model != LEFT_HAND_MODEL:
                 raise EndProxyError(
                     f"END 210 did not forward left HX5 model {LEFT_HAND_MODEL}; "
@@ -396,6 +399,7 @@ class EndProxy:
             voltage = int.from_bytes(self.read_hand(102, 2), "little")
             status = self.read_hand(106, 1)[0]
         return {"end_model": END_MODEL, "hand_model": model,
+                "hand_firmware": identity[6],
                 "hand_voltage_centivolts": voltage, "hand_status": status}
 
     def probe_hand_state(self) -> dict[str, int | bool]:
@@ -418,6 +422,7 @@ class EndProxy:
             status = self.read_hand(106, 1)[0]
             second_tick = int.from_bytes(self.read_hand(HAND_TICK_ADDRESS, 2), "little")
         return {
+            "firmware": identity[6],
             "mode": mode,
             "table_sync": table_sync,
             "watchdog": watchdog,
@@ -526,6 +531,8 @@ class EndProxy:
         """Forward one bounded preset request through END to HX5 ID 140."""
         if not getattr(self, "_preset_active", False):
             raise EndProxyError("preset session is not active")
+        # HX5 control table: 2018 is Preset Motion Time, documented as the
+        # delay between motion playback, range 0..32,737 ms.
         if not 0 <= index <= 2 or not 0 <= percent <= 100 or not 1 <= duration_ms <= 32737:
             raise ValueError("preset requires index 0..2, percent 0..100, time 1..32737 ms")
         if self._preset_original_aliases is None:
@@ -549,6 +556,8 @@ class EndProxy:
             self.write_end(SYNC_ENABLE, 1, 0)
             self.write_end(WRITE_SIZE_1, 2, 0)
         self.write_end(SYNC_ENABLE, 1, 1)
+        # Let END refresh its read buffer before treating the echo as current.
+        self.sleep(FORWARD_SETTLE)
         if self.read(READ_BUFFER, 4) != data:
             raise EndProxyError("HX5 preset registers did not echo the requested values")
 
@@ -596,7 +605,7 @@ def main(argv=None) -> int:
         parser.error("choose only one inspection mode")
 
     try:
-        from dynamixel_sdk import PacketHandler, PortHandler
+        from dynamixel_sdk import PacketHandler
     except ModuleNotFoundError as exc:
         if exc.name == "serial":
             parser.exit(1, "Missing pyserial in the Robot PC container; "
@@ -607,7 +616,7 @@ def main(argv=None) -> int:
         lock_fd = acquire_end_bus_lock()
     except EndProxyError as exc:
         parser.exit(1, f"END proxy probe failed: {exc}\n")
-    port = PortHandler(args.port)
+    port = make_fresh_rx_port(args.port)
     if not port.openPort():
         parser.exit(1, f"Cannot open {args.port}; stop other END owners first\n")
     try:
@@ -627,7 +636,8 @@ def main(argv=None) -> int:
             result = proxy.probe()
             print(
                 f"END {END_ID}: model {result['end_model']} OK; "
-                f"left HX5 via END: ID {HAND_ID}, model {result['hand_model']} OK; "
+                f"left HX5 via END: ID {HAND_ID}, model {result['hand_model']} OK, "
+                f"firmware {result['hand_firmware']}; "
                 f"voltage {result['hand_voltage_centivolts'] / 100:.2f} V; "
                 f"status {result['hand_status']}. No hand command sent."
             )

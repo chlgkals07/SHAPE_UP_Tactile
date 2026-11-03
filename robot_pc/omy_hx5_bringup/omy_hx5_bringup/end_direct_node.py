@@ -13,8 +13,8 @@ from pathlib import Path
 from threading import Lock
 
 from .direct_trajectory import (
-    JOINT_NAMES, Segment, make_jog_segment, make_trajectory_segment,
-    validate_currents,
+    JOINT_NAMES, OFFICIAL_GOAL_CURRENT, Segment, make_jog_segment,
+    make_trajectory_segment, validate_currents,
 )
 from .end_direct_core import EndDirect, load_vendor_motor_settings
 from .end_proxy import EndProxyError, acquire_end_bus_lock, make_fresh_rx_port
@@ -27,9 +27,14 @@ def main(argv=None) -> int:
     parser.add_argument("--allow-active-status32", choices=("true", "false"),
                         default="false")
     parser.add_argument("--read-only", choices=("true", "false"), default="false")
+    parser.add_argument("--goal-current", type=int, default=OFFICIAL_GOAL_CURRENT,
+                        help="Goal Current for full-hand trajectories until "
+                             "/effort_l_controller/commands arrives (official 300)")
     args, ros_args = parser.parse_known_args(argv)
     if ros_args and ros_args[0] != "--ros-args":
         parser.error(f"unrecognized arguments: {' '.join(ros_args)}")
+    if not 0 <= args.goal_current <= 910:
+        parser.error("--goal-current must be 0..910")
     try:
         import rclpy
         from ament_index_python.packages import get_package_share_directory
@@ -47,17 +52,25 @@ def main(argv=None) -> int:
         parser.exit(1, f"Missing Robot PC ROS dependency: {exc.name}\n")
 
     class DirectNode(Node):
-        def __init__(self, direct: EndDirect, first, *, read_only: bool):
+        def __init__(self, direct: EndDirect, first, *, read_only: bool,
+                     goal_current: int):
             super().__init__("omy_hx5_end_direct")
             self.direct = direct
             self.read_only = read_only
             self.lock = Lock()
             self.positions = first.positions
+            # Goals the motors hold now; every new segment starts here.
+            self.command = direct.primed_positions
+            self.command_currents = direct.primed_currents
             self.segment: Segment | None = None
             self.jog_index: int | None = None
-            self.currents = (100,) * 20
+            self.currents = (goal_current,) * 20
             self.last_tick = first.tick
             self.tick_changed = time.monotonic()
+            # JointState.velocity is estimated from successive positions and
+            # the hand's millisecond tick; ROBOTIS joint_trajectory_executor
+            # indexes velocity for every joint.
+            self.velocities = (0.0,) * 20
             self.active_action = False
             self.fault = None
             self.joints_pub = self.create_publisher(JointState, "/joint_states", 10)
@@ -82,9 +95,9 @@ def main(argv=None) -> int:
             self.create_timer(0.05, self.poll, callback_group=group)
 
         @staticmethod
-        def segment_from_message(msg, measured):
+        def segment_from_message(msg, start):
             return make_trajectory_segment(msg.joint_names, msg.points,
-                                           measured, time.monotonic())
+                                           start, time.monotonic())
 
         def on_keyboard(self, msg):
             if self.read_only:
@@ -101,7 +114,7 @@ def main(argv=None) -> int:
                     self.get_logger().warn("Action is active; keyboard command ignored")
                     return
                 try:
-                    self.segment = self.segment_from_message(msg, self.positions)
+                    self.segment = self.segment_from_message(msg, self.command)
                     self.jog_index = None
                 except ValueError as exc:
                     self.get_logger().error(f"Rejected hand trajectory: {exc}")
@@ -135,7 +148,7 @@ def main(argv=None) -> int:
                     return
                 try:
                     self.segment = make_jog_segment(
-                        msg.data[0], msg.data[1], self.positions, now)
+                        msg.data[0], msg.data[1], self.command, now)
                     self.jog_index = int(msg.data[0]) - 1
                 except ValueError as exc:
                     self.get_logger().error(f"Rejected hand jog: {exc}")
@@ -150,7 +163,7 @@ def main(argv=None) -> int:
                 if self.active_action:
                     return GoalResponse.REJECT
                 try:
-                    self.segment_from_message(request.trajectory, self.positions)
+                    self.segment_from_message(request.trajectory, self.command)
                 except ValueError as exc:
                     self.get_logger().error(f"Rejected hand action: {exc}")
                     return GoalResponse.REJECT
@@ -165,7 +178,7 @@ def main(argv=None) -> int:
             try:
                 with self.lock:
                     self.segment = self.segment_from_message(
-                        goal_handle.request.trajectory, self.positions)
+                        goal_handle.request.trajectory, self.command)
                     self.jog_index = None
                     owned = self.segment
                 deadline = owned.start_time + owned.duration + 3.0
@@ -205,19 +218,31 @@ def main(argv=None) -> int:
                 now = time.monotonic()
                 with self.lock:
                     if snapshot.tick != self.last_tick:
+                        elapsed = ((snapshot.tick - self.last_tick) % 32768) / 1000.0
+                        self.velocities = tuple(
+                            (new - old) / elapsed
+                            for new, old in zip(snapshot.positions, self.positions))
                         self.tick_changed = now
                         self.last_tick = snapshot.tick
                     if now - self.tick_changed > 0.5:
                         raise EndProxyError("HX5 controller tick stopped updating")
                     self.positions = snapshot.positions
+                    velocities = self.velocities
                     segment = self.segment
                     jog_index = self.jog_index
-                    currents = self.currents
+                    goal = None
+                    if segment is not None and not self.read_only:
+                        goal = segment.sample(now)
+                        self.command = goal
+                        if jog_index is None:
+                            self.command_currents = self.currents
+                    currents = self.command_currents
                 stamp = self.get_clock().now().to_msg()
                 joint_state = JointState()
                 joint_state.header.stamp = stamp
                 joint_state.name = list(JOINT_NAMES)
                 joint_state.position = list(snapshot.positions)
+                joint_state.velocity = list(velocities)
                 self.joints_pub.publish(joint_state)
                 tactile = HandPressures()
                 tactile.header.stamp = stamp
@@ -230,13 +255,13 @@ def main(argv=None) -> int:
                     sensor.pressure_values = list(values)
                     tactile.sensors.append(sensor)
                 self.pressure_pub.publish(tactile)
-                if segment is not None and not self.read_only:
-                    positions = segment.sample(now)
+                if goal is not None:
                     if jog_index is None:
-                        self.direct.write_goals(positions, currents)
+                        self.direct.write_goals(goal, currents)
                     else:
+                        # A jog keeps the motor's held current; only position changes.
                         self.direct.write_one_goal(
-                            jog_index, positions[jog_index], currents[jog_index])
+                            jog_index, goal[jog_index], currents[jog_index])
             except (EndProxyError, OSError, ValueError) as exc:
                 with self.lock:
                     self.fault = exc
@@ -266,12 +291,17 @@ def main(argv=None) -> int:
             read_only=args.read_only == "true")
         issues = direct.audit_motors(expected)
         if issues:
-            raise EndProxyError("HX5 motor setup does not match official Xacro:\n" +
-                                "\n".join(issues))
+            raise EndProxyError(
+                "HX5 motor setup does not match official Xacro; run "
+                "omy_hx5_end_torque_on to apply official RAM settings:\n" +
+                "\n".join(issues))
+        for note in direct.audit_notes:
+            print(f"Note: {note}")
         direct.verify_direct_setup()
         with direct.direct_session() as first:
             rclpy.init(args=ros_args)
-            node = DirectNode(direct, first, read_only=args.read_only == "true")
+            node = DirectNode(direct, first, read_only=args.read_only == "true",
+                              goal_current=args.goal_current)
             executor = MultiThreadedExecutor(num_threads=3)
             executor.add_node(node)
             interface_note = (
@@ -280,7 +310,10 @@ def main(argv=None) -> int:
                 "ROBOTIS left-hand keyboard trajectory and tactile topics are active.")
             node.get_logger().info(
                 "END 210 -> HX5 140 Direct Mode ready. No motion command sent. "
-                f"read_only={node.read_only}, active_status={first.status}. "
+                f"firmware={direct.hand_firmware}, read_only={node.read_only}, "
+                f"active_status={first.status}, held_currents="
+                f"{min(direct.primed_currents)}..{max(direct.primed_currents)}, "
+                f"trajectory_current={args.goal_current}. "
                 + interface_note)
             try:
                 executor.spin()

@@ -207,8 +207,9 @@ class Hx5RosBridge:
                     return SetParametersResult(successful=False, reason="hand joint states stale")
                 if (self._leader is None or now - self._leader[1] > self._leader_timeout
                         or self._leader[0] > self._core.config.baseline_grasp_max):
-                    return SetParametersResult(successful=False,
-                                               reason="press z and keep keyboard client running")
+                    return SetParametersResult(
+                        successful=False,
+                        reason="leader trigger must be fresh and released (keyboard: press z)")
                 if any(abs(position - opened) > self._core.config.baseline_open_tolerance_rad
                        for position, opened, span in zip(
                            self._joint[0], self._core.config.open_positions,
@@ -289,7 +290,10 @@ class Hx5RosBridge:
             # A pre-activation command has never been sent to the hand. If the
             # measured posture changed, baseline samples and the seeded target
             # may no longer describe the same unloaded open hand.
-            if max(abs(a - b) for a, b in zip(self._last_command, self._joint[0])) > self._startup_delta_limit:
+            # Compare with the clamped measurement: a resting joint just past
+            # its limit was seeded at that limit and has not moved yet.
+            measured = self._core.clamp_to_limits(self._joint[0])
+            if max(abs(a - b) for a, b in zip(self._last_command, measured)) > self._startup_delta_limit:
                 self._startup_motion_fault = True
             if self._startup_motion_fault:
                 self._report("hand moved during baseline; restart bridge before commanding", now)

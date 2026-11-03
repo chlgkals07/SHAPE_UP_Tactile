@@ -14,7 +14,7 @@ from omy_hx5_bringup.direct_trajectory import (
 from omy_hx5_bringup.end_direct_core import (
     EndDirect, MOTOR_IDS, MOTOR_INDIRECT, SENSOR_IDS, load_vendor_motor_settings,
 )
-from omy_hx5_bringup.end_proxy import EndProxyError
+from omy_hx5_bringup.end_proxy import SAFE_HAND_READ_CHUNK, EndProxyError
 from omy_hx5_bringup.end_layout import (
     INDIRECT_TARGETS, POSITION_SCALE, READ_BLOCK_START, WRITE_BLOCK_START,
     WRITE_WINDOW,
@@ -66,7 +66,14 @@ class FakeBus:
             motor[10] = expected[motor_id].drive_mode
             motor[11] = 5
             motor[20:24] = pack("<i", expected[motor_id].homing_offset)
+            motor[60:62] = pack("<H", 2)
             motor[64] = 1
+            motor[80:82] = pack("<H", 1000)
+            motor[84:86] = pack("<H", 500)
+            motor[102:104] = pack("<H", 100)
+            motor[108:112] = pack("<I", 50)
+            motor[112:116] = pack("<I", 100)
+            motor[116:120] = pack("<I", 1800 + motor_id)
             motor[168:188] = pack("<10H", *MOTOR_INDIRECT)
             self.motors[motor_id] = motor
         for sensor_id in SENSOR_IDS:
@@ -76,6 +83,8 @@ class FakeBus:
             sensor[72:81] = bytes(range(1, 10))
             self.sensors[sensor_id] = sensor
         self.goals = {}
+        self.enable_write_data = None  # hand Write Data when TableSync turns on
+        self.hand_control_writes = []
         self.end_writes = []
         self.freeze_hand_tick = False
         self.hand_reads_with_write_slot = 0
@@ -111,6 +120,14 @@ class FakeBus:
         device = self._device()
         if device is self.hand and 634 <= address <= 889:
             address = int.from_bytes(device[122 + 2 * (address - 634):124 + 2 * (address - 634)], "little")
+        if device is self.hand and address in (8, 70):
+            self.hand_control_writes.append((address, value))
+            if address == 70 and value and not device[70]:
+                self.enable_write_data = {
+                    MOTOR_IDS[4 * finger + slot]: bytes(
+                        device[WRITE_BLOCK_START + 198 * finger + 4 * slot:
+                               WRITE_BLOCK_START + 198 * finger + 4 * slot + 4])
+                    for finger in range(5) for slot in range(4)}
         device[address] = value
         if device is self.hand and self.hand[70] and address >= WRITE_BLOCK_START:
             for finger in range(5):
@@ -155,6 +172,12 @@ class FakeBus:
             if address == 46:
                 self._forward()
         return 0, 0
+
+
+def audited(bus, **kwargs):
+    proxy = EndDirect(None, bus, sleep=lambda _: None, **kwargs)
+    assert proxy.audit_motors(load_vendor_motor_settings(XACRO)) == []
+    return proxy
 
 
 def test_motor_audit_keeps_one_end_session_and_two_read_windows_per_motor():
@@ -260,11 +283,11 @@ def test_torque_on_aborts_before_any_write_if_a_motor_watchdog_is_active():
         motor[64] = 0
         motor[132:136] = pack("<I", 2048)
     bus.motors[164][98] = 100
+    before = {motor_id: bytes(motor) for motor_id, motor in bus.motors.items()}
     proxy = EndDirect(None, bus, sleep=lambda _: None)
     with pytest.raises(EndProxyError, match="watchdog=100"):
         proxy.enable_motor_torque(load_vendor_motor_settings(XACRO))
-    assert all(motor[64] == 0 for motor in bus.motors.values())
-    assert all(motor[102:104] == b"\x00\x00" for motor in bus.motors.values())
+    assert {motor_id: bytes(motor) for motor_id, motor in bus.motors.items()} == before
 
 
 def test_torque_on_rolls_back_motors_after_a_failed_enable():
@@ -321,7 +344,7 @@ def test_vendor_configuration_and_20_goal_path_keep_persistent_aliases():
 
 def test_jog_writes_only_one_motor_slot_and_can_switch_back_to_full_trajectory():
     bus = FakeBus()
-    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    proxy = audited(bus)
     proxy.prepare_direct(apply=True)
     original_end = bus.end.copy()
     original_buffer = bytes(bus.buffer)
@@ -346,7 +369,7 @@ def test_jog_writes_only_one_motor_slot_and_can_switch_back_to_full_trajectory()
 
 def test_direct_launch_sets_watchdog_only_while_active():
     bus = FakeBus()
-    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    proxy = audited(bus)
     proxy.prepare_direct(apply=True)
     assert proxy.verify_direct_setup() == 0
     with proxy.direct_session():
@@ -364,7 +387,7 @@ def test_undocumented_active_status_requires_opt_in_and_still_rejects_other_erro
                 self.hand[106] = 32 if value else 0
 
     bus = ActiveStatusBus()
-    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    proxy = audited(bus)
     proxy.prepare_direct(apply=True)
     original_end = bus.end.copy()
     with pytest.raises(EndProxyError, match="undocumented active status 32"):
@@ -373,8 +396,7 @@ def test_undocumented_active_status_requires_opt_in_and_still_rejects_other_erro
     assert bus.hand[70] == 0 and bus.hand[8] == 0
     assert bus.end == original_end
 
-    proxy = EndDirect(None, bus, sleep=lambda _: None,
-                      allow_active_status32=True, read_only=True)
+    proxy = audited(bus, allow_active_status32=True, read_only=True)
     with proxy.direct_session() as first:
         assert first.status == 32
         assert proxy.read_snapshot().status == 32
@@ -429,7 +451,7 @@ def test_active_health_probe_compares_paths_and_disables_hand_sync():
             return data, result, error
 
     bus = CorruptOnlyWhenActiveBus()
-    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    proxy = audited(bus)
     proxy.prepare_direct(apply=True)
     original_end = bus.end.copy()
     samples = proxy.compare_active_health()
@@ -458,7 +480,7 @@ def test_direct_hand_read_uses_only_bounded_first_slot():
     class FirstSlotOnlyBus(FakeBus):
         def readTxRx(self, port, device_id, address, size):
             if address == 72 and self.end[13] == 140:
-                assert self.end[52] <= 16
+                assert self.end[52] <= SAFE_HAND_READ_CHUNK
                 assert self.end[54] == 0
             return super().readTxRx(port, device_id, address, size)
 
@@ -571,3 +593,97 @@ def test_interrupted_direct_write_window_must_be_recovered():
     assert proxy.restore_preset_mode() == 0
     assert bus.end[46] == 0 and bus.end[60] == 0
     assert bus.hand[33] == 1 and bus.hand[70] == 0
+
+
+@pytest.mark.parametrize("read_only", (False, True))
+def test_direct_session_primes_write_data_with_held_goals_before_tablesync(read_only):
+    bus = FakeBus()
+    proxy = audited(bus, read_only=read_only)
+    proxy.prepare_direct(apply=True)
+    with proxy.direct_session():
+        held = {motor_id: pack("<HH", 100, 1800 + motor_id) for motor_id in MOTOR_IDS}
+        assert bus.enable_write_data == held
+        assert proxy.primed_currents == (100,) * 20
+        assert proxy.primed_positions[0] == pytest.approx(1941 * POSITION_SCALE - pi)
+        assert bus.goals == {}
+
+
+def test_direct_session_refuses_to_start_without_a_clean_audit():
+    bus = FakeBus()
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    proxy.prepare_direct(apply=True)
+    with pytest.raises(EndProxyError, match="audit_motors"):
+        with proxy.direct_session():
+            pass
+    bus.motors[151][112:116] = pack("<I", 0)  # power-on Profile Velocity
+    issues = proxy.audit_motors(load_vendor_motor_settings(XACRO))
+    assert len(issues) == 1 and "ID 151" in issues[0]
+    with pytest.raises(EndProxyError, match="audit_motors"):
+        with proxy.direct_session():
+            pass
+    assert bus.hand[70] == 0 and bus.enable_write_data is None
+
+
+def test_direct_exit_disables_hand_watchdog_before_tablesync():
+    bus = FakeBus()
+    proxy = audited(bus)
+    proxy.prepare_direct(apply=True)
+    with proxy.direct_session():
+        bus.hand_control_writes.clear()
+    assert bus.hand_control_writes == [(8, 0), (70, 0)]
+
+
+def test_torque_on_applies_official_ram_settings_to_motors_already_holding():
+    bus = FakeBus()
+    bus.hand[33] = 0
+    for motor in bus.motors.values():
+        motor[80:88] = bytes(8)      # Position D/I/P gains after a power cycle
+        motor[108:116] = bytes(8)    # Profile Acceleration/Velocity
+        motor[132:136] = pack("<I", 2048)
+    goals = {motor_id: bytes(motor[102:120]) for motor_id, motor in bus.motors.items()}
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    assert proxy.enable_motor_torque(load_vendor_motor_settings(XACRO)) == ()
+    assert proxy.ram_updated_motors == list(MOTOR_IDS)
+    for motor_id, motor in bus.motors.items():
+        assert motor[80:82] == pack("<H", 1000) and motor[84:86] == pack("<H", 500)
+        assert motor[108:116] == pack("<II", 50, 100)
+        assert motor[64] == 1
+        assert bytes(motor[102:104]) + bytes(motor[116:120]) == goals[motor_id][:2] + goals[motor_id][14:18]
+    assert proxy.audit_motors(load_vendor_motor_settings(XACRO)) == []
+
+
+def test_trajectory_segments_start_from_commanded_pose_not_measured_state():
+    commanded = (0.0,) * 5 + (0.5,) + (0.0,) * 14
+    segment = make_segment(JOINT_NAMES, (0.0,) * 5 + (0.6,) + (0.0,) * 14,
+                           0.05, commanded, 1.0)
+    assert segment.sample(1.0) == commanded
+    jog = make_jog_segment(6, 0.03, commanded, 1.0)
+    assert jog.start == commanded and jog.goal[5] == pytest.approx(0.53)
+
+
+def test_official_initial_pose_trajectory_may_start_just_past_a_limit():
+    measured = (0.0,) * 16 + (-0.648874, 0.0, 0.0, 0.0)
+    points = [SimpleNamespace(
+        positions=tuple(value * (1 - i / 99) for value in measured),
+        time_from_start=SimpleNamespace(sec=int(2 * i / 99),
+                                        nanosec=int((2 * i / 99) % 1 * 1e9)))
+        for i in range(100)]
+    segment = make_trajectory_segment(JOINT_NAMES, points, measured, 0.0)
+    assert segment.goal == (0.0,) * 20
+    bad_goal = points[:-1] + [SimpleNamespace(positions=measured,
+                                              time_from_start=points[-1].time_from_start)]
+    with pytest.raises(ValueError, match="joint limit"):
+        make_trajectory_segment(JOINT_NAMES, bad_goal, measured, 0.0)
+
+
+def test_mode_setup_audit_ignores_power_cycled_torque_and_ram():
+    bus = FakeBus()
+    for motor in bus.motors.values():
+        motor[64] = 0
+        motor[108:116] = bytes(8)
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    assert proxy.audit_motors(load_vendor_motor_settings(XACRO), runtime=False) == []
+    assert len(proxy.audit_motors(load_vendor_motor_settings(XACRO))) == 20
+    with pytest.raises(EndProxyError, match="audit_motors"):
+        with proxy.direct_session():
+            pass

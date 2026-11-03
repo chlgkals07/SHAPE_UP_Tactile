@@ -185,14 +185,16 @@ def test_invalid_sensor_shapes_values_and_joint_states_are_rejected():
         core.initialize([0.0, 1.792] + [0.0] * 18, 0.0)
 
 
-def test_initialize_accepts_only_tiny_simulator_noise_at_zero_limit():
+def test_initialize_clamps_a_resting_pose_slightly_past_its_limit():
     core = Hx5GraspCore()
     measured = [0.0] * 20
     measured[2] = 9e-11  # Left thumb joint3 has an upper limit of 0.
+    measured[16] = -0.648874  # 2026-11-03 physical joint17, limit -0.6.
     core.initialize(measured, 0.0)
     assert core.command[2] == 0.0
+    assert core.command[16] == -0.6
     rejected = Hx5GraspCore()
-    measured[2] = 1e-4
+    measured[16] = -0.75
     with pytest.raises(ValueError, match="outside model limits"):
         rejected.initialize(measured, 0.0)
 

@@ -113,6 +113,10 @@ class Hx5CoreConfig:
     max_open_adjust_per_s: float = 0.2
     max_joint_speed_rad_s: float = 0.5
     max_control_dt_s: float = 0.1
+    # The physical left hand rested with joint17 at -0.649 rad on 2026-11-03,
+    # 0.049 rad past the URDF limit. Seed such joints at the limit instead of
+    # refusing to start; larger deviations still indicate a bad state.
+    initial_limit_margin_rad: float = 0.1
 
     def __post_init__(self) -> None:
         limits = _joint_limits(self.hand_side) if self.hand_side in ("left", "right") else None
@@ -141,6 +145,7 @@ class Hx5CoreConfig:
             "thumb_contact_ratio", "pressure_hard_cap", "reactive_ratio",
             "saturation_taxel", "pressure_gain_per_count_s", "max_close_adjust_per_s",
             "max_open_adjust_per_s", "max_joint_speed_rad_s", "max_control_dt_s",
+            "initial_limit_margin_rad",
         )
         if any(not _finite(getattr(self, key)) or getattr(self, key) <= 0.0 for key in positive):
             raise ValueError("control rates and positive thresholds must be finite and positive")
@@ -211,8 +216,16 @@ class Hx5GraspCore:
             raise RuntimeError("initialize with measured joint positions before commanding")
         return self._command
 
+    def clamp_to_limits(self, positions: Sequence[float]) -> tuple[float, ...]:
+        return tuple(max(low, min(high, float(position)))
+                     for position, (low, high) in zip(positions, self._limits))
+
     def initialize(self, current_positions: Sequence[float], now: float) -> None:
-        """Seed the command from measured joint states, without moving the hand."""
+        """Seed the command from measured joint states, clamped into model limits.
+
+        A joint within ``initial_limit_margin_rad`` outside its limit is seeded
+        at the limit; the first command moves it at most that far.
+        """
         if self._command is not None:
             raise RuntimeError("core is already initialized")
         if not _finite(now):
@@ -220,16 +233,11 @@ class Hx5GraspCore:
         if len(current_positions) != JOINT_COUNT:
             raise ValueError("initialize needs all 20 joint positions")
         positions = tuple(float(value) for value in current_positions)
-        bounded = []
+        margin = self.config.initial_limit_margin_rad
         for index, (position, (low, high)) in enumerate(zip(positions, self._limits)):
-            # Gazebo's unconstrained solver reports numerical noise near zero
-            # (about 1e-10 rad on joints whose upper limit is exactly zero).
-            # Accept only this tiny boundary error; reject actual out-of-range
-            # postures and seed commands strictly inside the model limits.
-            if not _finite(position) or not low - 1e-6 <= position <= high + 1e-6:
+            if not _finite(position) or not low - margin <= position <= high + margin:
                 raise ValueError(f"joint {index + 1} measured position is invalid or outside model limits")
-            bounded.append(max(low, min(high, position)))
-        self._command = tuple(bounded)
+        self._command = self.clamp_to_limits(positions)
         self._last_step_time = float(now)
 
     def _near_open(self) -> bool:

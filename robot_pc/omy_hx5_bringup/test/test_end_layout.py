@@ -72,3 +72,14 @@ def test_state_and_goal_byte_layout():
     assert decode_snapshot(active_status, allow_active_status32=True).status == 32
     with pytest.raises(ValueError, match="status=33"):
         decode_snapshot(active_status[:-1] + b"\x21", allow_active_status32=True)
+
+
+def test_positions_decode_as_signed_like_the_official_synctable_model():
+    state = bytearray(85)
+    state[0:2] = (-10).to_bytes(2, "little", signed=True)
+    state[2:4] = (4100).to_bytes(2, "little")
+    positions, _ = decode_state(bytes(state))
+    assert positions[0] < -3.14159 and positions[1] > 3.14159
+    state[0:2] = (9000).to_bytes(2, "little")
+    with pytest.raises(ValueError, match="implausible"):
+        decode_state(bytes(state))

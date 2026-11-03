@@ -1,6 +1,8 @@
 """Enable HX5 motor torque through OMY END after matching goals to positions.
 
-The command changes motor Goal Current, Goal Position, and Torque Enable.
+The command writes the official Profile Acceleration/Velocity and Position
+P/D gains (RAM, cleared by a power cycle), then Goal Current, Goal Position,
+and Torque Enable for motors whose torque is off.
 It never sends a grasp or teleoperation trajectory. Stop other END owners.
 """
 
@@ -10,7 +12,9 @@ import argparse
 import os
 from pathlib import Path
 
-from .end_direct_core import EndDirect, MOTOR_IDS, load_vendor_motor_settings
+from .end_direct_core import (
+    EndDirect, MOTOR_IDS, STARTUP_GOAL_CURRENT, load_vendor_motor_settings,
+)
 from .end_proxy import EndProxyError, acquire_end_bus_lock, make_fresh_rx_port
 from .end_recover import STOCK_END, read_end_settings
 
@@ -47,7 +51,9 @@ def main(argv=None) -> int:
         count = 1 if args.motor_id is not None else len(MOTOR_IDS)
         print(f"HX5 motor torque ON verified: {count} selected, "
               f"{len(enabled)} newly enabled. Goal Position was set to each "
-              "motor's measured position and startup Goal Current to 100. "
+              "newly enabled motor's measured position and startup Goal "
+              f"Current to {STARTUP_GOAL_CURRENT}. Official Profile/P/D RAM "
+              f"settings written to {direct.ram_updated_motors or 'none (already set)'}. "
               "No grasp trajectory sent.")
         return 0
     except (EndProxyError, OSError, ValueError) as exc:

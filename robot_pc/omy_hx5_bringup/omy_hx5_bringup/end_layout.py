@@ -21,6 +21,7 @@ WRITE_BLOCK_START = 1150
 HAND_INDIRECT_ADDRESS_START = 122
 HAND_INDIRECT_DATA_START = 634
 POSITION_SCALE = 2 * pi / 4096
+POSITION_RAW_MARGIN = 4096  # one extra turn; larger values indicate a corrupt read
 
 
 def read_targets() -> tuple[int, ...]:
@@ -89,12 +90,18 @@ def decode_state(data: bytes) -> tuple[tuple[float, ...], tuple[tuple[int, ...],
     for channel in range(CHANNELS):
         base = channel * 17
         for motor in range(MOTORS_PER_CHANNEL):
-            raw = int.from_bytes(data[base + 2 * motor:base + 2 * motor + 2], "little")
-            if raw > 4095:
-                raise ValueError(f"HX5 motor position {raw} is outside 0..4095")
+            # ROBOTIS hx5_d20 SyncTable model: signed 2-byte Present Position.
+            raw = int.from_bytes(data[base + 2 * motor:base + 2 * motor + 2],
+                                 "little", signed=True)
+            if not -POSITION_RAW_MARGIN <= raw <= 4095 + POSITION_RAW_MARGIN:
+                raise ValueError(f"HX5 motor position {raw} is implausible for one turn")
             positions.append(raw * POSITION_SCALE - pi)
         pressures.append(tuple(data[base + 8:base + 17]))
     return tuple(positions), tuple(pressures)
+
+
+def raw_to_position(raw: int) -> float:
+    return raw * POSITION_SCALE - pi
 
 
 def encode_command(positions: tuple[float, ...], current: int | tuple[int, ...]) -> bytes:
@@ -116,4 +123,11 @@ def encode_motor_goal(position: float, current: int) -> bytes:
     if not isfinite(position) or not -pi <= position <= pi:
         raise ValueError("HX5 goal position must be finite and within +/-pi")
     raw = min(round((position + pi) / POSITION_SCALE), 4095)
+    return encode_raw_goal(current, raw)
+
+
+def encode_raw_goal(current: int, raw: int) -> bytes:
+    """One slot from register values already read back from a motor."""
+    if not 0 <= current <= 910 or not 0 <= raw <= 4095:
+        raise ValueError("HX5 raw goal requires current 0..910 and position 0..4095")
     return current.to_bytes(2, "little") + raw.to_bytes(2, "little")

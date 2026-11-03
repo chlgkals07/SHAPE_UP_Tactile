@@ -41,7 +41,7 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     try:
         from ament_index_python.packages import get_package_share_directory
-        from dynamixel_sdk import PacketHandler, PortHandler
+        from dynamixel_sdk import PacketHandler
     except ModuleNotFoundError as exc:
         parser.exit(1, f"Missing Robot PC dependency: {exc.name}\n")
 
@@ -52,11 +52,9 @@ def main(argv=None) -> int:
         lock_fd = acquire_end_bus_lock()
     except EndProxyError as exc:
         parser.exit(1, f"END direct preparation failed: {exc}\n")
-    port = (make_fresh_rx_port(args.port)
-            if args.diagnose or args.torque_status or args.verify_direct
-            or args.compare_health_alias or args.compare_active_health
-            or args.probe_sensors
-            else PortHandler(args.port))
+    # Every mode drops late END replies before each request. A late write ACK
+    # or PING reply otherwise reads as a 0- or 3-byte "successful" reply.
+    port = make_fresh_rx_port(args.port)
     if not port.openPort():
         parser.exit(1, f"Cannot open {args.port}; stop other END owners first\n")
     try:
@@ -78,6 +76,10 @@ def main(argv=None) -> int:
             settings = read_end_settings(direct)
             if settings != STOCK_END:
                 raise EndProxyError(f"END 210 is not at stock OMY settings: {settings}")
+            issues = direct.audit_motors(expected)
+            if issues:
+                raise EndProxyError("motor configuration differs from ROBOTIS Xacro:\n" +
+                                    "\n".join(issues))
             samples = direct.compare_active_health()
             for index, sample in enumerate(samples, start=1):
                 print(f"HX5 active health sample {index}: {sample}")
@@ -131,11 +133,15 @@ def main(argv=None) -> int:
                 print(f"END 210 write status packets missing {direct.end_write_ack_timeouts} "
                       "time(s); each register value was confirmed by readback.")
             return 0
-        issues = direct.audit_motors(expected)
+        # Mode and TableSync setup need only persistent motor configuration;
+        # torque and the RAM profile/gains are checked before Direct control.
+        issues = direct.audit_motors(expected, runtime=False)
         if issues:
             raise EndProxyError("motor configuration differs from ROBOTIS Xacro:\n" +
                                 "\n".join(issues))
         print("All 20 HX5 actuators identified and match ROBOTIS setup; no motor goal sent.")
+        for note in direct.audit_notes:
+            print(f"Note: {note}")
         old_mode, changed = direct.prepare_direct(apply=args.apply)
         if args.apply:
             print(f"HX5 Direct Control Mode 0 ready; prior mode={old_mode}; "

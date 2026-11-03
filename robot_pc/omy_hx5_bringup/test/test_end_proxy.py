@@ -84,9 +84,10 @@ class FakePacket:
 
 def test_end_proxy_identifies_left_hand_and_restores_end():
     packet = FakePacket()
+    packet.hand[6] = 45
     original = packet.end.copy()
     result = EndProxy(None, packet, sleep=lambda _: None).probe()
-    assert result == {"end_model": 230, "hand_model": 261,
+    assert result == {"end_model": 230, "hand_model": 261, "hand_firmware": 45,
                       "hand_voltage_centivolts": 2368, "hand_status": 0}
     assert packet.end == original
     assert all(address in {a for a, _ in SAVED_REGISTERS}
@@ -105,11 +106,11 @@ def test_hand_state_probe_reads_small_windows_without_hand_writes():
             return super().readTxRx(port, device_id, address, size)
 
     packet = TickingPacket()
-    packet.hand.update({8: 0, 33: 0, 70: 0})
+    packet.hand.update({6: 45, 8: 0, 33: 0, 70: 0})
     original = packet.end.copy()
     state = EndProxy(None, packet, sleep=lambda _: None).probe_hand_state()
     assert state == {
-        "mode": 0, "table_sync": 0, "watchdog": 0,
+        "firmware": 45, "mode": 0, "table_sync": 0, "watchdog": 0,
         "tick_before": 2, "tick_after": 4, "tick_advanced": True,
         "voltage_centivolts": 2368, "status": 0,
     }

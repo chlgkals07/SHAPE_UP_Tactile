@@ -17,11 +17,12 @@ from xml.etree import ElementTree
 from .end_layout import (
     INDIRECT_TARGETS, READ_SIZE, READ_WINDOW, STATE_SIZE, WRITE_WINDOW,
     HandSnapshot, decode_snapshot, encode_command, encode_motor_goal,
+    encode_raw_goal, raw_to_position,
 )
 from .end_proxy import (
-    END_ID, END_MODEL, HAND_ID, LEFT_HAND_MODEL, READ_ADDRESS_1, READ_BUFFER,
-    READ_SIZE_1, SYNC_ENABLE, TOOL_ID, WRITE_ADDRESS_1, WRITE_SIZE_1, WRITE_SIZE_2,
-    EndProxy, EndProxyError,
+    END_ID, END_MODEL, FORWARD_SETTLE, HAND_ID, LEFT_HAND_MODEL, READ_ADDRESS_1,
+    READ_BUFFER, READ_SIZE_1, SYNC_ENABLE, TOOL_ID, WRITE_ADDRESS_1, WRITE_SIZE_1,
+    WRITE_SIZE_2, EndProxy, EndProxyError,
 )
 
 MOTOR_IDS = tuple(141 + 5 * finger + joint for finger in range(5)
@@ -32,12 +33,38 @@ HAND_INDIRECT_BASE = 122
 HAND_INDIRECT_DATA = 634
 CHANNEL_SIZE = 198
 CONFIG_SIZE = 54
+STARTUP_GOAL_CURRENT = 100
+# XM335 RAM items the official driver writes on every init: (address, size).
+POSITION_D_GAIN = (80, 2)
+POSITION_P_GAIN = (84, 2)
+PROFILE_ACCELERATION = (108, 4)
+PROFILE_VELOCITY = (112, 4)
+MOTOR_RAM_WRITES = ((64, 1), POSITION_D_GAIN, POSITION_P_GAIN, (102, 2),
+                    PROFILE_ACCELERATION, PROFILE_VELOCITY, (116, 4))
+RAM_NAMES = ("profile_acceleration", "profile_velocity",
+             "position_p_gain", "position_d_gain")
 
 
 @dataclass(frozen=True)
 class MotorExpected:
     drive_mode: int
     homing_offset: int
+    profile_velocity: int = 100
+    profile_acceleration: int = 50
+    position_p_gain: int = 500
+    position_d_gain: int = 1000
+    startup_configuration: int = 2
+
+    def ram_settings(self) -> tuple[tuple[tuple[int, int], int], ...]:
+        return ((PROFILE_ACCELERATION, self.profile_acceleration),
+                (PROFILE_VELOCITY, self.profile_velocity),
+                (POSITION_P_GAIN, self.position_p_gain),
+                (POSITION_D_GAIN, self.position_d_gain))
+
+
+def _register(data: bytes, item: tuple[int, int]) -> int:
+    address, size = item
+    return int.from_bytes(data[address:address + size], "little")
 
 
 def load_vendor_motor_settings(xacro_path: Path) -> dict[int, MotorExpected]:
@@ -57,7 +84,10 @@ def load_vendor_motor_settings(xacro_path: Path) -> dict[int, MotorExpected]:
         if aliases != MOTOR_INDIRECT:
             raise ValueError(f"vendor motor {motor_id} has unexpected indirect map")
         expected[motor_id] = MotorExpected(
-            int(values["Drive Mode"]), int(values.get("Homing Offset", "0")))
+            int(values["Drive Mode"]), int(values.get("Homing Offset", "0")),
+            int(values["Profile Velocity"]), int(values["Profile Acceleration"]),
+            int(values["Position P Gain"]), int(values["Position D Gain"]),
+            int(values["Startup Configuration"]))
     if set(expected) != set(MOTOR_IDS):
         raise ValueError("vendor left-hand Xacro does not define all 20 motors")
     return expected
@@ -88,6 +118,12 @@ class EndDirect(EndProxy):
         self.allow_active_status32 = allow_active_status32
         self.read_only = read_only
         self._active_status32_verified = False
+        self._motor_goals: dict[int, tuple[int, int]] | None = None
+        self.audit_notes: list[str] = []
+        self.hand_firmware: int | None = None
+        self.primed_positions: tuple[float, ...] | None = None
+        self.primed_currents: tuple[int, ...] | None = None
+        self.ram_updated_motors: list[int] = []
 
     def read_hand(self, address: int, size: int, *, stable: bool = False) -> bytes:
         if self._current.get(TOOL_ID) == HAND_ID:
@@ -106,6 +142,7 @@ class EndDirect(EndProxy):
             return {
                 "model": model,
                 "id": hand_id,
+                "firmware": data[6],
                 "mode": data[33],
                 "table_sync": data[70],
                 "watchdog": data[8],
@@ -145,7 +182,8 @@ class EndDirect(EndProxy):
         """Compare active TableSync health paths without sending motor goals.
 
         Enable the hand watchdog and TableSync only while the END tool write
-        slot is disabled. Always attempt to turn both off before END restore.
+        slot is disabled, after copying the held motor goals into Write Data.
+        Always attempt to turn both off before END restore.
         """
         with self.temporary_read_window():
             self._check_hand(required_mode=0)
@@ -153,6 +191,7 @@ class EndDirect(EndProxy):
                 raise EndProxyError("active health probe requires idle watchdog 0")
             samples = []
             try:
+                self._prime_write_data()
                 self.write_hand(8, b"\x64")
                 self.write_hand(70, b"\x01")
                 self.sleep(0.2)
@@ -180,14 +219,26 @@ class EndDirect(EndProxy):
                     })
             finally:
                 try:
-                    self.write_hand(70, b"\x00")
+                    self.write_hand(8, b"\x00")  # watchdog first; see direct_session
                 finally:
-                    self.write_hand(8, b"\x00")
+                    self.write_hand(70, b"\x00")
             return samples
 
-    def audit_motors(self, expected: dict[int, MotorExpected]) -> list[str]:
-        """Inspect the 20 actuators through END, without actuator writes."""
+    def audit_motors(self, expected: dict[int, MotorExpected], *,
+                     runtime: bool = True) -> list[str]:
+        """Inspect the 20 actuators through END, without actuator writes.
+
+        ``runtime=False`` checks only persistent identity and configuration,
+        so TableSync and mode setup do not depend on torque or RAM values
+        that a power cycle clears. A clean runtime audit also records each
+        motor's present Goal Current and Goal Position. ``direct_session`` copies exactly those values into the hand's
+        TableSync Write Data before enabling it, so enabling TableSync cannot
+        send the controller's power-on zeros (current 0, position -pi).
+        """
         issues = []
+        notes = []
+        goals = {}
+        self._motor_goals = None
         with self.temporary_read_window(tool_id=MOTOR_IDS[0]):
             for motor_id in MOTOR_IDS:
                 if motor_id != MOTOR_IDS[0]:
@@ -197,6 +248,7 @@ class EndDirect(EndProxy):
                 torque = first[64]
                 hardware_error = first[70]
                 goal_raw = int.from_bytes(first[116:120], "little")
+                goal_current = int.from_bytes(first[102:104], "little")
                 aliases = self.read_hand(168, 20, stable=True)
                 model = int.from_bytes(first[:2], "little")
                 actual_id = first[7]
@@ -205,34 +257,55 @@ class EndDirect(EndProxy):
                 mapped = tuple(int.from_bytes(aliases[i:i + 2], "little")
                                for i in range(0, 20, 2))
                 item = expected[motor_id]
+                ram = {name: _register(first, register)
+                       for name, (register, _) in zip(RAM_NAMES, item.ram_settings())}
+                wanted_ram = {name: value
+                              for name, (_, value) in zip(RAM_NAMES, item.ram_settings())}
+                runtime_bad = (goal_raw > 4095 or not 0 <= goal_current <= 910 or
+                               torque != 1 or ram != wanted_ram)
                 if (model != 1710 or actual_id != motor_id or mode != 5 or
                         (drive & ~8) != (item.drive_mode & ~8) or
                         homing != item.homing_offset or mapped != MOTOR_INDIRECT or
-                        goal_raw > 4095 or hardware_error or
-                        torque != 1):
+                        hardware_error or (runtime and runtime_bad)):
                     issues.append(
                         f"ID {motor_id}: model={model}, id={actual_id}, drive={drive}, "
                         f"mode={mode}, homing={homing}, torque={torque}, "
-                        f"goal_raw={goal_raw}, hardware_error={hardware_error}, "
+                        f"goal_raw={goal_raw}, goal_current={goal_current}, "
+                        f"hardware_error={hardware_error}, {ram}, "
                         f"aliases={mapped}; "
                         f"expected model=1710, drive={item.drive_mode} (bit 3 optional), "
                         f"mode=5, homing={item.homing_offset}, torque=1, goal_raw<=4095, "
-                        f"aliases={MOTOR_INDIRECT}"
+                        f"goal_current<=910, {wanted_ram}, aliases={MOTOR_INDIRECT}"
                     )
+                else:
+                    goals[motor_id] = (goal_current, goal_raw)
+                startup = _register(first, (60, 2))
+                if startup != item.startup_configuration:
+                    notes.append(
+                        f"ID {motor_id}: Startup Configuration={startup}, official "
+                        f"{item.startup_configuration}; power-on behavior differs, "
+                        "Direct control is unaffected")
+        self.audit_notes = notes
+        if runtime and not issues:
+            self._motor_goals = goals
         return issues
 
     def _motor_torque_state(self, motor_id: int, expected: MotorExpected) -> dict[str, int]:
         """Inspect a selected motor before changing its torque."""
-        first = self.read_hand(0, 71)
-        rest = self.read_hand(98, 22)
+        first = self.read_hand(0, 120)
         present = int.from_bytes(self.read_hand(132, 4), "little", signed=True)
         aliases = self.read_hand(168, 20, stable=True)
         model = int.from_bytes(first[:2], "little")
         homing = int.from_bytes(first[20:24], "little", signed=True)
         drive, mode, torque, error = first[10], first[11], first[64], first[70]
-        watchdog = rest[0]
-        goal_current = int.from_bytes(rest[4:6], "little")
-        goal_position = int.from_bytes(rest[18:22], "little", signed=True)
+        # Motor Bus Watchdog stays 0 on this path, unlike the official 100:
+        # the hand's TableSync is off between sessions, so a motor watchdog
+        # would latch an error and lock Goal registers while the hand idles.
+        watchdog = first[98]
+        goal_current = int.from_bytes(first[102:104], "little")
+        goal_position = int.from_bytes(first[116:120], "little", signed=True)
+        ram = {register: _register(first, register)
+               for register, _ in expected.ram_settings()}
         mapped = tuple(int.from_bytes(aliases[i:i + 2], "little")
                        for i in range(0, 20, 2))
         if (model != 1710 or first[7] != motor_id or mode != 5 or
@@ -249,7 +322,7 @@ class EndDirect(EndProxy):
                 f"torque={torque}, error={error}, watchdog={watchdog}, "
                 f"goal_current={goal_current}, goal_position={goal_position}, "
                 f"present_position={present}, aliases={mapped}")
-        return {"torque": torque, "present": present,
+        return {"torque": torque, "present": present, "ram": ram,
                 "goal_position": goal_position, "goal_current": goal_current}
 
     def inspect_motor_torques(self) -> dict[int, tuple[int, int]]:
@@ -310,7 +383,7 @@ class EndDirect(EndProxy):
     def _write_selected_motor(self, motor_id: int, address: int, data: bytes) -> None:
         """Forward one verified RAM write to the selected motor via END."""
         if (self._current.get(TOOL_ID) != motor_id or motor_id not in MOTOR_IDS or
-                (address, len(data)) not in ((64, 1), (102, 2), (116, 4))):
+                (address, len(data)) not in MOTOR_RAM_WRITES):
             raise EndProxyError("invalid selected motor or torque-start register")
         self.write_end(SYNC_ENABLE, 1, 0)
         self.write_end(READ_ADDRESS_1, 2, address)
@@ -320,7 +393,7 @@ class EndDirect(EndProxy):
         self.write_end_buffer(data)
         try:
             self.write_end(SYNC_ENABLE, 1, 1)
-            self.sleep(0.05)
+            self.sleep(FORWARD_SETTLE)
         finally:
             self.write_end(SYNC_ENABLE, 1, 0)
             self.write_end(WRITE_SIZE_1, 2, 0)
@@ -342,16 +415,21 @@ class EndDirect(EndProxy):
 
     def enable_motor_torque(self, expected: dict[int, MotorExpected],
                             *, motor_id: int | None = None) -> tuple[int, ...]:
-        """Prime current positions, then enable torque; roll back on failure.
+        """Apply official RAM settings, prime positions, enable torque.
 
         Explicitly invoked only. All motors are checked before the first
-        torque write. Drive Mode bit 3 must be off so priming cannot itself
-        enable torque. The low startup current limits initial holding force.
+        write. Every selected motor, including one already holding torque,
+        receives the official Profile Acceleration/Velocity and Position P/D
+        gains, which the vendor driver writes on each init and a power cycle
+        clears. Drive Mode bit 3 must be off so priming cannot itself enable
+        torque. The low startup current limits initial holding force. Torque
+        rollback covers only motors this call tried to enable.
         """
         selected = (motor_id,) if motor_id is not None else MOTOR_IDS
         if not selected or any(item not in MOTOR_IDS for item in selected):
             raise ValueError("motor_id must be one of the 20 left HX5 motor IDs")
         enabled = []
+        self.ram_updated_motors = []
         with self.temporary_read_window():
             self._check_hand(required_mode=0)
             states = {}
@@ -363,6 +441,12 @@ class EndDirect(EndProxy):
                 for item in selected:
                     self.write_end(SYNC_ENABLE, 1, 0)
                     self.write_end(TOOL_ID, 1, item)
+                    for (address, size), value in expected[item].ram_settings():
+                        if states[item]["ram"][(address, size)] != value:
+                            self._write_selected_motor(
+                                item, address, value.to_bytes(size, "little"))
+                            if item not in self.ram_updated_motors:
+                                self.ram_updated_motors.append(item)
                     if states[item]["torque"]:
                         continue
                     before = int.from_bytes(
@@ -373,7 +457,8 @@ class EndDirect(EndProxy):
                     if (not 0 <= current <= 4095 or abs(current - before) > 32):
                         raise EndProxyError(
                             f"motor {item} moved while preparing torque: {before}, {current}")
-                    self._write_selected_motor(item, 102, (100).to_bytes(2, "little"))
+                    self._write_selected_motor(
+                        item, 102, STARTUP_GOAL_CURRENT.to_bytes(2, "little"))
                     self._write_selected_motor(item, 116, current.to_bytes(4, "little"))
                     latest = int.from_bytes(
                         self.read_hand(132, 4), "little", signed=True)
@@ -414,6 +499,7 @@ class EndDirect(EndProxy):
         mode = control[33]
         sync = control[70]
         status = control[106]
+        self.hand_firmware = control[6]
         if (hand_model != LEFT_HAND_MODEL or hand_id != HAND_ID or status or
                 mode not in (0, 1) or sync not in (0, 1)):
             raise EndProxyError(
@@ -553,9 +639,26 @@ class EndDirect(EndProxy):
                     raise EndProxyError("HX5 did not enter Preset Motion Mode 1")
             return old_mode
 
+    def _prime_write_data(self) -> None:
+        """Copy each motor's held goal into hand Write Data; TableSync must be off."""
+        if self._motor_goals is None:
+            raise EndProxyError("run a clean audit_motors() before enabling hand TableSync")
+        primed = tuple(self._motor_goals[motor_id] for motor_id in MOTOR_IDS)
+        self.write_hand(WRITE_WINDOW,
+                        b"".join(encode_raw_goal(current, raw) for current, raw in primed))
+        self.primed_currents = tuple(current for current, _ in primed)
+        self.primed_positions = tuple(raw_to_position(raw) for _, raw in primed)
+
     @contextmanager
     def direct_session(self):
-        """Enable read-only direct state on startup; forward goals only on request."""
+        """Enable direct state on startup; forward goals only on request.
+
+        Before hand TableSync starts, its Write Data is filled with the goals
+        each motor already holds (from ``audit_motors``). Enabling TableSync,
+        including in read-only mode, therefore rewrites identical goals.
+        """
+        if self._motor_goals is None:
+            raise EndProxyError("run a clean audit_motors() before a Direct session")
         with self.temporary_read_window():
             self._check_hand(required_mode=0)
             alias_data = pack(f"<{len(INDIRECT_TARGETS)}H", *INDIRECT_TARGETS)
@@ -564,6 +667,7 @@ class EndDirect(EndProxy):
             self._direct_active = False
             self._active_status32_verified = False
             try:
+                self._prime_write_data()
                 watchdog = self.read_hand(8, 1, stable=True)[0]
                 if watchdog == 0:
                     self.write_hand(8, b"\x64")
@@ -606,10 +710,13 @@ class EndDirect(EndProxy):
                 self._active_status32_verified = False
                 self.write_end(SYNC_ENABLE, 1, 0)
                 self.write_end(WRITE_SIZE_1, 2, 0)
+                # Disable the hand watchdog while TableSync is still running.
+                # The END pauses polling between the following writes; with a
+                # missed ACK, a pause can exceed the 2 s watchdog.
+                self.write_hand(8, b"\x00")
                 self.write_hand(70, b"\x00")
                 if self.read_hand(70, 1, stable=True) != b"\x00":
                     raise EndProxyError("HX5 TableSync did not stop on Direct exit")
-                self.write_hand(8, b"\x00")
 
     def read_snapshot(self) -> HandSnapshot:
         if self._current.get(READ_ADDRESS_1) != READ_WINDOW or \
