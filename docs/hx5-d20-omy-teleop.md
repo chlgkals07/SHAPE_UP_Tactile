@@ -3,6 +3,14 @@
 > **2026-11-03 실물 Direct 런치 대기:** 손 ID 140의 정상 상태와
 > 20개 모터의 토크 1·하드웨어 오류 0을 확인했다. Direct 런치와 키보드
 > 손가락 동작은 아직 실물 검증 전이다.
+>
+> **2026-11-04 코드 변경 — 실물 재검증 전:** 실물 텔레옵 런치가
+> `allow_active_status32`·`read_only`·`goal_current`를 Direct 손 런치에
+> 전달한다. 손 TableSync를 켤 때마다 `status=32`가 재현되므로 아래 실물 런치
+> 명령은 모두 `allow_active_status32:=true`를 넣는다. 손 브리지는 실측 시작
+> 자세가 URDF 한계를 0.1 rad 이내로 넘으면(2026-11-03 joint17 −0.649 rad)
+> 한계값에서 시작한다. Direct 노드는 마지막 명령값에서 보간한다. 변경 내용은
+> [Direct 손 실행 순서](hx5-d20-omy-direct-hand.md)의 첫 안내를 따른다.
 
 실물 손은 OMY의 END ID 210을 경유해 제어한다. **Direct Mode의 20관절 리더 텔레옵은 아직 실물 검증 전**이다. 아래 0절에서 브랜치 갱신·빌드·Direct Mode 준비를 완료한다. 처음 연결한다면 1절의 공식 키보드 시험으로 작은 손가락 동작을 먼저 확인한다.
 
@@ -68,7 +76,15 @@ ros2 pkg prefix robotis_interfaces
 ```
 
 다른 손 런치와 END 진단 프로그램을 종료하고, 팔이 안정된 자세인지 확인한다.
-손 모터 20개의 모델·설정을 먼저 검사한다. 결과가 다르면 여기서 중단한다.
+OMY나 손 전원을 다시 켠 뒤라면 먼저 손 모터 토크와 공식 Profile·P/D Gain
+RAM 값을 설정한다. 손가락이 현재 위치를 잡으므로 주변을 비운다. 자세한 확인
+순서는 [Direct 손 준비](hx5-d20-omy-direct-hand.md#2-손-direct-mode-준비)를 따른다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_torque_on --port /dev/ttyAMA4
+```
+
+손 모터 20개의 모델·설정을 검사한다. 결과가 다르면 여기서 중단한다.
 
 ```bash
 ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4
@@ -108,7 +124,8 @@ ros2 run rmw_zenoh_cpp rmw_zenohd
 **첫 번째 컨테이너 터미널**에서 1절의 ROS 환경을 적용하고 실행한다.
 
 ```bash
-ros2 launch omy_hx5_bringup omy_hx5_end_direct_hand.launch.py end_port:=/dev/ttyAMA4
+ros2 launch omy_hx5_bringup omy_hx5_end_direct_hand.launch.py \
+  end_port:=/dev/ttyAMA4 allow_active_status32:=true goal_current:=100
 ```
 
 `END 210 -> HX5 140 Direct Mode ready`가 나온 뒤 **두 번째 컨테이너
@@ -119,7 +136,7 @@ ros2 run robotis_hand_teleop hx5_d20_teleop --hand-side left
 ```
 
 주변을 비우고 `q/a`로 검지를 조금 닫고 편다. 첫 명령은 엄지 기준 자세도
-포함할 수 있다. 손의 실제 동작과 `/joint_states`의 손 관절 변화를 확인한다.
+포함하므로 엄지가 약 0.8초 동안 크게 움직일 수 있다. 손의 실제 동작과 `/joint_states`의 손 관절 변화를 확인한다.
 키보드에서 `ESC`, 손 런치에서 `Ctrl+C`로 종료한 뒤 리더 텔레옵으로 넘어간다.
 이미 이 실물 확인을 마쳤다면 이 단계를 반복하지 않는다.
 
@@ -154,12 +171,12 @@ read -rp '쥔 상태 rh_r1_joint 값: ' MEASURED_CLOSED
 
 ```bash
 ros2 launch omy_hx5_bringup omy_hx5_teleop.launch.py \
-  mock_arm:=false mock_hand:=false start_leader:=false \
+  mock_arm:=false mock_hand:=false start_leader:=false allow_active_status32:=true \
   enable_arm_teleop:=false enable_hand_teleop:=true hand_dry_run:=true \
   leader_open:="$MEASURED_OPEN" leader_closed:="$MEASURED_CLOSED"
 ```
 
-런치 터미널을 유지한다. 이 설정은 손 목표 관절값을 발행하지 않지만 END Direct 노드가 손 상태를 읽고 TableSync 통신을 활성화한다. **다른 컨테이너 터미널**에서 1절의 ROS 환경을 적용한 후 확인한다.
+런치 터미널을 유지한다. 이 설정은 손 목표 관절값을 발행하지 않지만 END Direct 노드가 손 상태를 읽고 TableSync 통신을 활성화한다. TableSync를 켜기 전에 각 모터가 잡고 있는 목표값을 손에 복사하므로 손가락의 힘이 빠지지 않아야 한다. 전체 손 궤적 전류는 공식 기본값 300이며, 처음에는 `goal_current:=100`을 덧붙여 낮출 수 있다. **다른 컨테이너 터미널**에서 1절의 ROS 환경을 적용한 후 확인한다.
 
 ```bash
 ros2 control list_controllers
@@ -170,6 +187,13 @@ ros2 topic echo /left_hand/finger_pressures --once
 `joint_states`는 팔과 손이 각각 발행하므로 팔 관절만 보이면 명령을 반복한다. 팔 컨트롤러가 활성이고 손 메시지에 `finger_l_joint1..20`, 촉각 메시지에 다섯 손가락 센서가 있어야 한다. 리더 방아쇠를 움직여 손 브리지의 `dry-run grasp=...` 로그도 확인한다. 값이 갱신되지 않거나 손 노드가 종료되면 여기서 중단한다.
 
 ## 4. 팔 추종 없이 리더로 손만 첫 동작
+
+손 명령은 손 관절이 공식 초기 자세(20관절 모두 0)에서 0.1 rad 이내일 때만 켜진다. 실물 손의 정지 자세는 이 범위를 벗어나므로(2026-11-03 실측 joint6 약 1.50 rad), 런치를 유지한 채 다른 터미널에서 공식 초기 자세 명령으로 손을 먼저 편다. 손이 약 2초 이상에 걸쳐 움직인다.
+
+```bash
+ros2 run robotis_hand_bringup joint_trajectory_executor --ros-args \
+  --params-file /workspace/omy_ws/install/robotis_hand_bringup/share/robotis_hand_bringup/config/hx5_d20/hx5_d20_left_initial_positions.yaml
+```
 
 손과 주변 물체가 떨어져 있고 리더 방아쇠가 열린 상태에서, **확인용 터미널**에서 손 명령을 켠다.
 
@@ -191,7 +215,7 @@ ros2 param set /hx5_left_omy_teleop command_enabled false
 
 ```bash
 ros2 launch omy_hx5_bringup omy_hx5_teleop.launch.py \
-  mock_arm:=false mock_hand:=false start_leader:=false \
+  mock_arm:=false mock_hand:=false start_leader:=false allow_active_status32:=true \
   enable_arm_teleop:=true enable_hand_teleop:=true hand_dry_run:=true \
   leader_open:="$MEASURED_OPEN" leader_closed:="$MEASURED_CLOSED"
 ```

@@ -9,6 +9,31 @@
 > Hardware Error는 0, watchdog은 100이었고 촉각 센서 5개 ID는 응답했다.
 > 먼저 아래의 명시적 읽기 전용 Direct 런치로 상태 토픽을 확인한다.
 
+> **2026-11-04 코드 변경 — 실물 재검증 전:** 아래 동작이 바뀌었으므로
+> 다음 연결 때 2절의 토크·RAM 설정부터 다시 실행한다. 입력 순서는
+> [다음 실물 시험 명령 순서](hx5-d20-next-field-run.md)에 정리했다.
+>
+> - `omy_hx5_end_torque_on`이 이미 토크가 켜진 모터에도 공식 Xacro의
+>   Profile Acceleration 50·Profile Velocity 100·Position P 500·D 1000을 쓴다.
+>   Direct 런치와 `--apply`의 모터 감사는 이 값까지 확인한다.
+> - Direct 런치는 손 TableSync를 켜기 **전에** 각 모터가 지금 잡고 있는
+>   Goal Current·Goal Position을 손의 Write Data에 복사한다. 읽기 전용
+>   런치도 손 TableSync는 켜지만, 이 복사 때문에 모터에 같은 값만 다시 쓴다.
+> - 키보드·action·jog 궤적은 실측값이 아니라 **마지막 명령값**에서
+>   보간한다. 전체 손 궤적의 기본 Goal Current는 공식 launch와 같은 300이다.
+>   jog은 해당 모터가 잡고 있던 전류를 바꾸지 않는다.
+> - 종료 시 손 watchdog을 먼저 0으로 끈 뒤 TableSync를 끈다.
+> - 모든 진단·준비 명령이 END의 늦은 응답 패킷을 버린 뒤 요청한다.
+>   손 읽기 단위가 16바이트에서 90바이트로 커져 END 설정 쓰기가 줄었다.
+> - `--diagnose`, `--hand-state`, 기본 probe가 손 펌웨어 버전을 출력한다.
+>   `status=32` 문의용으로 값을 기록한다.
+> - 손 `JointState`에 velocity(손 tick 기준 위치 차분 추정값)를 넣는다.
+>   공식 `joint_trajectory_executor`가 velocity를 읽기 때문이다. 초기 자세
+>   궤적의 중간 경유점은 관절 제한을 0.1 rad까지 넘어도 받아들이고, 최종
+>   자세만 제한 안에 있어야 한다.
+> - `omy_hx5_end_direct_prepare`의 기본 검사와 `--apply`는 토크·RAM 값과
+>   무관하게 모터 구성만 검사한다. 토크·RAM은 Direct 런치 직전에 검사한다.
+
 이 경로는 OMY의 END ID 210을 통해 손 컨트롤러 ID 140으로 접근한다. 로봇 PC의
 별도 손 USB 포트나 외부 전원 제어 코드를 요구하지 않는다. 기존 Preset Mode 런치와
 텔레옵 코드는 유지한다. **동시에 실행할 수는 없다.** 손에 연결된 실제 4핀 케이블의
@@ -92,11 +117,26 @@ ros2 run omy_hx5_bringup omy_hx5_end_proxy_probe --port /dev/ttyAMA4 --hand-stat
 아래 Direct 준비·런치를 진행하지 않는다. 모터 141만 토크를 켜는 것으로
 20관절 초기화가 완료되지는 않는다.
 
-Direct 손 모드가 0이고 20개 모터가 토크 0인 현장 상태에서는 아래 명령으로
-토크를 켠다. 실행 전 모든 대상 모터의 ID·모드·영점·간접 주소·오류·watchdog을
-검사한다. 하나라도 검사에 실패하면 토크 쓰기를 시작하지 않는다. 각 모터의
-목표 위치를 실제 위치로 맞추고 Goal Current를 100으로 낮춘 뒤 Torque Enable을
-1로 설정한다. 도중 실패 시 이번 명령에서 켠 모터의 토크를 다시 끈다.
+Direct 손 모드가 0이면 아래 명령으로 모터를 초기화한다. 실행 전 모든 대상
+모터의 ID·모드·영점·간접 주소·오류·watchdog을 검사한다. 하나라도 검사에
+실패하면 쓰기를 시작하지 않는다. 이후 모터마다 다음을 수행한다.
+
+1. 공식 Xacro의 Profile Acceleration 50, Profile Velocity 100, Position P
+   Gain 500, Position D Gain 1000과 다른 값을 쓴다. **이미 토크가 켜진
+   모터에도 적용한다.** 이 값들은 RAM이므로 전원을 껐다 켜면 사라진다.
+2. 토크가 꺼진 모터만 목표 위치를 실제 위치로 맞추고 Goal Current를 100으로
+   낮춘 뒤 Torque Enable을 1로 설정한다.
+
+도중 실패 시 이번 명령에서 켠 모터의 토크를 다시 끈다. Torque Enable도
+RAM이고 손 모터의 Drive Mode는 목표 갱신 시 자동 토크(bit 3)가 꺼져 있다.
+따라서 **OMY나 손 전원을 다시 켤 때마다 이 명령을 다시 실행한다.** 손 모드를
+`--apply`나 `--restore-preset`으로 바꾼 뒤에도 `--torque-status`로 토크가
+유지됐는지 확인한다.
+
+모터의 Bus Watchdog는 공식 값 100이 아니라 0으로 둔다. 이 경로에서는 Direct
+세션 사이에 손 TableSync가 꺼져 모터 통신이 멈추므로, 모터 watchdog을 켜 두면
+오류가 걸려 목표값이 잠긴다.
+
 첫 실물 시도는 ID 141 하나로 확인한 뒤 전체 20개를 실행한다.
 개별 명령을 실행할 때는 한 줄씩 입력하고, 하나라도 실패하면 다음 모터로
 진행하지 않는다. 실패 후 현재 토크 상태는 아래 명령으로 확인한다.
@@ -113,11 +153,13 @@ ros2 run omy_hx5_bringup omy_hx5_end_torque_on --port /dev/ttyAMA4
 ```
 
 토크가 켜지면 손가락이 현재 위치를 잡으므로 손 주변을 비워 둔다. 위 명령은
-쥐기 궤적을 보내지 않는다. 실물 결과가 확인될 때까지 아래 Direct 런치는
-진행하지 않는다.
+쥐기 궤적을 보내지 않는다. 출력의 `Official Profile/P/D RAM settings written
+to ...`에 공식 값을 새로 쓴 모터 목록이 나온다. 실물 결과가 확인될 때까지
+아래 Direct 런치는 진행하지 않는다.
 
-먼저 손에 쓰지 않는 진단을 실행하고 `model=261`, `id=140`, 증가한 손
+먼저 손에 쓰지 않는 진단을 실행하고 `model=261`, `id=140`, `firmware`, 증가한 손
 `tick`, `mode`, `watchdog`, `status`, `voltage_centivolts`를 확인한다.
+`firmware` 값은 공식 문서에 없는 `status=32`를 ROBOTIS에 문의할 때 함께 기록한다.
 `end_tool_status`는 END가 기록한 도구 통신 상태다. END의 통신 설정은
 진단 중 잠시 바뀌고 종료 시 원래 값으로 복구된다. `status`가 0이 아니거나,
 `watchdog`가 `0`, `1..127`, `255` 밖이면 다음 명령으로 진행하지 말고
@@ -137,7 +179,9 @@ ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --compar
 
 유휴 간접·직접 상태가 모두 정상이지만 Direct 런치에서만 `status=32`가 나온
 경우, 손 TableSync와 watchdog을 잠시 켠 상태에서 두 읽기 경로를 비교한다.
-이 진단은 손가락 목표값을 보내지 않고 종료 시 두 설정을 다시 끈다.
+이 진단은 먼저 20모터 감사를 통과해야 하며, 손 TableSync를 켜기 전에 각
+모터가 잡고 있는 목표값을 손의 Write Data에 복사한다. 새 손가락 목표값은
+보내지 않고 종료 시 watchdog, TableSync 순서로 다시 끈다.
 
 ```bash
 ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --compare-active-health
@@ -154,8 +198,11 @@ ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --probe-
 기존 `omy_hx5_official_hand.launch.py`, 손 preset 노드, unpack/pack,
 다른 `/dev/ttyAMA4` 사용자들을 종료한 상태에서 수행한다. 로봇 팔이
 안정된 자세인지 확인한다. 명령은 END 경유로 20개 모터의 ID, 모델,
-운용 모드, 방향 설정, 영점, 간접 주소, 토크를 공식 왼손 Xacro와 비교한다.
-일치하지 않으면 **어느 모터가 다른지 보고하고 중단한다.** 모터 목표 위치는
+운용 모드, 방향 설정, 영점, 간접 주소, 토크, Goal Current 범위, Profile
+Acceleration/Velocity, Position P/D Gain을 공식 왼손 Xacro와 비교한다.
+일치하지 않으면 **어느 모터가 다른지 보고하고 중단한다.** Profile·Gain만 다르면
+위의 `omy_hx5_end_torque_on`을 다시 실행한다. Startup Configuration 차이는
+전원 투입 시 동작에만 영향을 주므로 `Note:`로만 표시한다. 모터 목표 위치는
 보내지 않는다.
 
 ```bash
@@ -217,8 +264,14 @@ ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --clear-
 
 그 뒤 `--verify-direct`를 다시 실행한다. 유휴 Bus Watchdog는 `0`이어야 한다.
 Direct 런치가 시작될 때 `100`(2초)으로 설정하고 읽어서 확인한 뒤 손
-TableSync를 켠다. Direct 세션이 끝나면 손 TableSync를 끄고 Watchdog를 `0`으로
-되돌린다.
+TableSync를 켠다. Direct 세션이 끝나면 Watchdog를 먼저 `0`으로 끄고 그다음
+손 TableSync를 끈다. 종료 중 END 응답 누락으로 통신이 2초 넘게 멈춰도
+watchdog 오류가 생기지 않게 하기 위한 순서다.
+
+이 watchdog은 END가 손을 계속 폴링하는 동안에는 작동하지 않는다. 따라서 Direct
+노드가 강제 종료돼도 손은 마지막 목표를 그대로 잡는다. 공식 손 단독 구성에서도
+watchdog 오류는 TableSync만 멈추고 모터는 마지막 목표를 유지한다. 즉시 힘을
+빼야 하면 런치를 `Ctrl+C`로 종료하거나 전원을 차단한다.
 
 ## 3. 실물 Direct Mode 런치
 
@@ -250,22 +303,34 @@ ros2 launch omy_hx5_bringup omy_hx5_end_direct_hand.launch.py \
 ```
 
 런치가 팔 컨트롤러와 손 노드를 올리고 손의 첫 상태를 읽는다. **실행만으로 팔이나
-손에 목표 자세를 보내지 않는다.** 위 읽기 전용 설정은 키보드·action 명령도
-거부한다. `END 210 -> HX5 140 Direct Mode ready`가 표시되면 별도 터미널에서
-`/joint_states`와 `/left_hand/finger_pressures`가 갱신되는지 확인한다. 런치
-터미널은 계속 유지한다. `allow_active_status32`는 이 실물에서 재현된 정확한
-값 32만 허용한다. 시작 시 Hardware Error와 watchdog도 확인하며, 실행 중
-다른 손 상태값이 읽히면 중단한다.
+손에 새 목표 자세를 보내지 않는다.** 위 읽기 전용 설정은 키보드·action·jog
+명령을 거부한다. 다만 손 TableSync 자체는 켜진다. 그 전에 각 모터가 이미 잡고
+있는 Goal Current·Goal Position을 손의 Write Data에 복사하므로, TableSync가
+모터로 보내는 값은 현재 목표와 같다. `END 210 -> HX5 140 Direct Mode ready`가
+표시되면 별도 터미널에서 `/joint_states`와 `/left_hand/finger_pressures`가
+갱신되는지 확인한다. 런치 터미널은 계속 유지한다. 준비 로그의
+`firmware`, `held_currents`, `trajectory_current`도 기록한다.
+`allow_active_status32`는 이 실물에서 재현된 정확한 값 32만 허용한다. 시작 시
+Hardware Error와 watchdog도 확인하며, 실행 중 다른 손 상태값이 읽히면 중단한다.
+
+**힘 유지 확인:** 런치 전에 손가락 하나를 손으로 살짝 눌러 저항을 기억한다.
+`Direct Mode ready` 뒤에 같은 손가락을 같은 세기로 눌러 저항이 사라지지 않았는지
+확인한다. 힘이 빠졌다면 Write Data 복사가 실물에서 기대대로 동작하지 않은
+것이므로 `Ctrl+C`로 종료하고 명령 허용 런치를 진행하지 않는다.
 
 읽기 전용 토픽 확인 후 `Ctrl+C`로 종료하고, 손이 의도치 않게 움직이지 않았고
-종료 로그에 복구 오류가 없을 때에만 명령 허용 런치를 별도로 시작한다.
+종료 로그에 복구 오류가 없을 때에만 명령 허용 런치를 별도로 시작한다. 첫 명령
+허용 런치는 전체 손 궤적 전류를 토크 인가 때와 같은 100으로 낮춰 시작한다.
 
 ```bash
 ros2 launch omy_hx5_bringup omy_hx5_end_direct_hand.launch.py \
-  end_port:=/dev/ttyAMA4 allow_active_status32:=true read_only:=false
+  end_port:=/dev/ttyAMA4 allow_active_status32:=true read_only:=false goal_current:=100
 ```
 
-새 런치에서 다시 `Direct Mode ready`가 출력된 뒤 다음 키보드 절로 진행한다.
+`goal_current`를 생략하면 공식 ROBOTIS 손 launch와 같은 300을 쓴다. 이 값은
+키보드·action의 전체 손 궤적에만 적용되고, `/effort_l_controller/commands`가
+들어오면 그 값으로 바뀐다. 새 런치에서 다시 `Direct Mode ready`가 출력된 뒤
+다음 절로 진행한다.
 
 ## 4. 첫 실물 동작: 검지 관절 하나
 
@@ -277,8 +342,10 @@ ros2 launch omy_hx5_bringup omy_hx5_end_direct_hand.launch.py \
 명령 허용 런치에서 `Direct Mode ready`가 뜬 뒤, 다른 Robot PC 컨테이너
 터미널에 위와 같은 ROS 환경을 적용하고 실행한다. 선택한 모터의 4바이트
 전류·위치 목표만 END 간접 주소로 전달해 **검지 관절 6만 +0.03 rad**
-이동시킨다. 다른 19개 모터의 목표값은 다시 쓰지 않는다. 목표 전류는
-토크 인가 때와 같은 100으로 시작한다. 명령은 한 번만 발행한다.
+이동시킨다. 다른 19개 모터의 목표값은 다시 쓰지 않는다. jog의 목표 전류는
+해당 모터가 이미 잡고 있던 값(토크 인가 직후라면 100)을 그대로 쓰며,
+`goal_current`의 영향을 받지 않는다. 이동 기준은 실측값이 아니라 그 관절의
+현재 목표값이다. 명령은 한 번만 발행한다.
 
 ```bash
 ros2 topic pub --once /omy_hx5/jog std_msgs/msg/Float64MultiArray '{data: [6.0, 0.03]}'
@@ -309,8 +376,12 @@ ros2 run robotis_hand_teleop hx5_d20_teleop --hand-side left
 공식 키보드에서 `q/a`는 검지 닫기/열기, `w/s`는 중지, `e/d`는 약지,
 `r/f`는 소지, `v/c`는 엄지다. `x/z`는 전체 쥐기/펴기, `ESC`는 키보드 종료다.
 단일 관절 동작을 확인한 뒤에 사용한다. 공식 키보드는 첫 명령에 엄지의 기준
-목표와 범위 밖 관절의 보정 목표도 함께 넣을 수 있다. 이 브리지는
-20관절 전체를 확인하고 제한 범위를 검사하며 최대 1 rad/s로 보간한다.
+목표와 범위 밖 관절의 보정 목표도 함께 넣는다. 2026-11-03 실측 자세라면 첫
+키 하나로 엄지 joint1이 약 −0.79에서 −1.57 rad로(0.78 rad), joint2가 약
+1.45에서 1.57 rad로 가고, joint17이 −0.649에서 −0.6 rad로 보정된다. 이
+브리지는 20관절 전체를 확인하고 제한 범위를 검사하며, 마지막 명령값에서 최대
+1 rad/s로 보간한다. 첫 키 입력에서 엄지가 약 0.8초 동안 크게 움직이므로 엄지
+주변을 비운다.
 
 이 ROS 노드는 공식 키보드 토픽
 `/leader/joint_trajectory_command_broadcaster_left_hand/joint_trajectory`,
@@ -344,8 +415,10 @@ ros2 topic hz /left_hand/finger_pressures
 `finger_l_joint1..20`, 다섯 손가락의 3×3 촉각값, 손의 실제 움직임을 각각
 확인한다. 토픽만 보이고 실제 움직임이 없으면 성공으로 간주하지 않는다.
 종료는 키보드에서 `ESC`, 런치 터미널에서 `Ctrl+C` 순서다. 정상 종료 시
-손의 TableSync를 끄고 END의 기존 설정과 쓰기 버퍼를 복원한다. 강제 전원 차단
-또는 프로세스 강제 종료 후에는 다시 손 상태를 확인한다.
+END의 목표 전달을 멈추고, 손 watchdog을 끈 뒤 TableSync를 끄고, END의 기존
+설정과 쓰기 버퍼를 복원한다. 손 모터는 마지막 목표를 계속 잡는다. 강제 전원
+차단 또는 프로세스 강제 종료 후에는 `--diagnose`와 `--torque-status`로 손
+상태를 다시 확인한다.
 
 Preset 런치로 되돌리려면 Direct 런치를 먼저 종료하고 같은 컨테이너에서
 아래 명령으로 손 컨트롤러를 Preset Mode `1`로 돌린다. 손 목표 위치는

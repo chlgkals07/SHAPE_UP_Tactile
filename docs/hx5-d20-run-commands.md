@@ -1,5 +1,7 @@
 # OMY + 왼손 HX5-D20 실행 명령어
 
+> **다음 실물 시험은 [명령 순서 체크리스트](hx5-d20-next-field-run.md)를 위에서부터 따른다.**
+
 이 문서는 END ID 210을 통한 진단 명령과 현장 읽기 결과를 기록한다. 실물
 Preset Mode bringup과 첫 작은 동작의 현재 실행 순서는
 [OMY 끝단 손 bringup](hx5-d20-omy-official-bringup.md)을 따른다. 기존
@@ -13,7 +15,9 @@ Preset Mode bringup과 첫 작은 동작의 현재 실행 순서는
 [Direct Mode 실행 순서](hx5-d20-omy-direct-hand.md)에 정리했다. 기존 Preset
 Mode와 서로 다른 손 모드를 사용한다.
 
-END 210의 Tool ID와 Table Sync 읽기 창을 임시로 바꾸고, 손 모델·전압·상태를 읽은 뒤 원래 값으로 복원한다. 손 목표 위치, 토크, 촉각 명령은 쓰지 않는다. END 설정은 EEPROM이므로 검사를 반복해서 실행하지 않는다.
+END 210의 Tool ID와 Table Sync 읽기 창을 임시로 바꾸고, 손 모델·펌웨어·전압·상태를 읽은 뒤 원래 값으로 복원한다. 손 목표 위치, 토크, 촉각 명령은 쓰지 않는다. END 설정은 EEPROM으로 취급하므로 검사를 반복해서 실행하지 않는다.
+
+2026-11-04부터 모든 END 진단·준비 명령(`omy_hx5_end_proxy_probe`, `omy_hx5_end_direct_prepare`의 모든 모드, `omy_hx5_end_preset`, `omy_hx5_end_recover`, `omy_hx5_end_torque_on`)은 요청마다 늦게 도착한 END 응답을 버린 뒤 보낸다. 11월 3일의 `received=0 bytes`, `received=3 bytes`, 범위 밖 값(`watchdog=170`, `13:170`)은 늦게 도착한 쓰기 확인·PING 응답이 다음 읽기의 응답으로 받아들여진 형태와 일치한다. 손 읽기 단위는 16바이트에서 90바이트로 커졌고, 공식 모델에 없는 END 두 번째 읽기 슬롯은 손 쓰기 확인에 더 이상 쓰지 않는다. 같은 진단의 END 설정 쓰기 횟수가 대략 절반으로 줄었다. 90바이트 단일 슬롯 읽기는 11월 3일 실물의 간접 상태 비교에서 정상이었지만, 손 제어표를 직접 읽는 경로는 다음 연결 때 `--diagnose`로 다시 확인한다.
 
 ## User PC 호스트 — Robot PC SSH 접속
 
@@ -97,7 +101,7 @@ source /workspace/omy_ws/install/setup.bash
 ros2 run omy_hx5_bringup omy_hx5_end_proxy_probe --port /dev/ttyAMA4
 ```
 
-정상이면 `END 210: model 230 OK; left HX5 via END: ID 140, model 261 OK; voltage ...; status ...; No hand command sent.`가 출력된다. 오류가 나거나 END 설정 복원이 실패했다고 표시되면 **런치를 진행하지 말고 전체 출력**을 보내준다. 이후 손의 높은 주소에 있는 TableSync 데이터에 END를 통해 접근할 수 있는지 확인한 뒤 실제 손 제어 코드를 활성화한다.
+정상이면 `END 210: model 230 OK; left HX5 via END: ID 140, model 261 OK, firmware ...; voltage ...; status ...; No hand command sent.`가 출력된다. `firmware` 값을 기록한다. 오류가 나거나 END 설정 복원이 실패했다고 표시되면 **런치를 진행하지 말고 전체 출력**을 보내준다. 이후 손의 높은 주소에 있는 TableSync 데이터에 END를 통해 접근할 수 있는지 확인한 뒤 실제 손 제어 코드를 활성화한다.
 
 손 컨트롤러 ID 140이 위처럼 확인된 다음, 공식 문서의 Direct Control Mode에서 내부 모터가 END를 통해 보이는지 **왼손 엄지 첫 모터 ID 141 하나만** 읽을 수 있다. 이 명령도 손에 동작 명령은 보내지 않는다. 다만 END의 EEPROM에 있는 Tool ID를 141로 잠시 바꿨다가 복원하므로 반복 실행하지 않는다.
 

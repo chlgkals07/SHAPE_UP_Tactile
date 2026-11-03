@@ -4,6 +4,8 @@
 
 [실행 명령어 모음](../docs/hx5-d20-run-commands.md)
 
+[다음 실물 시험 명령 순서](../docs/hx5-d20-next-field-run.md)
+
 [END 210 경유 공식 왼손 20관절 키보드 실행 순서](../docs/hx5-d20-omy-direct-hand.md)
 
 [2026-11-03 bringup 오류와 확인 결과](../docs/field-test/2026-11-03-omy-hx5-errors.md)
@@ -174,13 +176,17 @@ read -r -p 'measured leader open rh_r1_joint: ' MEASURED_OPEN
 read -r -p 'measured leader closed rh_r1_joint: ' MEASURED_CLOSED
 ros2 launch omy_hx5_bringup omy_hx5_teleop.launch.py \
   mock_arm:=false mock_hand:=false start_leader:=true mock_leader:=false \
+  allow_active_status32:=true \
   enable_arm_teleop:=true enable_hand_teleop:=true hand_dry_run:=true \
   leader_open:="$MEASURED_OPEN" leader_closed:="$MEASURED_CLOSED" \
   hand_mount_xyz:='<X Y Z>' hand_mount_rpy:='<ROLL PITCH YAW>'
 ```
 
-The first run logs hand calculations but sends no hand trajectory from the
-bridge. The real END Direct node checks the 20 motors and publishes hand state;
+The physical hand reports the undocumented status 32 whenever its TableSync
+is active, so the real launch needs `allow_active_status32:=true`; other
+status bits still stop it. `goal_current` (default 300, the official value)
+sets the full-hand trajectory current. The first run logs hand calculations but
+sends no hand trajectory from the bridge. The real END Direct node checks the 20 motors and publishes hand state;
 the arm controller manager has only `joint_state_broadcaster` and
 `arm_controller`. Confirm `finger_l_joint1..20` states, pressure frames, and
 leader endpoints. Keep the launch alive and switch `command_enabled=true`
