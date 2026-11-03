@@ -36,6 +36,8 @@ def main(argv=None) -> int:
                       help="compare the full END indirect window with direct hand health bytes")
     mode.add_argument("--compare-active-health", action="store_true",
                       help="temporarily enable hand TableSync and compare health paths without motor goals")
+    mode.add_argument("--probe-sensors", action="store_true",
+                      help="read the five HX5 fingertip sensor IDs and pressure bytes")
     args = parser.parse_args(argv)
     try:
         from ament_index_python.packages import get_package_share_directory
@@ -53,6 +55,7 @@ def main(argv=None) -> int:
     port = (make_fresh_rx_port(args.port)
             if args.diagnose or args.torque_status or args.verify_direct
             or args.compare_health_alias or args.compare_active_health
+            or args.probe_sensors
             else PortHandler(args.port))
     if not port.openPort():
         parser.exit(1, f"Cannot open {args.port}; stop other END owners first\n")
@@ -60,6 +63,17 @@ def main(argv=None) -> int:
         if not port.setBaudRate(args.baud):
             raise EndProxyError(f"cannot set {args.port} to {args.baud} baud")
         direct = EndDirect(port, PacketHandler(2.0))
+        if args.probe_sensors:
+            settings = read_end_settings(direct)
+            if settings != STOCK_END:
+                raise EndProxyError(f"END 210 is not at stock OMY settings: {settings}")
+            reports = direct.inspect_tactile_sensors()
+            for sensor_id, report in reports.items():
+                print(f"HX5 fingertip ID {sensor_id}: {report}")
+            print("No hand or motor goal sent. END settings restored.")
+            if any("error" in report for report in reports.values()):
+                raise EndProxyError("one or more fingertip sensors did not verify")
+            return 0
         if args.compare_active_health:
             settings = read_end_settings(direct)
             if settings != STOCK_END:

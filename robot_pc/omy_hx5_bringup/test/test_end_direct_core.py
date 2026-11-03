@@ -11,7 +11,7 @@ from omy_hx5_bringup.direct_trajectory import (
     JOINT_NAMES, make_segment, make_trajectory_segment, validate_currents,
 )
 from omy_hx5_bringup.end_direct_core import (
-    EndDirect, MOTOR_IDS, MOTOR_INDIRECT, load_vendor_motor_settings,
+    EndDirect, MOTOR_IDS, MOTOR_INDIRECT, SENSOR_IDS, load_vendor_motor_settings,
 )
 from omy_hx5_bringup.end_proxy import EndProxyError
 from omy_hx5_bringup.end_layout import (
@@ -34,6 +34,7 @@ class FakeBus:
         self.hand[33] = 1
         self.hand[102:104] = pack("<H", 2368)
         self.motors = {}
+        self.sensors = {}
         expected = load_vendor_motor_settings(XACRO)
         for motor_id in MOTOR_IDS:
             motor = bytearray(256)
@@ -45,6 +46,12 @@ class FakeBus:
             motor[64] = 1
             motor[168:188] = pack("<10H", *MOTOR_INDIRECT)
             self.motors[motor_id] = motor
+        for sensor_id in SENSOR_IDS:
+            sensor = bytearray(96)
+            sensor[0:2] = pack("<H", 6000 + sensor_id - 140)
+            sensor[7] = sensor_id
+            sensor[72:81] = bytes(range(1, 10))
+            self.sensors[sensor_id] = sensor
         self.goals = {}
         self.end_writes = []
         self.freeze_hand_tick = False
@@ -66,7 +73,9 @@ class FakeBus:
 
     def _device(self):
         selected = self.end[13]
-        return self.hand if selected == 140 else self.motors[selected]
+        if selected == 140:
+            return self.hand
+        return self.motors[selected] if selected in self.motors else self.sensors[selected]
 
     def _read_target(self, address):
         device = self._device()
@@ -173,6 +182,20 @@ def test_torque_status_reads_all_motors_without_motor_writes():
                       for motor_id in MOTOR_IDS}
     assert bus.end == original_end
     assert {motor_id: bytes(motor) for motor_id, motor in bus.motors.items()} == original_motors
+
+
+def test_tactile_probe_checks_all_five_ids_without_goals_and_reports_bad_id():
+    bus = FakeBus()
+    original_end = bus.end.copy()
+    bus.sensors[155][7] = 0
+    result = EndDirect(None, bus, sleep=lambda _: None).inspect_tactile_sensors()
+    assert set(result) == set(SENSOR_IDS)
+    assert result[145]["model"] == 6005
+    assert result[145]["pressures"] == tuple(range(1, 10))
+    assert "error" in result[155]
+    assert all("error" not in result[sensor_id] for sensor_id in SENSOR_IDS if sensor_id != 155)
+    assert bus.end == original_end
+    assert bus.goals == {}
 
 
 def test_torque_write_verification_retries_a_stale_end_read_without_rewriting():

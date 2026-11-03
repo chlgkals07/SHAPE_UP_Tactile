@@ -25,6 +25,7 @@ from .end_proxy import (
 
 MOTOR_IDS = tuple(141 + 5 * finger + joint for finger in range(5)
                   for joint in range(4))
+SENSOR_IDS = (145, 150, 155, 160, 165)
 MOTOR_INDIRECT = (126, 127, 128, 129, 132, 133, 102, 103, 116, 117)
 HAND_INDIRECT_BASE = 122
 HAND_INDIRECT_DATA = 634
@@ -264,6 +265,34 @@ class EndDirect(EndProxy):
                     raise EndProxyError(
                         f"motor {motor_id} status could not be verified: {last_error}")
         return states
+
+    def inspect_tactile_sensors(self) -> dict[int, dict[str, object]]:
+        """Read five sensor identities and pressure bytes, without motor goals."""
+        reports = {}
+        with self.temporary_read_window(tool_id=SENSOR_IDS[0]):
+            for sensor_id in SENSOR_IDS:
+                if sensor_id != SENSOR_IDS[0]:
+                    self.write_end(SYNC_ENABLE, 1, 0)
+                    self.write_end(TOOL_ID, 1, sensor_id)
+                last_error = None
+                for _ in range(3):
+                    try:
+                        identity = self.read_hand(0, 8, stable=True)
+                        model = int.from_bytes(identity[:2], "little")
+                        if identity[7] != sensor_id or model in (0, 0xFFFF):
+                            raise EndProxyError(
+                                f"ID {sensor_id} identity mismatch: "
+                                f"reported ID={identity[7]}, model={model}")
+                        pressures = self.read_hand(72, 9)
+                        reports[sensor_id] = {
+                            "model": model, "pressures": tuple(pressures)}
+                        break
+                    except EndProxyError as exc:
+                        last_error = exc
+                        self.sleep(0.1)
+                else:
+                    reports[sensor_id] = {"error": str(last_error)}
+        return reports
 
     def _write_selected_motor(self, motor_id: int, address: int, data: bytes) -> None:
         """Forward one verified RAM write to the selected motor via END."""

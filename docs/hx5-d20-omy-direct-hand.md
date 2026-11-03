@@ -3,9 +3,10 @@
 > **2026-11-03 실물 진행:** 손 컨트롤러 ID 140, 모드 0, watchdog 0,
 > 23.77 V, 상태 0과 증가하는 Realtime Tick을 확인했다. 모터 20개 모두
 > Torque Enable 1, Hardware Error 0으로 읽혔고 END 설정은 기존 OMY 값으로
-> 복원됐다. 첫 Direct 런치에서 간접 상태 `status=32`가 나와 중단됐다.
-> 종료 후 손 주소 106의 직접 읽기는 `status=0`이었다. 아래 간접/직접
-> 상태 비교 결과를 확인하기 전에는 Direct 런치를 재시도하지 않는다.
+> 복원됐다. 첫 Direct 런치에서 `status=32`가 나와 중단됐다. 손 TableSync를
+> 켠 상태에서는 간접·직접 주소 106이 모두 32였고, 끄면 0이었다. 공식 문서의
+> bit 5 설명과 맞지 않아 의미를 확인 중이다. 아래 촉각 센서 ID 검사가
+> 끝나기 전에는 Direct 런치를 재시도하지 않는다.
 
 이 경로는 OMY의 END ID 210을 통해 손 컨트롤러 ID 140으로 접근한다. 로봇 PC의
 별도 손 USB 포트나 외부 전원 제어 코드를 요구하지 않는다. 기존 Preset Mode 런치와
@@ -139,6 +140,14 @@ ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --compar
 
 ```bash
 ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --compare-active-health
+```
+
+공식 왼손 TableSync 설정에는 20개 모터와 별도로 손가락 끝 촉각 센서
+ID 145·150·155·160·165가 포함된다. 손 TableSync가 꺼진 상태에서 이
+5개 ID와 압력값을 END 경유로 읽는다. 모터 목표값은 보내지 않는다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --probe-sensors
 ```
 
 기존 `omy_hx5_official_hand.launch.py`, 손 preset 노드, unpack/pack,
