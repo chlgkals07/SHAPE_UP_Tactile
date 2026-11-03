@@ -1,6 +1,6 @@
 # HX5-D20 × OMY 촉각 보조 텔레오퍼레이션 준비
 
-> **실물 손 런치 중단:** 기존 드라이버는 손 ID 140에 직접 접근한다. OMY END 210 경유 배선에서는 이 경로로 손을 제어할 수 없다. 현재는 [END 경유 읽기 검사](hx5-d20-run-commands.md)만 진행한다.
+> **실물 텔레옵 런치 중단:** 기존 20관절 드라이버는 손 ID 140에 직접 접근한다. OMY END 210 경유 배선에서는 이 경로로 연속 관절 텔레옵을 할 수 없다. END 경유 Preset Mode bringup은 [별도 실행 순서](hx5-d20-omy-official-bringup.md)를 따른다.
 
 [실행 명령어 모음](hx5-d20-run-commands.md)
 

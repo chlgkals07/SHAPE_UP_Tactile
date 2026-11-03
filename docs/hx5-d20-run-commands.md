@@ -1,6 +1,10 @@
 # OMY + 왼손 HX5-D20 실행 명령어
 
-현재 단계는 **END ID 210을 통한 손 ID 140 읽기 검사**다. 기존 실물 손/텔레옵 런치는 손 ID 140에 직접 접속하려 하므로 실행이 차단된다. 손을 움직이는 명령은 아직 제공하지 않는다. 이 문서의 검사 결과로 다음 설정을 결정한다.
+이 문서는 END ID 210을 통한 진단 명령과 현장 읽기 결과를 기록한다. 실물
+Preset Mode bringup과 첫 작은 동작의 현재 실행 순서는
+[OMY 끝단 손 bringup](hx5-d20-omy-official-bringup.md)을 따른다. 기존
+`omy_hx5_hand_live.launch.py` 및 텔레옵 런치는 여전히 직접 ID 140 경로라
+실행이 차단된다.
 
 END 210의 Tool ID와 Table Sync 읽기 창을 임시로 바꾸고, 손 모델·전압·상태를 읽은 뒤 원래 값으로 복원한다. 손 목표 위치, 토크, 촉각 명령은 쓰지 않는다. END 설정은 EEPROM이므로 검사를 반복해서 실행하지 않는다.
 
@@ -77,7 +81,7 @@ source /workspace/omy_ws/install/setup.bash
 
 ## Robot PC 컨테이너 — END 210 경유 손 통신 확인
 
-다른 bringup/unpack/손 프로그램이 `/dev/ttyAMA4`를 사용 중이면 먼저 해당 터미널에서 Ctrl+C로 종료한다. 아래 명령은 **Robot PC 컨테이너 안**에서, 빌드 후 실행한다. 손의 4핀 전원 용량과 핀 배열 확인 전에는 이 읽기 검사까지만 진행한다.
+다른 bringup/unpack/손 프로그램이 `/dev/ttyAMA4`를 사용 중이면 먼저 해당 터미널에서 Ctrl+C로 종료한다. 아래 명령은 **Robot PC 컨테이너 안**에서, 빌드 후 실행한다. 사용자는 현재 장착한 손의 전원 경로에 문제가 없다고 확인했다.
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -94,7 +98,7 @@ ros2 run omy_hx5_bringup omy_hx5_end_proxy_probe --port /dev/ttyAMA4
 ros2 run omy_hx5_bringup omy_hx5_end_proxy_probe --port /dev/ttyAMA4 --motor-id 141
 ```
 
-이 검사에서 `motor ID 141`과 모델 번호가 나오면 END 경유 내부 모터의 주소 지정 가능성을 확인한 것이다. 실패해도 ID 140 경유 통신 성공 결과는 유지된다. 출력 전체를 기록하고 손 동작 launch는 실행하지 않는다.
+이 검사에서 `motor ID 141`과 모델 번호가 나오면 END 경유 내부 모터의 주소 지정 가능성을 확인한 것이다. 실패해도 ID 140 경유 통신 성공 결과는 유지된다. 출력 전체를 기록한다.
 
 최신 검사 코드는 모터 모델과 함께 Drive Mode, Operating Mode, Torque Enable, Indirect Address 1/2를 읽는다. 공식 왼손 Xacro의 첫 모터 설정과 비교하되, 한 모터만 정상이라고 20개 전체가 준비됐다고 판단하지 않는다.
 
@@ -108,7 +112,7 @@ ros2 run omy_hx5_bringup omy_hx5_end_proxy_probe --port /dev/ttyAMA4 --inspect-s
 
 `[141, 142, 143, 144, 145]`는 공식 왼손 Xacro의 첫 손가락 TableSync 설정과 일치한다. `[255, 255, 255, 255, 255]` 등 다른 값은 아직 해당 설정이 준비되지 않았다는 뜻일 수 있다. 이 결과만으로 손 동작을 실행하지 않는다.
 
-실측한 손 컨트롤러 `mode=1`은 Preset Motion Mode다. 이번 검사는 이 모드를 바꾸지 않았다. 직접 관절 텔레옵에는 `mode=0`과 모터·TableSync 설정이 필요하다. 또한 OMY END 출력 24 V / 1 A와 HX5 피크 전류 2.6 A의 차이가 해소되기 전에는 모드 변경·토크 활성화·손 이동 명령을 실행하지 않는다.
+실측한 손 컨트롤러 `mode=1`은 Preset Motion Mode다. 이번 검사는 이 모드를 바꾸지 않았다. 직접 관절 텔레옵에는 `mode=0`과 모터·TableSync 설정이 필요하다.
 
 ## 2026-11-03 현장 읽기 결과
 
@@ -121,6 +125,9 @@ ros2 run omy_hx5_bringup omy_hx5_end_proxy_probe --port /dev/ttyAMA4 --inspect-s
 | 첫 TableSync 채널 | ID 141, 142, 143, 144, 145. 간접 주소 임시 변경 후 복원 확인 |
 | 엄지 첫 모터 | ID 141, 모델 1710(XM335-T323-T), Drive Mode 5, Operating Mode 5, Torque Enable 1, Indirect Address 1/2 = 126/127 |
 
-모터 Drive Mode 5는 공식 왼손 Xacro의 ID 141 설정값 13과 다르다. [XM335 제어표](https://emanual.robotis.com/docs/en/dxl/x/xm335-t323/)에 따르면 차이인 bit 3은 **Goal Update 시 자동 토크 활성화**다. 현재 토크는 이미 켜져 있어 이 차이만으로 통신 실패를 설명할 수 없다. 다만 손 컨트롤러가 Preset Mode이고 실제 팔·손 구동 및 전원 용량은 아직 검증하지 않았다.
+모터 Drive Mode 5는 공식 왼손 Xacro의 ID 141 설정값 13과 다르다. [XM335 제어표](https://emanual.robotis.com/docs/en/dxl/x/xm335-t323/)에 따르면 차이인 bit 3은 **Goal Update 시 자동 토크 활성화**다. 현재 토크는 이미 켜져 있어 이 차이만으로 통신 실패를 설명할 수 없다. 다만 실제 팔·손 운동은 아직 검증하지 않았다.
 
-현재 `omy_hx5_hand_live.launch.py`, `omy_hx5_official_hand.launch.py`, 실물 `omy_hx5_teleop.launch.py`는 직접 ID 140에 접근하는 이전 드라이버 경로를 사용하므로 시작 시 명시적으로 중단된다. 이 상태에서 키보드 원격 제어를 실행해도 손은 제어되지 않는다.
+`omy_hx5_official_hand.launch.py`의 실물 경로는 END 경유 Preset 노드로
+변경됐다. 공식 20관절 키보드가 쓰는 `hand_l_controller`는 이 모드에서
+실행되지 않는다. Preset 토픽과 확인 명령은
+[손 bringup 실행 순서](hx5-d20-omy-official-bringup.md)에 있다.

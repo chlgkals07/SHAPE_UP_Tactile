@@ -14,6 +14,7 @@ class FakePacket:
                       168: 126, 169: 0, 170: 127, 171: 0}
         self.hand_indirect = bytearray(pack("<5H", 634, 635, 636, 637, 638))
         self.high = {1024 + i: 141 + i for i in range(5)}
+        self.hand_goals = []
         self.buffer = bytearray(128)
         self.fail_high_read_once = False
         self.end = {13: 1, 46: 1, 48: 634, 50: 0, 52: 16, 54: 0,
@@ -67,6 +68,15 @@ class FakePacket:
                     and self.end[13] == 140 and self.end[56] == 122
                     and self.end[60] == 10):
                 self.hand_indirect[:] = self.buffer[:10]
+            if (address == 46 and self.end[46] == 1
+                    and self.end[13] == 140 and self.end[56] == 634
+                    and self.end[60] == 4):
+                goal = bytes(self.buffer[:4])
+                self.hand_goals.append(goal)
+                for offset, value in enumerate(goal):
+                    target = int.from_bytes(
+                        self.hand_indirect[2 * offset:2 * offset + 2], "little")
+                    self.high[target] = value
         return 0, 0
 
 
@@ -131,3 +141,52 @@ def test_inspect_sync_ids_restores_after_high_register_failure():
     assert packet.end == original_end
     assert packet.hand_indirect == original_hand
     assert packet.buffer == original_buffer
+
+
+def test_preset_session_has_no_startup_motion_and_restores_aliases():
+    packet = FakePacket()
+    packet.hand[33] = 1
+    packet.hand[70] = 0
+    original_end = packet.end.copy()
+    original_aliases = packet.hand_indirect[:]
+    original_buffer = packet.buffer[:]
+    proxy = EndProxy(None, packet, sleep=lambda _: None)
+    with proxy.preset_session() as state:
+        assert state == {"hand_model": 261, "mode": 1,
+                         "voltage_centivolts": 2368, "status": 0}
+        assert packet.hand_goals == []
+        assert packet.hand_indirect == original_aliases
+        proxy.send_preset(index=0, percent=5, duration_ms=1000)
+        assert packet.hand_goals == [bytes((0, 5, 232, 3))]
+        assert packet.end[60] == 0
+        with pytest.raises(ValueError, match="preset requires"):
+            proxy.send_preset(index=3, percent=5, duration_ms=1000)
+    assert packet.end == original_end
+    assert packet.hand_indirect == original_aliases
+    assert packet.buffer == original_buffer
+
+
+def test_preset_bringup_without_command_does_not_write_hand_aliases():
+    packet = FakePacket()
+    packet.hand[33] = 1
+    packet.hand[70] = 0
+    original_end = packet.end.copy()
+    original_aliases = packet.hand_indirect[:]
+    with EndProxy(None, packet, sleep=lambda _: None).preset_session():
+        assert packet.hand_goals == []
+        assert packet.hand_indirect == original_aliases
+    assert packet.end == original_end
+    assert packet.hand_indirect == original_aliases
+    assert all(address != 200 for address, _, _ in packet.writes)
+
+
+def test_preset_session_rejects_direct_mode_without_motor_command():
+    packet = FakePacket()
+    packet.hand[33] = 0
+    packet.hand[70] = 0
+    original_end = packet.end.copy()
+    with pytest.raises(EndProxyError, match="not ready for preset"):
+        with EndProxy(None, packet, sleep=lambda _: None).preset_session():
+            pass
+    assert packet.hand_goals == []
+    assert packet.end == original_end

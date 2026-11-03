@@ -1,10 +1,10 @@
 # OMY robot PC + left HX5-D20
 
-> Real HX5 launches are blocked while the END ID 210 proxy control path is being verified. The current safe hardware step is the [END proxy read probe](../docs/hx5-d20-run-commands.md). The old live commands below are retained as design history; they cannot run on the current 4-pin END wiring.
+> The real `omy_hx5_official_hand.launch.py` now uses END ID 210 to reach the left HX5 in Preset Mode. See the [current bringup sequence](../docs/hx5-d20-omy-official-bringup.md). The older hand-only and teleop live launches still use direct ID 140 access and remain blocked on this wiring.
 
 [실행 명령어 모음](../docs/hx5-d20-run-commands.md)
 
-[OMY 끝단에서 공식 손 컨트롤러·키보드를 시험하는 bringup 순서](../docs/hx5-d20-omy-official-bringup.md)는 별도의 `omy_hx5_official_hand.launch.py`를 사용한다. 기존 텔레옵 launch는 그대로 유지한다.
+[OMY 끝단에서 END 경유 Preset Mode를 시험하는 bringup 순서](../docs/hx5-d20-omy-official-bringup.md)는 별도의 `omy_hx5_official_hand.launch.py`를 사용한다. 기존 텔레옵 launch는 그대로 유지한다.
 
 `omy_hx5_bringup` is a ROS 2 Jazzy overlay for an OMY-F3M follower with a
 planned left HX5-D20 in place of the gripper. The real-mode Xacro is configured

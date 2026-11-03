@@ -186,7 +186,7 @@ class EndProxy:
         }
 
     def _write_hand_indirect(self, data: bytes) -> None:
-        """One bounded EEPROM write to HX5 Indirect Address 1..5 via END."""
+        """Write five HX5 indirect aliases through END, then verify them."""
         if len(data) != 10:
             raise ValueError("only five 2-byte indirect addresses are allowed")
         self.write_end(SYNC_ENABLE, 1, 0)
@@ -205,6 +205,70 @@ class EndProxy:
                 f"HX5 indirect address write did not verify: {forwarded.hex()} "
                 f"!= {data.hex()}"
             )
+
+    @contextmanager
+    def preset_session(self):
+        """Own the END port for HX5 preset commands, restoring both devices on exit.
+
+        Entering this session changes only END configuration. The five HX5
+        indirect aliases are installed lazily on the first motion request.
+        """
+        model, result, error = self.packet.ping(self.port, END_ID)
+        if result != 0 or error or model != END_MODEL:
+            raise EndProxyError("END 210 did not respond before preset bringup")
+        with self.temporary_read_window():
+            hand_model = int.from_bytes(self.read_hand(0, 2, stable=True), "little")
+            mode = self.read_hand(33, 1, stable=True)[0]
+            table_sync = self.read_hand(70, 1, stable=True)[0]
+            voltage = int.from_bytes(self.read_hand(102, 2), "little")
+            status = self.read_hand(106, 1)[0]
+            if hand_model != LEFT_HAND_MODEL or mode != 1 or table_sync != 0 or status:
+                raise EndProxyError(
+                    f"left HX5 is not ready for preset control: model={hand_model}, "
+                    f"mode={mode}, TableSync Enable={table_sync}, status={status}"
+                )
+            self._preset_original_aliases = None
+            try:
+                self._preset_active = True
+                yield {"hand_model": hand_model, "mode": mode,
+                       "voltage_centivolts": voltage, "status": status}
+            finally:
+                self._preset_active = False
+                if self._preset_original_aliases is not None:
+                    self._write_hand_indirect(self._preset_original_aliases)
+                    if self.read_hand(122, 10, stable=True) != self._preset_original_aliases:
+                        raise EndProxyError("HX5 preset alias restoration did not verify")
+                self._preset_original_aliases = None
+
+    def send_preset(self, *, index: int, percent: int, duration_ms: int) -> None:
+        """Forward one bounded preset request through END to HX5 ID 140."""
+        if not getattr(self, "_preset_active", False):
+            raise EndProxyError("preset session is not active")
+        if not 0 <= index <= 2 or not 0 <= percent <= 100 or not 1 <= duration_ms <= 32737:
+            raise ValueError("preset requires index 0..2, percent 0..100, time 1..32737 ms")
+        if self._preset_original_aliases is None:
+            self._preset_original_aliases = self.read_hand(122, 10, stable=True)
+            preset_aliases = pack("<5H", 2016, 2017, 2018, 2019, 100)
+            self._write_hand_indirect(preset_aliases)
+            if self.read_hand(122, 10, stable=True) != preset_aliases:
+                raise EndProxyError("HX5 preset aliases did not verify")
+        data = bytes((index, percent)) + duration_ms.to_bytes(2, "little")
+        self.write_end(SYNC_ENABLE, 1, 0)
+        self.write_end(READ_ADDRESS_1, 2, 634)
+        self.write_end(READ_SIZE_1, 2, 4)
+        self.write_end(WRITE_ADDRESS_1, 2, 634)
+        self.write_end(WRITE_SIZE_1, 2, 4)
+        self.write_end_buffer(data)
+        try:
+            self.write_end(SYNC_ENABLE, 1, 1)
+            self.sleep(0.15)
+        finally:
+            # Never leave a repeating goal write in END's Table Sync loop.
+            self.write_end(SYNC_ENABLE, 1, 0)
+            self.write_end(WRITE_SIZE_1, 2, 0)
+        self.write_end(SYNC_ENABLE, 1, 1)
+        if self.read(READ_BUFFER, 4) != data:
+            raise EndProxyError("HX5 preset registers did not echo the requested values")
 
     def inspect_sync_ids(self) -> tuple[int, tuple[int, ...]]:
         """Read high TableSync IDs without changing the hand's operating mode."""

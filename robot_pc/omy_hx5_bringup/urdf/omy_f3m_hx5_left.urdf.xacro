@@ -4,6 +4,7 @@
   <xacro:arg name="mock_arm" default="true"/>
   <xacro:arg name="mock_hand" default="true"/>
   <xacro:arg name="enable_arm_hardware" default="true"/>
+  <xacro:arg name="enable_end_hardware" default="true"/>
   <xacro:arg name="mock_sensor_commands" default="false"/>
   <xacro:arg name="end_port" default="/dev/ttyAMA4"/>
   <xacro:arg name="end_tool_id" default="1"/>
@@ -47,7 +48,9 @@
       use_sim="false" use_mock_hardware="$(arg mock_arm)"
       mock_sensor_commands="$(arg mock_sensor_commands)"/>
   </xacro:if>
-  <xacro:omy_hx5_end_system port_name="$(arg end_port)" tool_id="$(arg end_tool_id)"
-    use_mock_hardware="$(arg mock_hand)"
-    mock_sensor_commands="$(arg mock_sensor_commands)"/>
+  <xacro:if value="$(arg enable_end_hardware)">
+    <xacro:omy_hx5_end_system port_name="$(arg end_port)" tool_id="$(arg end_tool_id)"
+      use_mock_hardware="$(arg mock_hand)"
+      mock_sensor_commands="$(arg mock_sensor_commands)"/>
+  </xacro:if>
 </robot>
