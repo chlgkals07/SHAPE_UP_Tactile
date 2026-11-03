@@ -54,7 +54,7 @@ SSH의 `No route to host`는 User PC의 OMY 직결 이더넷 인터페이스가 
 
 ## 다음 연결 때의 검증 경계
 
-1. [END Direct Mode 준비](../hx5-d20-omy-direct-hand.md#2-손-direct-mode-준비-한-번)에서 20모터 설정 점검과 5채널 TableSync 설정을 완료한다. 이 단계는 목표 관절값을 보내지 않는다.
+1. [END Direct Mode 준비](../hx5-d20-omy-direct-hand.md#2-손-direct-mode-준비)에서 20모터 설정 점검과 5채널 TableSync 설정을 완료한다. 이 단계는 목표 관절값을 보내지 않는다.
 2. 공식 키보드로 한 손가락의 작은 동작부터 실측한다. 손 관절·촉각 토픽의 실제 갱신과 물리 움직임을 함께 확인한다.
 3. [리더 방아쇠 텔레옵](../hx5-d20-omy-teleop.md#3-팔-추종-없이-손-드라이런)은 손 브리지 드라이런부터 시작한다. `hand_dry_run:=true`는 손 명령 발행을 멈추지만 팔 텔레옵을 자동으로 막지는 않는다.
 

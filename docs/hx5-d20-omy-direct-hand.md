@@ -22,27 +22,55 @@ ssh root@10.42.0.241
 Robot PC **호스트**에서:
 
 ```bash
-cd /data/docker/open_manipulator/docker/workspace/SHAPE_UP_Tactile
+cd /data/docker/open_manipulator/docker/workspace/SHAPE_UP_Tactile || exit 1
 git switch codex/hx5-d20
 git pull --ff-only
 git submodule update --init third_party/robotis_hand
-cd /data/docker/open_manipulator
+cd /data/docker/open_manipulator || exit 1
+if [ "$(docker inspect -f '{{.State.Running}}' open_manipulator 2>/dev/null)" != true ]; then
+  ./docker/container.sh start
+fi
 ./docker/container.sh enter
 ```
 
-Robot PC **컨테이너**에서 (최초 소스 연결과 의존 패키지 설치는
-[기존 실행 명령어](hx5-d20-run-commands.md#robot-pc-컨테이너--최초-빌드)를 따른다):
+Robot PC **컨테이너**에서 최초 한 번 소스 패키지를 연결하고 의존성을 설치한다.
+이미 준비한 작업공간이라면 아래 블록을 건너뛰고 다음 빌드 블록부터 실행한다.
+
+```bash
+export OMY_HX5_REPO=/workspace/SHAPE_UP_Tactile
+source /opt/ros/jazzy/setup.bash
+source /root/ros2_ws/install/setup.bash
+
+mkdir -p /workspace/omy_ws/src
+[ -e /workspace/omy_ws/src/omy_hx5_bringup ] || ln -s "$OMY_HX5_REPO/robot_pc/omy_hx5_bringup" /workspace/omy_ws/src/omy_hx5_bringup
+[ -e /workspace/omy_ws/src/robotis_hand_description ] || ln -s "$OMY_HX5_REPO/third_party/robotis_hand/robotis_hand_description" /workspace/omy_ws/src/robotis_hand_description
+[ -e /workspace/omy_ws/src/robotis_hand_bringup ] || ln -s "$OMY_HX5_REPO/third_party/robotis_hand/robotis_hand_bringup" /workspace/omy_ws/src/robotis_hand_bringup
+[ -e /workspace/omy_ws/src/robotis_hand_teleop ] || ln -s "$OMY_HX5_REPO/third_party/robotis_hand/robotis_hand_teleop" /workspace/omy_ws/src/robotis_hand_teleop
+[ -e /workspace/omy_ws/src/robotis_hand_pressure_broadcaster ] || ln -s "$OMY_HX5_REPO/third_party/robotis_hand/robotis_hand_pressure_broadcaster" /workspace/omy_ws/src/robotis_hand_pressure_broadcaster
+[ -e /workspace/omy_ws/src/robotis_hand_playground ] || ln -s "$OMY_HX5_REPO/third_party/robotis_hand/robotis_hand_playground" /workspace/omy_ws/src/robotis_hand_playground
+if [ ! -d /workspace/omy_ws/src/robotis_interfaces ]; then
+  git clone --depth 1 --branch jazzy https://github.com/ROBOTIS-GIT/robotis_interfaces.git /workspace/omy_ws/src/robotis_interfaces
+fi
+
+apt-get update
+apt-get install -y python3-serial
+rosdep install --from-paths /workspace/omy_ws/src --ignore-src --rosdistro jazzy -y
+```
+
+최초 설치 후와 HX5 브랜치를 갱신한 뒤에는 같은 컨테이너에서 빌드한다.
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 source /root/ros2_ws/install/setup.bash
 cd /workspace/omy_ws
-colcon build --symlink-install --packages-up-to omy_hx5_bringup
+MAKEFLAGS=-j2 CMAKE_BUILD_PARALLEL_LEVEL=2 colcon build --symlink-install --parallel-workers 1 --packages-up-to omy_hx5_bringup
 source /workspace/omy_ws/install/setup.bash
 ros2 pkg prefix omy_hx5_bringup
+ros2 pkg prefix robotis_hand_teleop
+ros2 pkg prefix robotis_interfaces
 ```
 
-## 2. 손 Direct Mode 준비 (한 번)
+## 2. 손 Direct Mode 준비
 
 기존 `omy_hx5_official_hand.launch.py`, 손 preset 노드, unpack/pack,
 다른 `/dev/ttyAMA4` 사용자들을 종료한 상태에서 수행한다. 로봇 팔이
@@ -56,7 +84,9 @@ ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4
 ```
 
 이 확인은 손의 높은 주소를 읽기 위해 간접 주소 EEPROM을 잠시 바꾸었다가
-복구한다. 반복 실행하지 않는다. 검사가 성공하면 다음 **한 번만** 실행한다.
+복구한다. 반복 실행하지 않는다. 검사 출력에 `HX5 mode=1` 또는 설정이 필요한
+TableSync 채널이 표시되면 다음 명령을 실행한다. 이미 `mode=0`이고 설정할
+채널이 없으면 건너뛴다.
 손 컨트롤러의 5개 TableSync 채널과 170개 간접 주소를 설정하고 손의
 Operating Mode를 `0`(Direct Control)으로 바꾼다. 이 설정은 손의 EEPROM에
 남는다. 모터 목표값은 보내지 않는다.
@@ -68,6 +98,8 @@ ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --apply
 `All 20 HX5 actuators identified`, `Direct Control Mode 0 ready`가
 나와야 한다. 모터 설정 차이가 나오면 여기서 멈추고 실제 출력과 공식 설정을
 대조한다. 손 모터 EEPROM은 이 프로그램이 자동으로 덮어쓰지 않는다.
+나중에 `--restore-preset`으로 모드 1에 되돌렸다면 Direct 모드를 시작하기 전에
+이 `--apply` 명령을 다시 실행해야 한다.
 
 ## 3. 실물 Direct Mode 런치
 
