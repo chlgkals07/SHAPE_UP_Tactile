@@ -194,8 +194,8 @@ class EndProxy:
                 f"!= {data.hex()}"
             )
 
-    def inspect_sync_ids(self) -> tuple[int, ...]:
-        """Read HX5 high TableSync IDs, restoring its five EEPROM aliases."""
+    def inspect_sync_ids(self) -> tuple[int, tuple[int, ...]]:
+        """Read high TableSync IDs without changing the hand's operating mode."""
         model, result, error = self.packet.ping(self.port, END_ID)
         if result != 0 or error or model != END_MODEL:
             raise EndProxyError("END 210 did not respond before TableSync inspection")
@@ -205,9 +205,9 @@ class EndProxy:
                 raise EndProxyError(f"expected left HX5 model 261, got {model}")
             mode = self.read_hand(33, 1)[0]
             enabled = self.read_hand(70, 1)[0]
-            if mode != 0 or enabled != 0:
+            if mode not in (0, 1) or enabled != 0:
                 raise EndProxyError(
-                    f"hand is not idle Direct Control Mode: mode={mode}, "
+                    f"hand is not idle for TableSync inspection: mode={mode}, "
                     f"TableSync Enable={enabled}"
                 )
             original = self.read_hand(122, 10, stable=True)
@@ -220,7 +220,7 @@ class EndProxy:
                 restored = self.read_hand(122, 10, stable=True)
                 if restored != original:
                     raise EndProxyError("HX5 indirect address restoration did not verify")
-        return ids
+        return mode, ids
 
 
 def main(argv=None) -> int:
@@ -251,8 +251,8 @@ def main(argv=None) -> int:
             parser.exit(1, f"Cannot set {args.port} to {args.baud} baud\n")
         proxy = EndProxy(port, PacketHandler(2.0))
         if args.inspect_sync_ids:
-            ids = proxy.inspect_sync_ids()
-            print(f"HX5 TableSync1 IDs via END 210: {list(ids)}. "
+            mode, ids = proxy.inspect_sync_ids()
+            print(f"HX5 mode {mode}; TableSync1 IDs via END 210: {list(ids)}. "
                   "Five indirect addresses restored; no motor command sent.")
         elif args.motor_id is None:
             result = proxy.probe()

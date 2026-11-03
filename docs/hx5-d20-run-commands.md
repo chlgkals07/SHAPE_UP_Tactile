@@ -98,6 +98,8 @@ ros2 run omy_hx5_bringup omy_hx5_end_proxy_probe --port /dev/ttyAMA4 --motor-id 
 
 모터 ID 141이 공식 XM335-T323-T 모델 1710으로 응답했다면, 다음 단계는 손 컨트롤러의 **높은 TableSync 설정 주소**를 END를 통해 읽을 수 있는지 검사하는 것이다. 아래 명령은 손의 `Indirect Address 1..5` EEPROM 값을 먼저 저장하고, 잠시 `1024..1028`로 바꿔 TableSync1의 5개 ID를 읽은 다음 원래 값으로 복원·검증한다. END의 읽기·쓰기 창과 쓰기 버퍼도 복원한다. 손가락 목표·토크 명령은 보내지 않지만 **손과 END 양쪽 EEPROM을 일시적으로 쓴다**. 검사 중 전원을 끄거나 케이블을 빼지 말고, 반복 실행하지 않는다. 복원 오류가 나면 그대로 멈추고 전체 출력을 보낸다.
 
+손의 `Operating Mode`가 `1`(Preset Motion Mode)이어도 이 읽기 검사는 진행한다. 모드는 변경하지 않는다. 다만 손의 `TableSync Enable`이 `0`이어야 한다. 텔레옵용 직접 제어에는 나중에 별도의 모드 전환과 설정 확인이 필요하다.
+
 ```bash
 ros2 run omy_hx5_bringup omy_hx5_end_proxy_probe --port /dev/ttyAMA4 --inspect-sync-ids
 ```

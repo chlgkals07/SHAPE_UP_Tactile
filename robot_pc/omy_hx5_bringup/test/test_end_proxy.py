@@ -99,12 +99,15 @@ def test_end_proxy_reads_motor_via_end_without_motor_writes():
     assert all(address != 7 for address, _, _ in packet.writes)
 
 
-def test_inspect_sync_ids_restores_hand_and_end_eeprom():
+@pytest.mark.parametrize("mode", [0, 1])
+def test_inspect_sync_ids_restores_hand_and_end_eeprom(mode):
     packet = FakePacket()
+    packet.hand[33] = mode
     original_end = packet.end.copy()
     original_hand = packet.hand_indirect[:]
     original_buffer = packet.buffer[:]
-    ids = EndProxy(None, packet, sleep=lambda _: None).inspect_sync_ids()
+    observed_mode, ids = EndProxy(None, packet, sleep=lambda _: None).inspect_sync_ids()
+    assert observed_mode == mode
     assert ids == (141, 142, 143, 144, 145)
     assert packet.end == original_end
     assert packet.hand_indirect == original_hand
