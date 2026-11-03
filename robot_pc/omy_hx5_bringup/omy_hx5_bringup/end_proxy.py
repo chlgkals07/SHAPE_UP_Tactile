@@ -37,6 +37,7 @@ WRITE_BUFFER = 200
 COMM_RX_TIMEOUT = -3001
 HAND_TICK_ADDRESS = 100
 MAX_FRESH_PAYLOAD = 126  # END's two read slots share a 128-byte buffer.
+SAFE_HAND_READ_CHUNK = 16  # Stock OMY END uses a 16-byte first read slot.
 
 SAVED_REGISTERS = (
     (TOOL_ID, 1), (SYNC_ENABLE, 1),
@@ -297,12 +298,12 @@ class EndProxy:
             raise EndProxyError("END proxy read was unstable; no hand state accepted")
         return second
 
-    def read_hand_fresh(self, address: int, size: int) -> bytes:
+    def read_hand_fresh(self, address: int, size: int, *, stable: bool = False) -> bytes:
         """Accept a hand value only after its own realtime tick advances.
 
-        The END's second read slot carries HX5 Realtime Tick (100..101) next
-        to the requested data. Equal copies of the END buffer are not proof
-        that the downstream hand replied to the current window.
+        Read the tick in the first slot before and after bounded data chunks.
+        The earlier 107-byte, two-slot END window returned a constant zero
+        on the physical OMY. That does not establish a hand power failure.
         """
         if (self._current.get(TOOL_ID) != HAND_ID or
                 not 0 <= address <= 1023 or
@@ -312,30 +313,23 @@ class EndProxy:
                 self._current.get(WRITE_SIZE_2, 0)):
             raise EndProxyError("fresh HX5 read requires hand ID 140, no write slots, and 1..126 bytes")
         self.write_end(SYNC_ENABLE, 1, 0)
-        self.write_end(READ_ADDRESS_1, 2, address)
-        self.write_end(READ_SIZE_1, 2, size)
-        self.write_end(READ_ADDRESS_2, 2, HAND_TICK_ADDRESS)
-        self.write_end(READ_SIZE_2, 2, 2)
-        self.write_end(SYNC_ENABLE, 1, 1)
-        self.sleep(0.10)
-        first = self.read(READ_BUFFER, size + 2)
-        tick = int.from_bytes(first[size:], "little")
-        for _ in range(10):
-            self.sleep(0.05)
-            current = self.read(READ_BUFFER, size + 2)
-            new_tick = int.from_bytes(current[size:], "little")
-            if tick <= 32767 and new_tick <= 32767 and new_tick != tick:
-                if address <= HAND_TICK_ADDRESS and address + size >= HAND_TICK_ADDRESS + 2:
-                    embedded = int.from_bytes(
-                        current[HAND_TICK_ADDRESS - address:
-                                HAND_TICK_ADDRESS + 2 - address], "little")
-                    if embedded != new_tick:
-                        continue
-                return current[:size]
-        raise EndProxyError(
-            f"END 210 did not receive a fresh HX5 response for {address}+{size}; "
-            f"hand realtime tick stayed at {tick}"
-        )
+        self.write_end(READ_SIZE_2, 2, 0)
+        first_tick = int.from_bytes(
+            EndProxy.read_hand(self, HAND_TICK_ADDRESS, 2), "little")
+        chunks = []
+        for offset in range(0, size, SAFE_HAND_READ_CHUNK):
+            chunk_size = min(SAFE_HAND_READ_CHUNK, size - offset)
+            chunks.append(EndProxy.read_hand(
+                self, address + offset, chunk_size, stable=stable))
+        second_tick = int.from_bytes(
+            EndProxy.read_hand(self, HAND_TICK_ADDRESS, 2), "little")
+        if (first_tick > 32767 or second_tick > 32767 or
+                first_tick == second_tick):
+            raise EndProxyError(
+                f"END 210 did not receive a fresh HX5 response for {address}+{size}; "
+                f"hand realtime ticks {first_tick}, {second_tick}"
+            )
+        return b"".join(chunks)
 
     def write_hand(self, address: int, data: bytes) -> None:
         """Forward a bounded write to the selected tool, then read it back.

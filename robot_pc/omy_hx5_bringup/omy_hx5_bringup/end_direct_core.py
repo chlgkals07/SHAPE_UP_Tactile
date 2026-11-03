@@ -82,7 +82,7 @@ def expected_channel_config(current: bytes, channel: int) -> bytes:
 class EndDirect(EndProxy):
     def read_hand(self, address: int, size: int, *, stable: bool = False) -> bytes:
         if self._current.get(TOOL_ID) == HAND_ID:
-            return self.read_hand_fresh(address, size)
+            return self.read_hand_fresh(address, size, stable=stable)
         return super().read_hand(address, size, stable=stable)
 
     def diagnose_hand(self) -> dict[str, int]:

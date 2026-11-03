@@ -197,6 +197,21 @@ def test_direct_read_rejects_stale_end_buffer_and_restores_end():
     with pytest.raises(EndProxyError, match="did not receive a fresh HX5 response"):
         proxy.verify_direct_setup()
     assert bus.end == original_end
+
+
+def test_direct_hand_read_uses_only_bounded_first_slot():
+    class FirstSlotOnlyBus(FakeBus):
+        def readTxRx(self, port, device_id, address, size):
+            if address == 72 and self.end[13] == 140:
+                assert self.end[52] <= 16
+                assert self.end[54] == 0
+            return super().readTxRx(port, device_id, address, size)
+
+    bus = FirstSlotOnlyBus()
+    bus.hand[33] = 0
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    assert proxy.diagnose_hand()["model"] == 261
+    assert proxy.diagnose_hand()["tick"] > 0
     assert not bus.goals
 
 
