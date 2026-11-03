@@ -18,6 +18,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--leader-closed", type=float, required=True,
                    help="measured rh_r1_joint value with leader gripper fully closed")
     p.add_argument("--leader-topic", default="/leader/joint_trajectory")
+    p.add_argument("--command-topic", default=None,
+                   help="hand JointTrajectory output; real END bridge uses the official left-hand topic")
     p.add_argument("--leader-joint", default="rh_r1_joint")
     p.add_argument("--contact-threshold", type=float, default=10.0,
                    help="experimental baseline-corrected 9-taxel sum, not newtons")
@@ -59,6 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     from hx5_teleop.ros_bridge import Hx5RosBridge
 
     bridge = Hx5RosBridge(core, leader, side=args.side, dry_run=args.dry_run,
+                         command_topic=args.command_topic,
                          arm_ready_topic=args.arm_ready_topic)
     bridge.spin()
     return 0

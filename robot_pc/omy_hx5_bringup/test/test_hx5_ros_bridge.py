@@ -11,6 +11,7 @@ from hx5_teleop.core import Hx5CoreConfig, Hx5GraspCore, TactileFrame
 from hx5_teleop.ros_bridge import Hx5RosBridge
 from hx5_teleop.ros_bridge import joint_positions, pressure_frame
 from hx5_teleop.leader import LeaderGripperConfig
+from hx5_teleop.cli import parser as bridge_parser
 
 
 def pressures(*, side="left", names=None, stamp_ns=2_000_000_000, value=8):
@@ -84,6 +85,15 @@ def test_bridge_rejects_core_with_opposite_hand_side_before_loading_ros():
     leader = LeaderGripperConfig("/leader/joint_trajectory", "rh_r1_joint", 0.0, 1.0)
     with pytest.raises(ValueError, match="hand_side"):
         Hx5RosBridge(core, leader, side="right")
+
+
+def test_cli_accepts_end_direct_command_topic():
+    args = bridge_parser().parse_args([
+        "--leader-open", "0.2", "--leader-closed", "0.5",
+        "--command-topic",
+        "/leader/joint_trajectory_command_broadcaster_left_hand/joint_trajectory",
+    ])
+    assert args.command_topic.endswith("left_hand/joint_trajectory")
 
 
 def test_first_published_command_is_bounded_from_measured_pose(monkeypatch):

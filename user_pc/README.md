@@ -5,20 +5,16 @@ LEAP Hand v1을 키보드 또는 OMY leader 그리퍼로 구동한다.
 
 HX5-D20 **왼손** 제어 본체는 [Robot PC용 `omy_hx5_bringup`](../robot_pc/README.md)에 있다. 이 디렉터리에는 손만 원격 조작하는 키보드 클라이언트 [`omy_hx5_keyboard.py`](omy_hx5_keyboard.py)도 있다. 아래 LEAP 설치·캘리브레이션 절차는 HX5에 적용하지 않는다.
 
-## HX5 손만 원격 키보드로 제어
+## HX5 왼손 원격 제어
 
-Robot PC에서 `omy_hx5_hand_only.launch.py`를 실행하면 팔을 unpack 영점으로 이동시킨 뒤 팔 컨트롤러를 계속 실행해 자세를 유지한다. 이동 완료를 확인한 다음 손 키보드 명령을 허용하며, 리더나 팔 텔레옵 브리지는 실행하지 않는다. 기본값은 `mock_arm:=true mock_hand:=true hand_dry_run:=true`다. 실물 모드는 팔·손 모두 `mock_*:=false`로 설정하며 손 드라이런이어도 실제 팔은 이동한다. [손 전용 실행 절차](../robot_pc/README.md#hand-only-remote-keyboard-at-the-unpack-pose)를 따른다.
+실물 OMY 끝단 4핀 배선에서는 손이 END 210 뒤에 있다. 공식 손가락별 키보드
+명령은 [END Direct 손 전용 절차](../docs/hx5-d20-omy-direct-hand.md)를 따른다.
+리더 방아쇠로 팔과 손을 조작하려면 [실물 텔레옵 절차](../docs/hx5-d20-omy-teleop.md)를
+따른다. 두 런치를 동시에 실행하지 않는다.
 
-원격 User PC에서 ROS 2 Jazzy를 source하고 Robot PC와 동일한 ROS domain, RMW, Zenoh 연결을 설정한 뒤 다음 명령을 실행한다.
-
-```bash
-source /opt/ros/jazzy/setup.bash
-python3 /path/to/SHAPE_UP_Tactile/user_pc/omy_hx5_keyboard.py
-```
-
-공식 ROBOTIS Hand 키보드와 같이 `x`는 쥐기, `z`는 펴기다. `]`와 `[`는 요청한 쥐기 정도를 각각 10% 올리고 내린다. `ESC`는 종료한다. 키보드는 `/hx5/keyboard_grasp_trajectory`에 `rh_r1_joint` **한 값만** 20 Hz로 발행한다. Robot PC 손 브리지가 이 값을 HX5의 왼손 20관절 명령으로 바꾸며, 팔 각도는 발행하지 않는다. 종료 전에 `z`를 누르고 손이 완전히 펴질 때까지 기다린다. 종료만으로 손 토크가 꺼지지 않는다.
-
-드라이런에서 실물 손 명령으로 전환할 때는 Robot PC launch를 종료하지 않는다. 키보드에서 `z`를 누르고 손이 열린 무접촉 상태에서, Robot PC의 별도 터미널로 `ros2 param set /hx5_left_omy_teleop command_enabled true`를 실행한다. 새 촉각 baseline 수집 뒤 손 제어가 시작되며 팔 자세 유지는 계속된다. 실물 END 4핀 배선의 전기·통신 적합성과 HX5 구동은 아직 검증되지 않았다.
+이 폴더의 `omy_hx5_keyboard.py`는 예전 손 브리지용 `rh_r1_joint` 한 값만
+`/hx5/keyboard_grasp_trajectory`에 발행한다. 기존 모의 `hand_only` 시험용으로
+남겨두었으며, 실물 END Direct 노드의 공식 20관절 키보드 입력은 아니다.
 
 ### HX5 촉각 신호 보기
 

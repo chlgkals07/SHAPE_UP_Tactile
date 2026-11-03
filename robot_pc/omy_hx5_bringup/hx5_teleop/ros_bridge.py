@@ -104,6 +104,7 @@ class Hx5RosBridge:
         leader_timeout: float = 0.5,
         joint_timeout: float = 0.5,
         tracking_error_limit: float = 0.5,
+        command_topic: str | None = None,
         arm_ready_topic: str | None = None,
         arm_ready_timeout: float = 0.5,
     ) -> None:
@@ -123,7 +124,9 @@ class Hx5RosBridge:
             raise ValueError("arm_ready_timeout must be finite and positive")
         self.side = side
         self.names = joint_names(side)
-        self.topic = f"/hand_{side[0]}_controller/joint_trajectory"
+        self.topic = command_topic or f"/hand_{side[0]}_controller/joint_trajectory"
+        if not self.topic.startswith("/") or self.topic.endswith("/"):
+            raise ValueError("command_topic must be an absolute ROS topic")
         self._core = core
         self._leader_cfg = leader
         self._dry_run = dry_run

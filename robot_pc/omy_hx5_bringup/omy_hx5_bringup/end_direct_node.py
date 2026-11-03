@@ -57,10 +57,12 @@ def main(argv=None) -> int:
             self.joints_pub = self.create_publisher(JointState, "/joint_states", 10)
             self.pressure_pub = self.create_publisher(
                 HandPressures, "/left_hand/finger_pressures", 10)
+            self.command_topic = (
+                "/leader/joint_trajectory_command_broadcaster_left_hand/joint_trajectory")
             group = ReentrantCallbackGroup()
             self.create_subscription(
                 JointTrajectory,
-                "/leader/joint_trajectory_command_broadcaster_left_hand/joint_trajectory",
+                self.command_topic,
                 self.on_keyboard, 10, callback_group=group)
             self.create_subscription(Float64MultiArray,
                                      "/effort_l_controller/commands",
@@ -77,6 +79,11 @@ def main(argv=None) -> int:
                                            measured, time.monotonic())
 
         def on_keyboard(self, msg):
+            if self.count_publishers(self.command_topic) > 1:
+                with self.lock:
+                    self.segment = None
+                self.get_logger().error("Multiple hand command publishers; trajectory ignored")
+                return
             with self.lock:
                 if self.active_action:
                     self.get_logger().warn("Action is active; keyboard command ignored")

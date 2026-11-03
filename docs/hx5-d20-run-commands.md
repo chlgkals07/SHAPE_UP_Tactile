@@ -3,8 +3,11 @@
 이 문서는 END ID 210을 통한 진단 명령과 현장 읽기 결과를 기록한다. 실물
 Preset Mode bringup과 첫 작은 동작의 현재 실행 순서는
 [OMY 끝단 손 bringup](hx5-d20-omy-official-bringup.md)을 따른다. 기존
-`omy_hx5_hand_live.launch.py` 및 텔레옵 런치는 여전히 직접 ID 140 경로라
-실행이 차단된다.
+`omy_hx5_hand_live.launch.py`의 실물 경로는 여전히 직접 ID 140을
+찾으므로 차단된다. 리더 기반 실물 텔레옵은 END Direct 경로를 사용하는
+[갱신된 실행 순서](hx5-d20-omy-teleop.md)를 따른다.
+오늘 발생한 빌드·포트·ID·런치 오류는
+[2026-11-03 현장 기록](field-test/2026-11-03-omy-hx5-errors.md)에 정리했다.
 
 공식 왼손 **20관절 키보드**를 END 210 경유로 실행하는 새 경로는
 [Direct Mode 실행 순서](hx5-d20-omy-direct-hand.md)에 정리했다. 기존 Preset

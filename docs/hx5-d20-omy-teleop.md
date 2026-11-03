@@ -1,10 +1,10 @@
 # HX5-D20 × OMY 촉각 보조 텔레오퍼레이션 준비
 
-> **실물 텔레옵 런치 중단:** 기존 20관절 드라이버는 손 ID 140에 직접 접근한다. OMY END 210 경유 배선에서는 이 경로로 연속 관절 텔레옵을 할 수 없다. END 경유 Preset Mode bringup은 [별도 실행 순서](hx5-d20-omy-official-bringup.md)를 따른다.
+> **현재 실물 경로:** OMY 팔은 기존 `arm_controller`, HX5 왼손은 END 210 경유 Direct Mode 노드가 맡는다. 기존 손 직결 드라이버를 쓰는 `omy_hx5_hand_live.launch.py`는 계속 차단한다. [Direct Mode 준비·키보드 절차](hx5-d20-omy-direct-hand.md)를 마친 뒤 이 문서의 텔레옵 런치를 사용한다. 실물 20관절 텔레옵의 동작 검증은 아직 남아 있다.
 
 [실행 명령어 모음](hx5-d20-run-commands.md)
 
-이 문서는 OMY-F3M follower의 RH-P12-RN 그리퍼를 제거하고 HX5-D20을 장착해, OMY-L100 leader의 그리퍼 입력으로 손을 연속 개폐하기 위한 준비 및 현장 검증 순서다. 목표 배선은 **기존 그리퍼 케이블을 HX5에 재사용**하는 것이다. [AI Worker 공식 장착 절차](https://docs.robotis.com/docs/systems/aiworker/quick_start_guide/setup_overview/hardware/#optional-robotis-hand-installation)는 같은 RH-P12-RN 제거 후 기존 4핀 JST 케이블을 HX5에 연결하는 사례이지만, OMY에서도 그 케이블의 전원·통신 경로가 HX5에 적합한지는 아직 확인되지 않았다. **HX5 장착·통전·실물 구동은 아직 검증하지 않았다.** 2026-10-09의 LEAP Hand 실물 성공은 leader 입력과 OMY 팔의 선행 근거이며, HX5의 기구·전기 호환성을 입증하지 않는다.
+이 문서는 OMY-F3M follower의 RH-P12-RN 그리퍼 대신 장착한 HX5-D20을 OMY-L100 leader의 그리퍼 입력으로 연속 개폐하기 위한 코드와 실행 순서다. 기존 그리퍼 4핀 케이블로 END 210, 손 컨트롤러 140, 첫 모터 141이 응답했고 Preset 명령으로 검지 움직임이 관찰됐다. Direct Mode의 20모터 동작, 촉각 제어, 리더 입력부터 손까지의 실물 텔레옵은 아직 검증하지 않았다. [AI Worker 공식 장착 절차](https://docs.robotis.com/docs/systems/aiworker/quick_start_guide/setup_overview/hardware/#optional-robotis-hand-installation)는 같은 4핀 케이블 재사용 사례다.
 
 표기: **[공식]** ROBOTIS 문서 또는 이 브랜치의 공식 `robotis_hand` 소스, **[실측 LEAP]** [10/09 현장 결과](field-test/2026-10-09-results.md), **[계획]** 이 통합의 설계·검증 항목, **[미검증]** HX5 실물에서 확인해야 할 사항.
 
@@ -39,21 +39,21 @@ docker pull robotis/robotis-hand:1.0.2
 
 **AI Worker의 통합 배선:** [공식 장착 절차](https://docs.robotis.com/docs/systems/aiworker/quick_start_guide/setup_overview/hardware/#optional-robotis-hand-installation)는 RH-P12-RN에서 뺀 기존 4핀 JST 케이블을 HX5 포트에 연결하고 손의 종단저항 스위치를 켠다. 별도 U2D2·SMPS는 이 장착 절차에 등장하지 않는다. 반면 [손 단독 Setup Guide](https://docs.robotis.com/docs/systems/hx5_d20/quick_start_guide/setup_guide/)의 **24V SMPS → U2D2 Power Hub → 4핀 케이블 → HX5**, **U2D2 USB → 손 제어 PC**는 독립 구동용이다.
 
-**OMY에 적용할 때 미확인 사항:** [OMY END 유닛 제어표](https://docs.robotis.com/docs/systems/omy/specifications/control_table/#tool-baud-rate--tool-protocol-type--tool-protocol-id-11--12--13)는 툴 포트의 통신 속도·프로토콜·단일 Tool ID와 Table Sync 경로를 설명한다. [OMY 하드웨어 사양](https://ai.robotis.com/omy/hardware_omy)은 END 유닛의 M8 8핀 툴 출력을 24V/1A로 표기하고, [HX5 사양](https://ai.robotis.com/hands/hardware_hands.html)은 24V/최대 2.6A를 표기한다. 현물 그리퍼의 4핀 케이블이 이 M8 정격 출력과 동일한 경로인지 공개 도면만으로 확인하지 못했다. **24V/1A 정격이 실제 재사용 케이블에 적용된다면 HX5 최대 전류를 만족하지 못하므로 그 경로로 통전하지 않는다.** 핀 배열·전원 공급 능력·커넥터 변환·종단 위치를 확인한 뒤 전원을 끈 상태에서 결선한다.
+**OMY에 적용한 결과와 남은 확인:** 기존 그리퍼 4핀 케이블로 손을 장착·통전했고 END 210 경유 손 140의 입력 전압 약 23.7 V와 Preset 손가락 동작을 확인했다. [OMY END 유닛 제어표](https://docs.robotis.com/docs/systems/omy/specifications/control_table/#tool-baud-rate--tool-protocol-type--tool-protocol-id-11--12--13)는 Tool ID와 Table Sync 경로를 설명한다. [OMY 하드웨어 사양](https://ai.robotis.com/omy/hardware_omy)의 M8 8핀 툴 출력 24V/1A와 [HX5 사양](https://ai.robotis.com/hands/hardware_hands.html)의 최대 2.6A를 바로 비교해 실제 재사용 4핀 케이블의 전류 한도를 확정할 수는 없다. 최대 부하에서의 전압 강하·전류 여유와 종단 상태는 별도 실측이 필요하다.
 
-HX5는 기본 4 Mbps RS-485/DYNAMIXEL Protocol 2.0을 쓴다. OMY 원래 END 유닛은 `/dev/ttyAMA4`에서 ID 210 컨트롤러와 `rh_r1_joint` 1개를 통해 기존 Tool ID 1 그리퍼를 제어한다. HX5는 왼손 ID 140 및 20관절(모터 ID 141–165)을 쓰므로, 같은 4핀에 꽂는 것만으로 기존 제어 설정이 손을 제어하지는 못한다. 손 단독 bringup의 기본 `/dev/ttyUSB0`를 `/dev/ttyAMA4`로 바꾸는 것만으로 END 유닛 뒤 툴 버스에 직접 접근된다고 가정하지 않는다. 또한 공식 왼손 root xacro는 현재 `port_name` launch 인자를 손 시스템 매크로에 전달하지 않아, 인자만 바꿔도 생성된 하드웨어 설정은 `/dev/ttyUSB0`다. [OMY 설정](../third_party/open_manipulator/open_manipulator_description/ros2_control/omy_f3m_end_unit.ros2_control.xacro), [HX5 왼손 xacro](../third_party/robotis_hand/robotis_hand_description/urdf/hx5_d20_rev2/hx5_d20_left.xacro).
+HX5는 기본 4 Mbps RS-485/DYNAMIXEL Protocol 2.0을 쓴다. OMY 원래 END 유닛은 `/dev/ttyAMA4`에서 ID 210 컨트롤러와 `rh_r1_joint` 1개를 통해 기존 Tool ID 1 그리퍼를 제어한다. 이 손은 왼손 컨트롤러 ID 140과 내부 모터·센서 ID 141–165를 사용한다. 손 ID 140을 `/dev/ttyAMA4`에 직접 ping했을 때는 무응답이었지만 END 210의 Tool ID와 읽기 창으로 경유하자 손 140과 모터 141이 응답했다. 따라서 손 단독 bringup의 `/dev/ttyUSB0` 인자를 `/dev/ttyAMA4`로 바꾸는 방법은 사용하지 않는다. [오늘 오류·확인 기록](field-test/2026-11-03-omy-hx5-errors.md).
 
 ## ROS 2 데이터 경로와 제어 주체
 
 | 출처 → 대상 | 메시지·의미 |
 |---|---|
 | OMY leader → 팔·손 브리지 | `/leader/joint_trajectory`의 `trajectory_msgs/msg/JointTrajectory`에서 `joint1..6`은 팔 브리지가 꺼내 `/arm_controller/joint_trajectory`에 발행한다. `rh_r1_joint`는 손 브리지가 열림 0–닫힘 1로 정규화한다. 열린 값은 이전 LEAP 시험에서 약 **0.197 rad**, 닫힌 값은 **미측정**이다. |
-| 손 브리지 → HX5 컨트롤러 | `/hand_l_controller/joint_trajectory`에 `finger_l_joint1..20`을 넣은 `JointTrajectory`를 발행한다. `hand_l_controller`는 OMY END의 `/dev/ttyAMA4`를 소유하는 하드웨어 인터페이스의 HX5 관절을 명령한다. 기존 그리퍼 `rh_r1_joint`는 follower 하드웨어 정의에서 제거했다. |
-| HX5 → 손 브리지 | `/joint_states`와 `/left_hand/finger_pressures`. 압력 타입은 `robotis_interfaces/msg/HandPressures`이며 `sensors[]` 안에 `sensor_name`, `pressure_names[9]`, `pressure_values[9]`가 있다. [공식 촉각 문서](https://docs.robotis.com/docs/systems/hx5_d20/resources/technical_story/tactile_feedback_grasping/). |
+| 손 브리지 → END Direct 노드 | 실물 모드에서는 `/leader/joint_trajectory_command_broadcaster_left_hand/joint_trajectory`에 `finger_l_joint1..20`을 넣어 발행한다. END Direct 노드가 `/dev/ttyAMA4`에서 END 210의 80바이트 쓰기 창으로 손 140의 TableSync 목표값을 전달한다. 모의 모드의 출력 `/hand_l_controller/joint_trajectory`는 유지한다. |
+| HX5 → 손 브리지 | END Direct 노드가 20관절 `/joint_states`와 다섯 손가락의 `/left_hand/finger_pressures`를 발행한다. 압력 타입은 `robotis_interfaces/msg/HandPressures`이며 `sensors[]` 안에 `sensor_name`, `pressure_names[9]`, `pressure_values[9]`가 있다. [공식 촉각 문서](https://docs.robotis.com/docs/systems/hx5_d20/resources/technical_story/tactile_feedback_grasping/). |
 
 HX5는 다섯 손가락 각 4관절이며 그룹은 엄지 1–4, 검지 5–8, 중지 9–12, 약지 13–16, 소지 17–20이다. [ROBOTIS 기본 Hand 키보드 텔레옵](../third_party/robotis_hand/robotis_hand_teleop/robotis_hand_teleop/hx5_d20_teleop.py)은 왼손 엄지의 방향 관절 `joint1/2`를 `-1.57/+1.57 rad`로 대향시키고 `x` 키로 쥘 때 `joint3/4`를 `-1.57/-1.57 rad`로 굽힌다. 다른 네 손가락은 각 그룹의 `joint2/3/4`를 `+2.0/+1.57/+1.57 rad`로 굽힌다. 별도 [공식 촉각 데모](../third_party/robotis_hand/robotis_hand_playground/src/tactile_force_controller.cpp)는 엄지 `joint3/4`의 음방향 굽힘만 이용하므로, 종전 매핑은 엄지를 손가락 쪽으로 대향시키지 못했다. 현재 OMY 연속 방아쇠 매핑은 기본 텔레옵의 대향 방향을 따르되, 공식 `x`의 관절 한계 포즈가 무부하 MuJoCo 장면에서 자기접촉을 일으켜 더 작은 목표를 쓴다. 실제 장착 방향·관절 움직임은 작은 범위에서 다시 확인한다. 손 단독 시험의 공식 왼손 명령은 `ros2 launch robotis_hand_bringup hx5_d20_left.launch.py`이며 **launch가 초기 자세로 손을 움직인다.** 이 명령은 OMY 4핀 결합 bringup이 아니다. [공식 Operation Guide](https://docs.robotis.com/docs/systems/hx5_d20/quick_start_guide/operation_guide/), [왼손 launch](../third_party/robotis_hand/robotis_hand_bringup/launch/hx5_d20_left.launch.py).
 
-AI Worker SH5의 [하드웨어 설정](https://github.com/ROBOTIS-GIT/ai_worker/blob/jazzy/ffw_description/ros2_control/ffw_sh5_rev1_follower/ffw_sh5_follower.ros2_control.xacro)은 손 관절을 `DynamixelHardware`에 등록하고 [손 컨트롤러](https://github.com/ROBOTIS-GIT/ai_worker/blob/jazzy/ffw_bringup/config/ffw_sh5_rev1_follower/ffw_sh5_follower_ai_hardware_controller.yaml)를 팔과 분리한다. 이 브랜치의 [OMY 통합 Xacro](../robot_pc/omy_hx5_bringup/urdf/omy_f3m_hx5_left.urdf.xacro)도 같은 제어 분리를 적용했다. 팔은 `/dev/ttyAMA2`, END 보드 ID 210과 HX5 컨트롤러 ID 140은 **하나의** `/dev/ttyAMA4` 인터페이스에 등록한다. 공식 HX5 `hx5_left_joints` 정의를 포함하므로 `virtual_dxl`은 실제 손 컨트롤러를 통한 모터 프록시이고, LEAP용 모의 `rh_r1_joint`가 아니다. OMY END Tool ID 1 설정은 기존 값을 유지했다. **ID 140 패킷이 OMY END를 통과하는지와 4핀 전원 적합성은 하드웨어 없이 검증할 수 없다.**
+AI Worker SH5의 [하드웨어 설정](https://github.com/ROBOTIS-GIT/ai_worker/blob/jazzy/ffw_description/ros2_control/ffw_sh5_rev1_follower/ffw_sh5_follower.ros2_control.xacro)은 손 관절을 `DynamixelHardware`에 등록하고 팔과 분리한다. OMY는 손 컨트롤러 140이 END 210 뒤에 있으므로 실물 런치에서 팔만 `ros2_control`에 등록하고, 손은 [END Direct 노드](../robot_pc/omy_hx5_bringup/omy_hx5_bringup/end_direct_node.py)로 별도 제어한다. 이 노드는 공식 키보드의 ROS 토픽 형식을 받지만 `controller_manager`의 `hand_l_controller`는 아니다. 모의 런치는 기존 손 컨트롤러를 유지한다. 기존 follower 그리퍼 `rh_r1_joint`는 하드웨어 정의에서 제외된다.
 
 리더와 follower를 OMY Robot PC의 동일한 ROS 2 네트워크 설정으로 실행한다. 기존 OMY의 `ROS_DOMAIN_ID=30`, `rmw_zenoh_cpp` 및 라우터 구성을 따른다. 별도 손 제어 PC와 손용 USB 시리얼 경로는 이 구성에 없다. [기존 OMY↔LEAP 현장 연결 기록](field-test/2026-10-09-results.md)을 참고한다.
 
@@ -70,24 +70,67 @@ HX5 손끝은 손가락마다 **3×3, 값 0–255**의 압력 배열을 낸다. 
 ## 단계별 현장 검증
 
 1. **기구·전원 OFF 검사:** 실제 HX5 모델의 좌우, 어댑터 체결, 질량·무게중심·손목 모멘트, 카메라/손가락 간섭, 케이블 전 범위와 전원 차단 수단을 확인한다. 고정되지 않거나 간섭이 있으면 구동하지 않는다.
-2. **OMY 툴 배선·드라이버 확인:** 기존 RH-P12-RN의 4핀 케이블이 OMY END의 어느 포트에서 나오는지, 전압·극성·전류 공급 능력이 HX5 요구 사양을 만족하는지 확인한다. 적합성이 입증되지 않은 배선으로 HX5에 전원을 인가하지 않는다. 손 전용 실물 실행은 별도 ID ping 단계 없이 드라이버를 시작한다. 드라이버 초기화 자체가 설정된 HX5 컨트롤러 ID 140의 응답을 요구하므로, 이전처럼 응답이 없으면 손 명령까지 진행되지 않는다. 이 브랜치는 `/dev/ttyAMA4`를 한 하드웨어 인터페이스만 열도록 구성했지만, 실제 패킷 통과는 미검증이다. 실행 뒤 `/joint_states` 20관절과 `/left_hand/finger_pressures`의 다섯 센서×아홉 값을 확인하고 무접촉 baseline·가벼운 접촉 반응을 기록한다.
+2. **END Direct 준비:** 기존 손 직결 드라이버를 실행하지 않는다. [Direct Mode 절차](hx5-d20-omy-direct-hand.md)에 따라 END 210 경유로 20모터 설정을 점검하고 손 컨트롤러 140을 Direct Mode 0으로 준비한다. 이미 확인한 END 210→손 140 읽기 결과와 20모터 준비 결과를 구분한다. `/joint_states`의 손 20관절과 `/left_hand/finger_pressures`의 다섯 센서×아홉 값을 확인하고 무접촉 baseline·가벼운 접촉 반응을 기록한다.
 3. **OMY leader 입력 실측:** 이전 LEAP 실험에서 확인한 `/leader/joint_trajectory`의 7번째 `rh_r1_joint`를 leader를 완전히 편 상태와 쥔 상태에서 여러 번 기록한다. **열림 약 0.197 rad는 과거 측정일 뿐이며 닫힘은 미측정**이다. 두 끝값의 방향·범위·떨림을 확정한다. `ros2 topic echo /leader/joint_trajectory --field points`를 사용할 수 있다.
-4. **손 궤적을 발행하지 않는 검증:** Robot PC의 [launch](../robot_pc/omy_hx5_bringup/launch/omy_hx5_teleop.launch.py)를 `hand_dry_run:=true`로 실행한다. 이 설정은 Python 손 브리지의 궤적 발행만 막으며, `mock_hand:=false`인 하드웨어 플러그인의 초기화 쓰기·재시작·토크 활성화는 막지 않는다. leader 양 끝·중간 입력, 입력 상실, 촉각 없는 경우와 접촉 발생 후 제한 동작을 확인한다. 양 끝값은 launch 인자로 넣는다. 임시 0/1 범위로 실물에 발행하지 않는다.
+4. **손 궤적을 발행하지 않는 검증:** Robot PC의 [launch](../robot_pc/omy_hx5_bringup/launch/omy_hx5_teleop.launch.py)를 `hand_dry_run:=true`로 실행한다. 이 설정은 손 브리지의 궤적 발행만 막는다. 실물 END Direct 노드는 손 상태를 읽고 Direct TableSync를 활성화하므로, 실행 전 준비 절차가 필요하다. leader 양 끝·중간 입력, 입력 상실, 촉각 없는 경우와 접촉 발생 후 제한 동작을 확인한다. 양 끝값은 launch 인자로 넣는다. 임시 0/1 범위로 실물에 발행하지 않는다.
 5. **실물 무부하 → 부드러운 물체:** 드라이런이 통과한 뒤 손과 팔 주변을 비우고 한 손가락씩 작은 범위에서 시작한다. 이후 연속 방아쇠 개폐와 부드러운 물체 파지를 시험하면서 압력 baseline·접촉 임계값·포화·지연, 손목 케이블을 관찰한다. OMY 텔레옵 중 leader가 갑자기 튄 [기존 현장 기록](field-test/2026-10-09-results.md)이 있으므로 leader를 손으로 잡고 시험한다. 이상 동작 시 입력·모터 전원을 중단한다.
 
 공식 MuJoCo 모델은 관절·형상 검토용이며 **실물 촉각 센서를 제공하지 않는다**. 촉각 제어 로직은 synthetic 입력으로 시험할 수 있지만, 접촉 문턱값·파지 안정성은 실제 HX5에서만 확정할 수 있다. [공식 시뮬레이션 자료](https://docs.robotis.com/docs/systems/hx5_d20/simulation/), [공식 촉각 가이드](https://docs.robotis.com/docs/systems/hx5_d20/resources/technical_story/tactile_feedback_grasping/).
 
 ### Robot PC bringup과 드라이런
 
-[설치·실행 절차](../robot_pc/README.md)는 Robot PC의 ROS 2 overlay를 빌드한 뒤 `omy_hx5_teleop.launch.py`를 실행한다. launch의 기본값은 팔·손 모두 mock이고 텔레옵이 꺼져 있다. 실물 구동 시에는 `mock_arm:=false mock_hand:=false`를 명시하며, 먼저 `hand_dry_run:=true`와 **실측한** `leader_open`, `leader_closed`를 넣는다. 드라이런에서는 손 브리지의 궤적을 발행하지 않지만 하드웨어 초기화는 진행된다. 정상 입력 확인 후 리더 방아쇠를 열고 손을 열린 무접촉 상태로 둔 채, 기존 launch를 유지하면서 `ros2 param set /hx5_left_omy_teleop command_enabled true`로 전환한다. 새 baseline을 수집하고 실제 관절값에서 명령을 다시 시작한다. 손 브리지가 멈춰도 컨트롤러의 torque가 자동으로 꺼지지는 않으므로 Robot PC의 비상정지·전원 차단 절차가 필요하다.
+[설치·실행 절차](hx5-d20-omy-direct-hand.md)를 따라 Robot PC의 overlay를 빌드하고 손의 Direct Mode 설정을 완료한 뒤 `omy_hx5_teleop.launch.py`를 실행한다. 기본값은 팔·손 모의 실행이고 텔레옵은 꺼져 있다. 실물 구동 시 `mock_arm:=false mock_hand:=false`, `enable_arm_teleop:=true`, `enable_hand_teleop:=true`, `hand_dry_run:=true`와 **실측한** `leader_open`, `leader_closed`를 넣는다. 드라이런에는 손 브리지가 목표 관절값을 발행하지 않는다. END Direct 노드는 상태를 읽고 TableSync 통신 설정을 활성화하지만 이동 목표는 보내지 않는다. 정상 입력 확인 후 리더 방아쇠를 열고 손을 열린 무접촉 상태로 둔 채 `ros2 param set /hx5_left_omy_teleop command_enabled true`로 전환한다. 손 브리지는 새 baseline을 수집하고 실제 관절값에서 명령을 시작한다. 손 브리지가 멈춰도 손 토크가 자동으로 꺼지지는 않는다.
+
+실행 전에는 Preset 런치, 공식 손 단독 런치, 기존 손 직결 `omy_hx5_hand_live.launch.py`와 END 포트를 사용하는 진단 프로그램을 종료한다. 손의 Direct Mode 준비는 [한 번만 수행하는 명령](hx5-d20-omy-direct-hand.md#2-손-direct-mode-준비-한-번)을 따른다. Robot PC의 Zenoh 라우터와 별도로 실행한 OMY leader가 `/leader/joint_trajectory`를 발행하는지 확인한다. `start_leader:=false`는 leader가 이미 다른 터미널 또는 PC에서 실행 중이라는 뜻이다. 이 런치는 팔을 자동으로 unpack하지 않으므로 시작 자세를 먼저 확인한다.
+
+Robot PC 컨테이너의 Bash 터미널에서:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source /root/ros2_ws/install/setup.bash
+source /workspace/omy_ws/install/setup.bash
+export ROS_DOMAIN_ID=30
+export RMW_IMPLEMENTATION=rmw_zenoh_cpp
+unset ZENOH_CONFIG_OVERRIDE
+ros2 topic echo /leader/joint_trajectory --field points
+```
+
+`ros2 topic echo`에서 두 끝값을 기록한 뒤 Ctrl+C로 종료한다. 리더를 편 상태와 완전히 쥔 상태에서 각각 관측한 `rh_r1_joint` 값으로 아래 두 변수를 채운다. 예시 숫자 0/1을 실물 측정값 대신 사용하지 않는다. 먼저 팔 텔레옵을 끄고 손 계산만 확인한다.
+
+```bash
+read -rp '리더를 편 상태의 rh_r1_joint: ' MEASURED_OPEN
+read -rp '리더를 쥔 상태의 rh_r1_joint: ' MEASURED_CLOSED
+ros2 launch omy_hx5_bringup omy_hx5_teleop.launch.py \
+  mock_arm:=false mock_hand:=false start_leader:=false \
+  enable_arm_teleop:=false enable_hand_teleop:=true hand_dry_run:=true \
+  leader_open:="$MEASURED_OPEN" leader_closed:="$MEASURED_CLOSED"
+```
+
+다른 컨테이너 터미널에서 `/joint_states`에 손 관절 20개가 들어오는지, `/left_hand/finger_pressures`의 다섯 센서가 갱신되는지, 손 브리지가 `waiting for released leader and tactile baseline`을 지나 계산 로그를 내는지 확인한다. 그다음 런치를 종료하고 팔 텔레옵을 켠 상태로 다시 시작한다. **팔은 leader의 여섯 관절을 즉시 따라갈 수 있으므로** leader를 잡고 안전한 위치에서 시작한다.
+
+```bash
+ros2 launch omy_hx5_bringup omy_hx5_teleop.launch.py \
+  mock_arm:=false mock_hand:=false start_leader:=false \
+  enable_arm_teleop:=true enable_hand_teleop:=true hand_dry_run:=true \
+  leader_open:="$MEASURED_OPEN" leader_closed:="$MEASURED_CLOSED"
+```
+
+손을 펴고 무접촉 상태에서 손 브리지가 신선한 관절·촉각·리더 입력을 받는 것을 확인한 뒤, 별도 컨테이너 터미널에서 같은 ROS 환경을 적용해 손 발행을 켠다.
+
+```bash
+ros2 param set /hx5_left_omy_teleop command_enabled true
+```
+
+이후 데이터 흐름은 `leader 7관절 → 팔 6관절 브리지 → arm_controller`와 `leader 방아쇠 → 촉각 보조 손 브리지 → 공식 왼손 JointTrajectory 토픽 → END 210 → HX5 140 → 20모터`로 갈라진다. 실물 모드에서 `ros2 control list_controllers`에는 **팔 컨트롤러만** 표시되는 것이 정상이며 손 제어 노드는 별도 프로세스다. 공식 키보드나 촉각 grasp 데모를 동시에 실행하면 손 명령 발행자가 겹치므로 사용하지 않는다.
 
 ### unpack 자세에서 손만 키보드로 원격 제어
 
-[`omy_hx5_hand_only.launch.py`](../robot_pc/omy_hx5_bringup/launch/omy_hx5_hand_only.launch.py)는 하나의 controller manager에서 팔·손 하드웨어와 네 컨트롤러를 관리한다. [unpack coordinator](../robot_pc/omy_hx5_bringup/omy_hx5_bringup/unpack.py)가 공식 포장 자세 또는 이미 unpack된 자세를 확인하고, 팔의 여섯 관절을 10초 동안 영점으로 이동시킨다. action 성공 후 실제 관절이 목표 ±0.01 rad 범위에 0.5초 동안 유지되면 `/hx5/arm_unpack_ready=true`를 발행한다. 팔 컨트롤러는 계속 목표를 유지하며, 리더·팔 텔레옵 브리지는 실행하지 않는다. 손 브리지는 이 신호가 신선할 때만 baseline 수집과 명령을 허용한다. 이동 실패, 관절 데이터 끊김, 유지 자세에서 0.05 rad 이상 이탈하면 손 제어를 차단하며 launch 재시작 전까지 복구하지 않는다.
-
-기본 launch는 `mock_arm:=true mock_hand:=true hand_dry_run:=true`다. 손 전용 실물 실행에는 [`omy_hx5_hand_live.launch.py`](../robot_pc/omy_hx5_bringup/launch/omy_hx5_hand_live.launch.py)를 사용한다. 이 파일은 `mock_arm:=false mock_hand:=false hand_dry_run:=false`로 손 전용 launch를 포함하므로 별도 ping이나 드라이런 전환 명령이 없다. 실제 팔은 먼저 unpack 자세로 이동하고 자세를 유지한다. 손 브리지는 unpack 준비 신호, 실측 관절, 열린 키보드 요청 및 무접촉 촉각 baseline이 갖춰진 뒤에만 손 궤적을 발행한다. 드라이버 초기화에서 ID 140 통신이 실패하면 손은 작동하지 않는다. `command_enabled=false`는 손 명령만 중단한다. 전체 launch 종료 시에는 팔 토크가 꺼지고 OMY 관절 브레이크가 멈춘 자세를 유지한다. 공식 `omy_3m_unpack.launch.py`나 전체 팔·손 텔레옵 launch와 중복 실행하지 않는다. 이미 공식 unpack launch를 실행했다면 완료 후 Ctrl+C로 종료한 다음 손 전용 launch를 시작한다.
-
-원격 PC의 [`omy_hx5_keyboard.py`](../user_pc/omy_hx5_keyboard.py)는 공식 Hand 키보드의 `x`(전체 쥐기), `z`(전체 펴기)를 참고한다. `[`/`]`로 쥐기 요청을 10%씩 바꿀 수 있다. 클라이언트는 전용 `/hx5/keyboard_grasp_trajectory`에 `rh_r1_joint` **한 값**을 20 Hz로 발행한다. Robot PC 손 브리지는 이를 0–1로 해석해 촉각·관절상태 게이트를 적용한 왼손 20관절 명령을 발행한다. 7관절 leader 토픽으로 팔을 추종하지 않으며, 팔 action은 최초 unpack 이동에만 사용한다. 키보드 종료 전 `z`를 누르고 실제 손 상태가 펴졌는지 확인한다. [실행 명령](../robot_pc/README.md#hand-only-remote-keyboard-at-the-unpack-pose).
+기존 `omy_hx5_hand_only.launch.py`와 `omy_hx5_hand_live.launch.py`의 실물 경로는
+손 ID 140에 직접 접근하므로 OMY END 210 뒤에 연결된 현재 손에는 사용할 수 없다.
+모의 unpack 시험에는 기존 코드를 유지한다. 실물 손만 제어하려면
+[END Direct 손 전용 실행 절차](hx5-d20-omy-direct-hand.md)를 따른다. 이
+경로에서 공식 왼손 키보드의 손가락별 20관절 명령을 쓸 수 있다. 팔 자세를 먼저
+확인하고, END 포트를 쓰는 다른 런치와 동시에 실행하지 않는다.
 
 ### 왼손 촉각 신호 가시화
 
@@ -112,6 +155,6 @@ Robot PC가 `/left_hand/finger_pressures`를 발행하면 User PC에서 [`run_hx
 
 ## 현재 증거와 남은 현장 작업
 
-- **확인됨:** AI Worker의 기존 4핀 케이블 재사용 절차와 SH5 통합 제어 방식, OMY+HX5 통합 Xacro 전개, ROS 2 모의 컨트롤러 기동, 합성 leader 7관절 → 팔 6관절·손 20관절 분리와 손 모의 관절 추종.
-- **미확인:** OMY↔HX5 마운트 호환성, 기존 4핀 케이블의 핀 배열·정격·END 툴 버스 접근 경로, 실제 장착/배선, HX5 시리얼 통신과 토픽 수신, leader 닫힘 끝값, 촉각 임계값과 물체별 파지, Robot PC 패키지의 실물 작동.
-- **실행 전 조건:** 왼손 모델과 기구 결합, 검증된 24V/RS-485 배선과 단일 버스 소유자, 하나의 손 명령 발행자, leader 양 끝값 실측, 전원 차단 수단.
+- **확인됨:** OMY 기존 4핀 장착·통전, END 210→손 140→모터 141 읽기, Preset 검지 움직임, 이전 ROS 2 모의 leader 7관절→팔 6관절·손 20관절 분리.
+- **아직 미검증:** 새 END Direct 20관절 실물 동작, 촉각 토픽과 접촉 임계값, leader 닫힘 끝값, 리더→END→20모터 전체 실물 텔레옵, 최대 부하 전류 여유.
+- **실행 전 조건:** 하나의 END 포트 소유자와 손 명령 발행자, Direct Mode 준비와 20모터 설정 점검, leader 양 끝값 실측, 주변 간섭 확인.

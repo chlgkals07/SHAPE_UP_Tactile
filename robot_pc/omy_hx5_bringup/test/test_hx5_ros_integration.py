@@ -90,13 +90,35 @@ def test_left_bridge_receives_official_messages_and_tracks_trigger_without_publi
             rclpy.shutdown()
 
 
-def test_left_bridge_publishes_one_ordered_twenty_joint_trajectory():
+def test_real_end_bridge_uses_official_hand_input_topic():
+    topic = "/leader/joint_trajectory_command_broadcaster_left_hand/joint_trajectory"
+    core = Hx5GraspCore(Hx5CoreConfig(hand_side="left"))
+    bridge = Hx5RosBridge(
+        core,
+        LeaderGripperConfig("/leader/joint_trajectory", "rh_r1_joint", 0.0, 1.0),
+        side="left", dry_run=True, command_topic=topic,
+    )
+    try:
+        assert bridge.topic == topic
+        assert bridge.node.count_publishers(topic) == 1
+    finally:
+        bridge.node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+@pytest.mark.parametrize("command_topic", [
+    None,
+    "/leader/joint_trajectory_command_broadcaster_left_hand/joint_trajectory",
+])
+def test_left_bridge_publishes_one_ordered_twenty_joint_trajectory(command_topic):
     core = Hx5GraspCore(Hx5CoreConfig(hand_side="left", baseline_frames=3))
     bridge = Hx5RosBridge(
         core,
         LeaderGripperConfig("/leader/joint_trajectory", "rh_r1_joint", 0.0, 1.0),
         side="left",
         dry_run=False,
+        command_topic=command_topic,
     )
     fake = rclpy.create_node("hx5_trajectory_observer")
     leader_pub = fake.create_publisher(

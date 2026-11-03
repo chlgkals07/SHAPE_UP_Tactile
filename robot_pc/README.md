@@ -1,10 +1,12 @@
 # OMY robot PC + left HX5-D20
 
-> The real `omy_hx5_official_hand.launch.py` now uses END ID 210 to reach the left HX5 in Preset Mode. See the [current bringup sequence](../docs/hx5-d20-omy-official-bringup.md). The older hand-only and teleop live launches still use direct ID 140 access and remain blocked on this wiring.
+> The real `omy_hx5_teleop.launch.py` now routes the left HX5 through END ID 210 in Direct Mode. See the [teleop sequence](../docs/hx5-d20-omy-teleop.md) and [Direct Mode preparation](../docs/hx5-d20-omy-direct-hand.md). The older `omy_hx5_hand_live.launch.py` still uses direct ID 140 access and remains blocked on this wiring. The separate Preset launch is unchanged.
 
 [실행 명령어 모음](../docs/hx5-d20-run-commands.md)
 
 [END 210 경유 공식 왼손 20관절 키보드 실행 순서](../docs/hx5-d20-omy-direct-hand.md)
+
+[2026-11-03 bringup 오류와 확인 결과](../docs/field-test/2026-11-03-omy-hx5-errors.md)
 
 [OMY 끝단에서 END 경유 Preset Mode를 시험하는 bringup 순서](../docs/hx5-d20-omy-official-bringup.md)는 별도의 `omy_hx5_official_hand.launch.py`를 사용한다. 기존 텔레옵 launch는 그대로 유지한다.
 
@@ -20,27 +22,24 @@ The software does not create a separate hand PC or USB serial adapter.
 
 `/leader/joint_trajectory` contains `joint1..6` and `rh_r1_joint`. The arm
 bridge sends only six arm joints to `/arm_controller/joint_trajectory`. The
-hand bridge turns `rh_r1_joint` into a 0..1 grasp ratio, combines it with
-`/left_hand/finger_pressures` and measured `/joint_states`, then sends one
-20-joint trajectory to `/hand_l_controller/joint_trajectory`. The controller
-manager is configured to own `/dev/ttyAMA2` for the arm and `/dev/ttyAMA4`
-for the END board and proposed HX5 path. The gripper's `rh_r1_joint` and DYNAMIXEL ID 7 are absent from the
-follower hardware description.
+hand bridge turns `rh_r1_joint` into a 0..1 grasp ratio and combines it with
+`/left_hand/finger_pressures` and measured `/joint_states`. In real mode it
+sends 20 joints to the official left-hand trajectory topic; the END Direct
+node owns `/dev/ttyAMA4` and forwards goals through END 210. The arm
+controller manager owns `/dev/ttyAMA2`. Mock mode retains the former
+`/hand_l_controller/joint_trajectory` output. The follower hardware
+description omits the gripper's `rh_r1_joint` and DYNAMIXEL ID 7.
 
-The hand controller uses the official HX5 rev2 left-hand joint and sensor
-definitions: hand controller ID 140, 20 virtual motor IDs and five tactile
-sensor IDs in the 141–165 range. The OMY END board keeps its stock ID 210 and Tool ID 1 setting by
-default; `end_tool_id` is an override after its required value is confirmed.
-The END tool path passing ID 140 has now been checked on the robot. The
-20-joint direct commands still require live validation.
+The hand model uses the official HX5 rev2 left-hand joint and sensor
+definitions: hand controller ID 140, 20 motor IDs and five tactile sensor IDs
+in the 141–165 range. END board ID 210 can access the hand through its tool
+path; the 20-joint Direct Mode commands still require live validation.
 
 The official AI Worker SH5 configuration places the HX5 joint macro on its
 `/dev/follower` bus and runs separate arm, hand, and pressure controllers.
-This overlay reuses the same left-hand macro and controller interfaces, but
-OMY's stock END configuration talks to its gripper as virtual ID 7 through
-END board `comm_id=210`. The HX5 macro instead requires a real bus response
-from controller ID 140. Copying AI Worker's hand macro does not prove that
-OMY's END board forwards packets to ID 140 or supplies enough current.
+OMY's END tool path has been confirmed to reach ID 140, so the real launch
+uses a separate END Direct node instead of AI Worker's direct hand hardware
+plugin. The available current under full hand load is still unmeasured.
 
 ## Build on the robot PC
 
@@ -107,106 +106,32 @@ ros2 topic echo /left_hand/finger_pressures --once
 
 ### Hand-only remote keyboard at the unpack pose
 
-`omy_hx5_hand_only.launch.py` moves the arm to ROBOTIS's unpack posture and
-keeps its controller active while only the hand is teleoperated. One controller
-manager owns `OMYF3MSystem` on `/dev/ttyAMA2` and `OMYHX5EndSystem` on
-`/dev/ttyAMA4`. No leader process or arm teleoperation bridge starts.
+`omy_hx5_hand_only.launch.py` and `omy_hx5_hand_live.launch.py` use the older
+hand hardware plugin. Their mock path is useful for simulation, but their real
+path is blocked because that plugin attempts to reach HX5 ID 140 directly on
+`/dev/ttyAMA4`. See the [END Direct keyboard procedure](../docs/hx5-d20-omy-direct-hand.md)
+for the working cable topology. Do not run it alongside another END owner.
 
-The unpack coordinator accepts the official packed posture
-`[0, 0, -2.61799, -0.52360, 0, 0]` or an already unpacked arm, then sends
-`[0, 0, 0, 0, 0, 0]` to `/arm_controller/follow_joint_trajectory` over 10 seconds.
-It requires action success and fresh measured joints within 0.01 rad of the
-target for 0.5 seconds before publishing `/hx5/arm_unpack_ready=true`.
-The hand bridge waits for this heartbeat before collecting its tactile baseline
-or commanding. If the action fails, joint states go stale, or the arm departs
-from the held posture by more than 0.05 rad, readiness is latched false.
-
-On the Robot PC, start with the default mock arm/hand and dry-run bridge:
-
-```bash
-ros2 launch omy_hx5_bringup omy_hx5_hand_only.launch.py
-ros2 control list_controllers
-ros2 control list_hardware_components
-```
-
-The expected active controllers are `joint_state_broadcaster`, `arm_controller`,
-`hand_l_controller`, and `pressure_l_broadcaster`. To exercise the mock hand,
-set `hand_dry_run:=false`. `mock_arm` and `mock_hand` must both be true for
-simulation or both false for physical operation; mixed modes are rejected.
-For the physical hand-only trial, run the dedicated live launch on the Robot PC:
-
-```bash
-ros2 launch omy_hx5_bringup omy_hx5_hand_live.launch.py
-```
-
-This starts the real arm and hand plugins and the live hand bridge without a
-separate SDK ping or `command_enabled` switch. The arm moves to unpack over
-10 seconds, then holds its pose. Keep the User PC keyboard at `z` with the
-hand unloaded and near open until the bridge collects its tactile baseline;
-use `]` for the first small closing request. The bridge still requires fresh
-arm, hand-joint, keyboard, and pressure data before it publishes trajectories.
-The driver opens `/dev/ttyAMA4` and checks communication during hardware
-initialization. The previous ID 140 no-reply result means this launch may fail
-before hand motion; removing the separate ping cannot make the END-to-hand
-path communicate. Hardware initialization can reboot/configure devices and
-activate torque.
-
-`command_enabled=false` stops new hand trajectories while the arm continues
-holding. Closing the keyboard does not stop the arm controller. Stopping the
-whole launch torques off the OMY arm; its integrated brakes hold the stopped
-posture. Another bringup can then take ownership of `/dev/ttyAMA4`.
-Do not run this launch alongside the full OMY/HX5 launch or another command
-publisher for the same hand controller.
+The legacy mock hand-only launch still tests the unpack coordinator: it moves
+an emulated arm from the official packed pose to zero over 10 seconds and
+requires fresh measured joints before accepting keyboard input. This does not
+validate physical unpacking or physical hand motion.
 
 ### Real-hardware notes
 
-- The first blocking check is electrical: identify the actual four-pin
-  connector, polarity, supply voltage/current limit, RS-485 pair, and HX5
-  termination before applying power. AI Worker's published four-pin swap is
-  specific to its wiring and cannot certify OMY's connector.
-- The driver opens `/dev/ttyAMA4` at 4 Mbps and requests HX5 controller ID 140. OMY's
-  original gripper was virtual ID 7 under END ID 210; END `Tool ID=1` and
-  its SyncTable settings have not been demonstrated to route HX5 packets.
-  The HX5 macro appears before the END GPIO in this Xacro, so the inspected
-  driver pings ID 140 before it initializes ID 210. If END routing needs its
-  settings applied first, this order is another startup failure path. If ID
-  140 cannot answer, hardware initialization fails before a hand controller
-  can be activated. Do not change `Tool ID` by guesswork.
-- Check the Robot PC's installed driver for `virtual_dxl` and
-  `virtual_sensor` support, all required ROS packages, and exclusive access
-  to the END serial device. A second OMY bringup process must not open the
-  same port.
-- After communication is established, inspect ID 140 status, all 20
-  measured joints, and each of the five 3×3 tactile arrays while touching
-  one finger at a time. A broadcaster can publish fresh timestamps around
-  unchanged or invalid hardware values, so topic frequency alone does not
-  prove tactile feedback. The grasp thresholds are experimental raw counts.
-- The hand-only launch moves the arm once and then holds it. Do not run the
-  original `omy_3m_unpack.launch.py` alongside it: that launch also owns the
-  END port and a controller manager. For the full seven-joint leader path, measure the actual open and
-  closed `rh_r1_joint` values and confirm that the robot uses the same ROS
-  domain, RMW, and Zenoh transport as the leader.
-
-On the remote User PC, source ROS 2 Jazzy, use the same ROS domain/RMW/Zenoh
-connection as the Robot PC, then run:
-
-```bash
-python3 /path/to/SHAPE_UP_Tactile/user_pc/omy_hx5_keyboard.py
-```
-
-The remote keyboard publishes only `rh_r1_joint=0..1` on
-`/hx5/keyboard_grasp_trajectory`; it does not publish six arm angles. Like
-ROBOTIS's official Hand keyboard, `x` requests all-close and `z` requests
-all-open. `]` increases closure and `[` decreases it by 10% per press;
-`--step` changes that fraction. For initial physical motion, use the small
-incremental keys. Press `z` and wait for the hand to reach open before
-`ESC` exits. The client republishes its target at 20 Hz so the hand bridge's
-leader timeout does not interrupt a commanded motion. Losing the client holds
-the last hand target; quitting does not torque off the hand.
-
-The Robot PC bridge still waits for an unloaded open-hand tactile baseline
-and measured hand joints before it publishes a command. Its pressure limits
-use raw sensor counts and are not calibrated grasp forces.
+- The END 210 proxy read has confirmed HX5 controller ID 140, motor ID 141,
+  and approximately 23.7 V at the hand. The Preset path moved the index finger.
+  Full-load current margin and Direct Mode 20-joint motion remain unverified.
+- Only one process may own `/dev/ttyAMA4`. Stop Preset, diagnostics, and any
+  old bringup before starting the END Direct launch.
+- The END Direct node publishes the hand's 20 measured joints and five tactile
+  arrays. Check actual changes on touch and motion; topic frequency alone does
+  not prove sensor or motor behavior.
+- Measure leader open and closed `rh_r1_joint` positions before enabling
+  [leader teleoperation](../docs/hx5-d20-omy-teleop.md). Its pressure thresholds
+  are experimental raw counts.
+- The separate [OMY/HX5 error record](../docs/field-test/2026-11-03-omy-hx5-errors.md)
+  explains why a direct ID 140 ping failed despite successful END proxy reads.
 
 ### Tactile visualization on the User PC
 
@@ -255,8 +180,9 @@ ros2 launch omy_hx5_bringup omy_hx5_teleop.launch.py \
 ```
 
 The first run logs hand calculations but sends no hand trajectory from the
-bridge; the real hardware plugin still performs its initialization writes. Confirm
-the active controllers, `finger_l_joint1..20` states, pressure frames, and
+bridge. The real END Direct node checks the 20 motors and publishes hand state;
+the arm controller manager has only `joint_state_broadcaster` and
+`arm_controller`. Confirm `finger_l_joint1..20` states, pressure frames, and
 leader endpoints. Keep the launch alive and switch `command_enabled=true`
 with a released leader and unloaded open hand for a low-motion test.
 `contact_threshold` and `pressure_hard_cap` launch arguments are raw

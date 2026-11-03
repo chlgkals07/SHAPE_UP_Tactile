@@ -1,12 +1,8 @@
-"""OMY robot-PC follower and left HX5 bringup using the existing END port.
-
-Both hardware interfaces default to mock. Real operation requires explicit
-mock_arm:=false mock_hand:=false and a verified OMY-to-HX5 installation.
-"""
+"""OMY follower and left HX5 teleop, with real hand access through END 210."""
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
@@ -37,8 +33,18 @@ def generate_launch_description():
         FindPackageShare("open_manipulator_bringup"),
         "launch", "omy_l100_leader_ai.launch.py"
     ])
+    direct_launch = PathJoinSubstitution([
+        FindPackageShare("omy_hx5_bringup"), "launch",
+        "omy_hx5_end_direct_hand.launch.py",
+    ])
+    hand_command_topic = PythonExpression([
+        "'/hand_l_controller/joint_trajectory' if '", mock_hand,
+        "'.lower() == 'true' else "
+        "'/leader/joint_trajectory_command_broadcaster_left_hand/joint_trajectory'"
+    ])
     hand_args = [
         "--side", "left",
+        "--command-topic", hand_command_topic,
         "--leader-open", LaunchConfiguration("leader_open"),
         "--leader-closed", LaunchConfiguration("leader_closed"),
         "--contact-threshold", LaunchConfiguration("contact_threshold"),
@@ -47,11 +53,14 @@ def generate_launch_description():
     hand_enabled = LaunchConfiguration("enable_hand_teleop")
 
     def validate_hardware(context):
-        if LaunchConfiguration("mock_hand").perform(context).lower() == "false":
+        arm = LaunchConfiguration("mock_arm").perform(context).lower()
+        hand = LaunchConfiguration("mock_hand").perform(context).lower()
+        if arm not in ("true", "false") or hand not in ("true", "false") or arm != hand:
             raise RuntimeError(
-                "The HX5 is behind OMY END ID 210. This launch's vendor "
-                "driver still pings ID 140 directly and cannot control the hand. "
-                "Run omy_hx5_end_proxy_probe first; live motion is blocked.")
+                "Use mock_arm:=true mock_hand:=true for simulation, or "
+                "mock_arm:=false mock_hand:=false for END 210 hardware")
+        if arm == "false" and LaunchConfiguration("end_tool_id").perform(context) != "1":
+            raise RuntimeError("end_tool_id is a mock Xacro option; the real END Direct node manages Tool ID itself")
         return []
 
     return LaunchDescription([
@@ -74,15 +83,27 @@ def generate_launch_description():
         Node(
             package="controller_manager", executable="ros2_control_node",
             parameters=[{"robot_description": robot_description}, config], output="screen",
+            condition=IfCondition(mock_hand),
         ),
         Node(
             package="controller_manager", executable="spawner",
             arguments=["joint_state_broadcaster", "arm_controller", "hand_l_controller",
                        "pressure_l_broadcaster"], output="screen",
+            condition=IfCondition(mock_hand),
         ),
         Node(
             package="robot_state_publisher", executable="robot_state_publisher",
             parameters=[{"robot_description": robot_description}], output="screen",
+            condition=IfCondition(mock_hand),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(direct_launch),
+            condition=UnlessCondition(mock_hand),
+            launch_arguments={
+                "end_port": LaunchConfiguration("end_port"),
+                "hand_mount_xyz": mount_xyz,
+                "hand_mount_rpy": mount_rpy,
+            }.items(),
         ),
         Node(
             package="omy_hx5_bringup", executable="omy_hx5_arm_bridge",
