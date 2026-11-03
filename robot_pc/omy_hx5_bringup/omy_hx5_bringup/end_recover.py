@@ -1,8 +1,8 @@
 """Inspect or restore the stock OMY 3M END settings after an interrupted probe.
 
 The target values come from the ROBOTIS omy_3m_end_unit ROS 2 control Xacro.
-Only interrupted states with TableSync and both write slots off may be
-restored automatically. This command never writes a hand or motor goal.
+Only recognized interrupted states with TableSync off may be restored
+automatically. This command never writes a hand or motor goal.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ import os
 from .end_proxy import (
     END_ID, END_MODEL, EndProxy, EndProxyError, SAVED_REGISTERS,
     SYNC_ENABLE, TOOL_ID, WRITE_SIZE_1, WRITE_SIZE_2, acquire_end_bus_lock,
+    make_fresh_rx_port,
 )
 
 
@@ -35,6 +36,11 @@ def restore_stock(proxy: EndProxy, *, apply: bool) -> tuple[dict[int, int], dict
     before = read_end_settings(proxy)
     if not apply:
         return before, before.copy()
+    repeated = read_end_settings(proxy)
+    if repeated != before:
+        raise EndProxyError(
+            f"END readings are inconsistent; no write sent: first={before}, "
+            f"second={repeated}")
     safe_stock_interruption = (
         before[TOOL_ID] == 1 and before[SYNC_ENABLE] == 0 and
         before[WRITE_SIZE_1] in (0, STOCK_END[WRITE_SIZE_1]) and
@@ -47,7 +53,16 @@ def restore_stock(proxy: EndProxy, *, apply: bool) -> tuple[dict[int, int], dict
         0 <= before[52] <= 128 and 0 <= before[54] <= 128 and
         before[52] + before[54] <= 128
     )
-    if not safe_stock_interruption and not safe_hand_interruption:
+    # A read failure can leave TableSync off immediately after selecting
+    # HX5 Tool ID 140, with every other END register still at the stock
+    # setting. This is safe to restore because Tool ID is returned to 1
+    # while TableSync remains disabled.
+    safe_paused_stock = (
+        before[TOOL_ID] == 140 and before[SYNC_ENABLE] == 0 and
+        all(before[address] == desired for address, desired in STOCK_END.items()
+            if address not in (TOOL_ID, SYNC_ENABLE))
+    )
+    if not (safe_stock_interruption or safe_hand_interruption or safe_paused_stock):
         raise EndProxyError(
             "recovery requires a known interrupted END state with TableSync off; "
             f"actual={before}"
@@ -80,14 +95,14 @@ def main(argv=None) -> int:
                         help="restore the stock OMY END values after inspecting them")
     args = parser.parse_args(argv)
     try:
-        from dynamixel_sdk import PacketHandler, PortHandler
+        from dynamixel_sdk import PacketHandler
     except ModuleNotFoundError as exc:
         parser.exit(1, f"Missing Robot PC dependency: {exc.name}\n")
     try:
         lock_fd = acquire_end_bus_lock()
     except EndProxyError as exc:
         parser.exit(1, f"END recovery failed: {exc}\n")
-    port = PortHandler(args.port)
+    port = make_fresh_rx_port(args.port)
     try:
         if not port.openPort():
             raise EndProxyError(f"cannot open {args.port}; stop other END owners first")

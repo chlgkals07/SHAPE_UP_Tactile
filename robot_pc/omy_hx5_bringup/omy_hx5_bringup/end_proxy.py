@@ -52,6 +52,22 @@ class EndProxyError(RuntimeError):
     """A serial or proxy read did not return a valid response."""
 
 
+def make_fresh_rx_port(port_name: str):
+    """Drop late same-ID status packets before each new END request.
+
+    Python DynamixelSDK's PortHandler.clearPort() only flushes TX. A late
+    three-byte PING reply can otherwise be accepted as the next READ reply.
+    """
+    from dynamixel_sdk import PortHandler
+
+    class FreshRxPort(PortHandler):
+        def clearPort(self):
+            self.ser.reset_input_buffer()
+            self.ser.flush()
+
+    return FreshRxPort(port_name)
+
+
 def acquire_end_bus_lock() -> int:
     """Prevent this package's probes and hand controllers sharing the END port."""
     fd = os.open("/tmp/omy_hx5_end_210.lock", os.O_CREAT | os.O_RDWR, 0o600)

@@ -11,7 +11,8 @@ import os
 from pathlib import Path
 
 from .end_direct_core import EndDirect, MOTOR_IDS, load_vendor_motor_settings
-from .end_proxy import EndProxyError, acquire_end_bus_lock
+from .end_proxy import EndProxyError, acquire_end_bus_lock, make_fresh_rx_port
+from .end_recover import STOCK_END, read_end_settings
 
 
 def main(argv=None) -> int:
@@ -23,7 +24,7 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     from ament_index_python.packages import get_package_share_directory
-    from dynamixel_sdk import PacketHandler, PortHandler
+    from dynamixel_sdk import PacketHandler
 
     xacro = (Path(get_package_share_directory("robotis_hand_description")) /
              "ros2_control/hx5_d20_rev2/hx5_d20_left.ros2_control.xacro")
@@ -32,11 +33,16 @@ def main(argv=None) -> int:
         lock_fd = acquire_end_bus_lock()
     except EndProxyError as exc:
         parser.exit(1, f"HX5 torque enable failed: {exc}\n")
-    port = PortHandler(args.port)
+    port = make_fresh_rx_port(args.port)
     try:
         if not port.openPort() or not port.setBaudRate(args.baud):
             raise EndProxyError(f"cannot open {args.port} at {args.baud} baud")
         direct = EndDirect(port, PacketHandler(2.0))
+        end_settings = read_end_settings(direct)
+        if end_settings != STOCK_END:
+            raise EndProxyError(
+                "END 210 is not at stock OMY settings; inspect and recover "
+                f"before enabling torque: {end_settings}")
         enabled = direct.enable_motor_torque(expected, motor_id=args.motor_id)
         count = 1 if args.motor_id is not None else len(MOTOR_IDS)
         print(f"HX5 motor torque ON verified: {count} selected, "

@@ -32,6 +32,34 @@ def test_end_recovery_accepts_restored_sizes_with_sync_left_off():
     assert after == STOCK_END
 
 
+def test_end_recovery_accepts_paused_stock_with_hand_tool_id():
+    packet = FakePacket()
+    packet.end.update({13: 140, 46: 0})
+    before, after = restore_stock(EndProxy(None, packet, sleep=lambda _: None), apply=True)
+    assert before[13] == 140 and before[46] == 0 and before[60] == 12
+    assert after == STOCK_END
+    assert packet.writes[0] == (13, 1, (1,))
+    assert packet.hand_goals == []
+
+
+def test_end_recovery_does_not_write_when_two_reads_disagree():
+    class UnstablePacket(FakePacket):
+        tool_reads = 0
+
+        def readTxRx(self, port, device_id, address, size):
+            data, result, error = super().readTxRx(port, device_id, address, size)
+            if address == 13:
+                self.tool_reads += 1
+                if self.tool_reads == 2:
+                    data = [140]
+            return data, result, error
+
+    packet = UnstablePacket()
+    with pytest.raises(EndProxyError, match="readings are inconsistent"):
+        restore_stock(EndProxy(None, packet), apply=True)
+    assert not packet.writes
+
+
 def test_end_recovery_restores_observed_hand_read_interruption():
     packet = FakePacket()
     packet.end.update({13: 140, 46: 0, 48: 8, 52: 1, 60: 0})
