@@ -1,5 +1,8 @@
 # OMY + 왼손 HX5-D20 실행 명령어
 
+ROBOTIS 공식 손 키보드·초기 자세 동작을 OMY 끝단에서 먼저 시험하려면
+[OMY 끝단 공식 손 bringup 실행 순서](hx5-d20-omy-official-bringup.md)를 따른다.
+
 ## User PC 호스트 — Robot PC SSH 접속
 
 ```bash
@@ -51,6 +54,8 @@ mkdir -p /workspace/omy_ws/src
 # 최초 한 번. 이미 연결한 링크는 다시 만들지 않음.
 [ -e /workspace/omy_ws/src/omy_hx5_bringup ] || ln -s "$OMY_HX5_REPO/robot_pc/omy_hx5_bringup" /workspace/omy_ws/src/omy_hx5_bringup
 [ -e /workspace/omy_ws/src/robotis_hand_description ] || ln -s "$OMY_HX5_REPO/third_party/robotis_hand/robotis_hand_description" /workspace/omy_ws/src/robotis_hand_description
+[ -e /workspace/omy_ws/src/robotis_hand_bringup ] || ln -s "$OMY_HX5_REPO/third_party/robotis_hand/robotis_hand_bringup" /workspace/omy_ws/src/robotis_hand_bringup
+[ -e /workspace/omy_ws/src/robotis_hand_teleop ] || ln -s "$OMY_HX5_REPO/third_party/robotis_hand/robotis_hand_teleop" /workspace/omy_ws/src/robotis_hand_teleop
 [ -e /workspace/omy_ws/src/robotis_hand_pressure_broadcaster ] || ln -s "$OMY_HX5_REPO/third_party/robotis_hand/robotis_hand_pressure_broadcaster" /workspace/omy_ws/src/robotis_hand_pressure_broadcaster
 [ -e /workspace/omy_ws/src/robotis_hand_playground ] || ln -s "$OMY_HX5_REPO/third_party/robotis_hand/robotis_hand_playground" /workspace/omy_ws/src/robotis_hand_playground
 
@@ -90,6 +95,8 @@ source /workspace/omy_ws/install/setup.bash
 export OMY_HX5_REPO="/workspace/SHAPE_UP_Tactile"
 export ROS_DOMAIN_ID=30
 export RMW_IMPLEMENTATION=rmw_zenoh_cpp
+# 이 컨테이너에서 띄운 라우터를 사용한다. 이전 원격 client 설정이 남아 있으면 제거.
+unset ZENOH_CONFIG_OVERRIDE
 ```
 
 ## Robot PC 컨테이너 · 터미널 A — Zenoh 라우터
@@ -138,15 +145,26 @@ ros2 topic hz /left_hand/finger_pressures
 ## User PC — 키보드 원격 제어
 
 ```bash
-# User PC 호스트의 Bash 터미널. 현재 HX5 브랜치 작업 폴더.
+# User PC 호스트 터미널. Robot PC SSH 셸 밖에서 실행.
 export OMY_HX5_REPO="/home/jiwoo/.codex/worktrees/hx5-d20/SHAPE_UP_Tactile"
 source /opt/ros/jazzy/setup.bash
-read -rp '현재 Robot PC IP: ' OMY_ROBOT_IP
+# 마지막으로 확인된 IP. 현재 Robot PC IP가 다르면 이 값을 수정.
+export OMY_ROBOT_IP="10.42.0.241"
 export ROS_DOMAIN_ID=30
 export RMW_IMPLEMENTATION=rmw_zenoh_cpp
 export ZENOH_CONFIG_OVERRIDE="mode=\"client\";connect/endpoints=[\"tcp/${OMY_ROBOT_IP}:7447\"]"
 ros2 daemon stop
 
+# Robot PC의 팔 준비 토픽이 실제로 도착하고 data: true인지 확인.
+# 시간 초과, false, 또는 토픽 미발견이면 키보드를 시작하지 말고 라우터·IP·launch를 확인.
+timeout 10s ros2 topic echo /hx5/arm_unpack_ready --once
+# Publisher count가 1 이상이어야 촉각 baseline을 수집할 수 있음.
+ros2 topic info /left_hand/finger_pressures
+```
+
+`data: true`와 압력 토픽의 `Publisher count`가 1 이상인 것을 확인한 다음, **같은 User PC 터미널**에서 실행한다.
+
+```bash
 # ]: 5% 닫기, [: 5% 열기, z: 모두 열기, x: 모두 닫기, ESC: 종료.
 # 먼저 z로 열린 요청을 유지하고, 실물 첫 동작은 ]로 5%부터 확인.
 python3 "$OMY_HX5_REPO/user_pc/omy_hx5_keyboard.py" --step 0.05
@@ -155,11 +173,12 @@ python3 "$OMY_HX5_REPO/user_pc/omy_hx5_keyboard.py" --step 0.05
 ## User PC — 촉각 히트맵 / RViz
 
 ```bash
-# User PC 호스트의 별도 Bash 터미널. Robot PC SSH 셸 밖에서 실행.
+# User PC 호스트의 별도 터미널. Robot PC SSH 셸 밖에서 실행.
 export OMY_HX5_REPO="/home/jiwoo/.codex/worktrees/hx5-d20/SHAPE_UP_Tactile"
 source /opt/ros/jazzy/setup.bash
 source /home/jiwoo/Projects/hx5_tactile_viz_ws/install/setup.bash
-read -rp '현재 Robot PC IP: ' OMY_ROBOT_IP
+# 키보드 터미널과 동일한 현재 Robot PC IP를 사용.
+export OMY_ROBOT_IP="10.42.0.241"
 export ROS_DOMAIN_ID=30
 export RMW_IMPLEMENTATION=rmw_zenoh_cpp
 export ZENOH_CONFIG_OVERRIDE="mode=\"client\";connect/endpoints=[\"tcp/${OMY_ROBOT_IP}:7447\"]"
@@ -167,12 +186,31 @@ ros2 daemon stop
 bash "$OMY_HX5_REPO/user_pc/run_hx5_tactile_viz.sh"
 ```
 
+## Robot PC 컨테이너 — 팔·손 리더 텔레옵 전 방아쇠 값 측정
+
+```bash
+# 손 전용 launch와 기존 omy_ai를 종료한 뒤, 터미널 B에서 리더만 실행.
+# 터미널 A의 Zenoh 라우터는 유지하고 터미널마다 앞의 공통 환경을 설정.
+ros2 launch open_manipulator_bringup omy_l100_leader_ai.launch.py use_mock_hardware:=false
+```
+
+```bash
+# 별도 Robot PC 컨테이너 터미널 C에서 실행. 리더를 완전히 연 상태와
+# 완전히 닫은 상태에서 각각 한 번씩 입력해 joint_names의 rh_r1_joint와
+# 같은 순서에 있는 positions 값을 기록. 배열의 7번째라고 가정하지 않음.
+ros2 topic echo /leader/joint_trajectory --once
+ros2 topic echo /leader/joint_trajectory --once
+```
+
+측정을 마치면 터미널 B의 리더 단독 launch를 `Ctrl+C`로 종료한다. 아래 텔레옵 launch가 리더를 다시 실행하므로 기존 `omy_ai`나 리더 단독 launch를 동시에 켜지 않는다.
+
 ## Robot PC 컨테이너 · 터미널 B — 팔·손 리더 텔레옵 드라이런
 
 ```bash
 # 손 전용 launch를 종료한 뒤, 팔까지 시험할 때만 실행.
 # 팔은 리더를 따라 움직이며 손 궤적만 드라이런.
-# leader 열린 값·닫힌 값 및 장착 좌표는 실측값을 입력.
+# 위에서 측정한 leader 열린 값·닫힌 값 및 장착 좌표를 입력.
+# 팔 텔레옵은 시작 후 리더를 따라 움직이므로 리더를 잡고 시작.
 read -r -p 'leader open rh_r1_joint: ' MEASURED_OPEN
 read -r -p 'leader closed rh_r1_joint: ' MEASURED_CLOSED
 read -r -p 'hand mount xyz (X Y Z): ' MEASURED_MOUNT_XYZ
