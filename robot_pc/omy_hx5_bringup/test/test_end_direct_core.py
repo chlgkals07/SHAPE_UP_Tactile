@@ -46,6 +46,7 @@ class FakeBus:
             motor[168:188] = pack("<10H", *MOTOR_INDIRECT)
             self.motors[motor_id] = motor
         self.goals = {}
+        self.end_writes = []
         for channel in range(5):
             base = READ_BLOCK_START + channel * 198
             for joint in range(4):
@@ -106,6 +107,7 @@ class FakeBus:
 
     def writeTxRx(self, port, device_id, address, size, data):
         assert device_id == 210
+        self.end_writes.append(address)
         if address == 200:
             self.buffer[:size] = bytes(data)
             self._forward()
@@ -114,6 +116,17 @@ class FakeBus:
             if address == 46:
                 self._forward()
         return 0, 0
+
+
+def test_motor_audit_keeps_one_end_session_and_two_read_windows_per_motor():
+    bus = FakeBus()
+    original_end = bus.end.copy()
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    assert proxy.audit_motors(load_vendor_motor_settings(XACRO)) == []
+    assert bus.end == original_end
+    assert bus.end_writes.count(13) == 21  # first motor, 19 switches, restore
+    assert bus.end_writes.count(60) == 2   # disable and restore write slot
+    assert bus.end_writes.count(48) == 41  # two reads per motor, restore
 
 
 def test_vendor_configuration_and_20_goal_path_keep_persistent_aliases():

@@ -83,34 +83,37 @@ class EndDirect(EndProxy):
     def audit_motors(self, expected: dict[int, MotorExpected]) -> list[str]:
         """Inspect the 20 actuators through END, without actuator writes."""
         issues = []
-        for motor_id in MOTOR_IDS:
-            with self.temporary_read_window(tool_id=motor_id):
-                first = self.read_hand(0, 24)
-                torque = self.read_hand(64, 1)[0]
-                hardware_error = self.read_hand(70, 1)[0]
-                goal_raw = int.from_bytes(self.read_hand(116, 4), "little")
+        with self.temporary_read_window(tool_id=MOTOR_IDS[0]):
+            for motor_id in MOTOR_IDS:
+                if motor_id != MOTOR_IDS[0]:
+                    self.write_end(SYNC_ENABLE, 1, 0)
+                    self.write_end(TOOL_ID, 1, motor_id)
+                first = self.read_hand(0, 120)
+                torque = first[64]
+                hardware_error = first[70]
+                goal_raw = int.from_bytes(first[116:120], "little")
                 aliases = self.read_hand(168, 20, stable=True)
-            model = int.from_bytes(first[:2], "little")
-            actual_id = first[7]
-            drive, mode = first[10], first[11]
-            homing = int.from_bytes(first[20:24], "little", signed=True)
-            mapped = tuple(int.from_bytes(aliases[i:i + 2], "little")
-                           for i in range(0, 20, 2))
-            item = expected[motor_id]
-            if (model != 1710 or actual_id != motor_id or mode != 5 or
-                    (drive & ~8) != (item.drive_mode & ~8) or
-                    homing != item.homing_offset or mapped != MOTOR_INDIRECT or
-                    goal_raw > 4095 or hardware_error or
-                    torque != 1):
-                issues.append(
-                    f"ID {motor_id}: model={model}, id={actual_id}, drive={drive}, "
-                    f"mode={mode}, homing={homing}, torque={torque}, "
-                    f"goal_raw={goal_raw}, hardware_error={hardware_error}, "
-                    f"aliases={mapped}; "
-                    f"expected model=1710, drive={item.drive_mode} (bit 3 optional), "
-                    f"mode=5, homing={item.homing_offset}, torque=1, goal_raw<=4095, "
-                    f"aliases={MOTOR_INDIRECT}"
-                )
+                model = int.from_bytes(first[:2], "little")
+                actual_id = first[7]
+                drive, mode = first[10], first[11]
+                homing = int.from_bytes(first[20:24], "little", signed=True)
+                mapped = tuple(int.from_bytes(aliases[i:i + 2], "little")
+                               for i in range(0, 20, 2))
+                item = expected[motor_id]
+                if (model != 1710 or actual_id != motor_id or mode != 5 or
+                        (drive & ~8) != (item.drive_mode & ~8) or
+                        homing != item.homing_offset or mapped != MOTOR_INDIRECT or
+                        goal_raw > 4095 or hardware_error or
+                        torque != 1):
+                    issues.append(
+                        f"ID {motor_id}: model={model}, id={actual_id}, drive={drive}, "
+                        f"mode={mode}, homing={homing}, torque={torque}, "
+                        f"goal_raw={goal_raw}, hardware_error={hardware_error}, "
+                        f"aliases={mapped}; "
+                        f"expected model=1710, drive={item.drive_mode} (bit 3 optional), "
+                        f"mode=5, homing={item.homing_offset}, torque=1, goal_raw<=4095, "
+                        f"aliases={MOTOR_INDIRECT}"
+                    )
         return issues
 
     def _check_hand(self, *, required_mode: int | None = None,
