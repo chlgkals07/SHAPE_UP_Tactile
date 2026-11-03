@@ -11,7 +11,7 @@ import argparse
 from pathlib import Path
 
 from .end_direct_core import EndDirect, load_vendor_motor_settings
-from .end_proxy import EndProxyError, acquire_end_bus_lock
+from .end_proxy import EndProxyError, acquire_end_bus_lock, make_fresh_rx_port
 
 
 def main(argv=None) -> int:
@@ -43,7 +43,7 @@ def main(argv=None) -> int:
         lock_fd = acquire_end_bus_lock()
     except EndProxyError as exc:
         parser.exit(1, f"END direct preparation failed: {exc}\n")
-    port = PortHandler(args.port)
+    port = make_fresh_rx_port(args.port) if args.diagnose else PortHandler(args.port)
     if not port.openPort():
         parser.exit(1, f"Cannot open {args.port}; stop other END owners first\n")
     try:
