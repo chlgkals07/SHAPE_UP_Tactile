@@ -177,8 +177,8 @@ class EndDirect(EndProxy):
                     if self.read_hand(33, 1, stable=True) != b"\x00":
                         raise EndProxyError("HX5 did not enter Direct Control Mode 0")
                 if apply:
-                    if self.read_hand(8, 1, stable=True) != b"\x64":
-                        self.write_hand(8, b"\x64")  # official 2 s bus watchdog
+                    if self.read_hand(8, 1, stable=True) != b"\x00":
+                        self.write_hand(8, b"\x00")  # leave idle watchdog disabled
                     final_aliases = pack(f"<{len(INDIRECT_TARGETS)}H", *INDIRECT_TARGETS)
                     self._set_alias_bytes(HAND_INDIRECT_BASE, final_aliases)
                     if self._alias_bytes(HAND_INDIRECT_BASE, len(final_aliases)) != final_aliases:
@@ -209,6 +209,33 @@ class EndDirect(EndProxy):
                 raise EndProxyError(
                     "HX5 direct aliases differ; run omy_hx5_end_direct_prepare --apply")
             return watchdog
+
+    def clear_idle_watchdog(self) -> tuple[int, int]:
+        """Clear only a stopped HX5 watchdog while its TableSync is idle."""
+        with self.temporary_read_window():
+            model = int.from_bytes(self.read_hand(0, 2, stable=True), "little")
+            mode = self.read_hand(33, 1, stable=True)[0]
+            sync = self.read_hand(70, 1, stable=True)[0]
+            status = self.read_hand(106, 1)[0]
+            prior = self.read_hand(8, 1, stable=True)[0]
+            if model != LEFT_HAND_MODEL or mode != 0 or sync != 0 or status & ~0x40:
+                raise EndProxyError(
+                    f"cannot clear HX5 watchdog: model={model}, mode={mode}, "
+                    f"TableSync={sync}, status={status}, watchdog={prior}")
+            if prior not in (0, 255):
+                raise EndProxyError(
+                    f"HX5 watchdog is {prior}; only idle 0 or error 255 is allowed")
+            if prior == 255 or status:
+                self.write_hand(8, b"\x00")
+                current = self.read_hand(8, 1, stable=True)[0]
+                new_status = self.read_hand(106, 1)[0]
+                if current != 0 or new_status:
+                    raise EndProxyError(
+                        f"HX5 watchdog clear did not verify: "
+                        f"watchdog={current}, status={new_status}")
+            else:
+                current = 0
+            return prior, current
 
     def restore_preset_mode(self) -> int:
         """Switch the controller back to Preset Mode without a motor goal."""
@@ -272,6 +299,9 @@ class EndDirect(EndProxy):
                 self.write_end(SYNC_ENABLE, 1, 0)
                 self.write_end(WRITE_SIZE_1, 2, 0)
                 self.write_hand(70, b"\x00")
+                if self.read_hand(70, 1, stable=True) != b"\x00":
+                    raise EndProxyError("HX5 TableSync did not stop on Direct exit")
+                self.write_hand(8, b"\x00")
 
     def read_snapshot(self) -> HandSnapshot:
         if self._current.get(READ_ADDRESS_1) != READ_WINDOW or \

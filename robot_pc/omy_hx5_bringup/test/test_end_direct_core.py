@@ -153,21 +153,22 @@ def test_vendor_configuration_and_20_goal_path_keep_persistent_aliases():
             assert bus.goals[motor_id] == pack("<HH", currents[i], raw)
         assert proxy.read_snapshot().tick != first.tick
     assert bus.hand[70] == 0
+    assert bus.hand[8] == 0
     assert bytes(bus.hand[122:462]) == pack("<170H", *INDIRECT_TARGETS)
     assert bus.end == original_end
     assert bytes(bus.buffer[:12]) == original_buffer[:12]
 
 
-def test_direct_launch_sets_watchdog_after_idle_ram_value_resets():
+def test_direct_launch_sets_watchdog_only_while_active():
     bus = FakeBus()
     proxy = EndDirect(None, bus, sleep=lambda _: None)
     proxy.prepare_direct(apply=True)
-    bus.hand[8] = 0  # RAM can return to its power-on value before launch
     assert proxy.verify_direct_setup() == 0
     with proxy.direct_session():
         assert bus.hand[8] == 100
         assert not bus.goals
     assert bus.hand[70] == 0
+    assert bus.hand[8] == 0
 
 
 def test_direct_verify_reports_unexpected_watchdog_value():
@@ -177,6 +178,47 @@ def test_direct_verify_reports_unexpected_watchdog_value():
     bus.hand[8] = 255
     with pytest.raises(EndProxyError, match="Bus Watchdog is 255"):
         proxy.verify_direct_setup()
+
+
+def test_clear_idle_watchdog_writes_only_error_reset_without_motor_goal():
+    bus = FakeBus()
+    original_end = bus.end.copy()
+    bus.hand[33] = 0
+    bus.hand[8] = 255
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    assert proxy.clear_idle_watchdog() == (255, 0)
+    assert bus.hand[8] == 0
+    assert bus.hand[70] == 0
+    assert not bus.goals
+    assert bus.end == original_end
+
+
+def test_clear_idle_watchdog_rejects_active_hand_tablesync():
+    bus = FakeBus()
+    bus.hand[33] = 0
+    bus.hand[70] = 1
+    bus.hand[8] = 255
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    with pytest.raises(EndProxyError, match="cannot clear HX5 watchdog"):
+        proxy.clear_idle_watchdog()
+    assert bus.hand[8] == 255
+    assert not bus.goals
+
+
+def test_clear_idle_watchdog_accepts_official_status_bit_and_verifies_clear():
+    class WatchdogBus(FakeBus):
+        def _write_target(self, address, value):
+            super()._write_target(address, value)
+            if self._device() is self.hand and address == 8 and value == 0:
+                self.hand[106] = 0
+
+    bus = WatchdogBus()
+    bus.hand[33] = 0
+    bus.hand[8] = 255
+    bus.hand[106] = 64
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    assert proxy.clear_idle_watchdog() == (255, 0)
+    assert bus.hand[106] == 0
     prior_goals = bus.goals.copy()
     bus.hand[70] = 1  # emulate an interrupted direct launch
     assert proxy.restore_preset_mode() == 0

@@ -127,9 +127,18 @@ Direct 준비 출력이 END 버퍼 복원 단계에서 중단됐으면 복구 �
 ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --verify-direct
 ```
 
-유휴 Bus Watchdog는 `0` 또는 `100`일 수 있다. 런치가 시작될 때 `0`이면
-`100`(2초)으로 설정하고 읽어서 확인한 뒤 손 TableSync를 켠다. 다른 값이면
-동작을 시작하지 않는다.
+Watchdog가 `255`라면 공식 제어표의 오류 상태 `-1`이다. 손 TableSync가 꺼진
+상태인지 확인한 뒤 아래 명령이 주소 8에 `0`을 써서 오류를 해제한다.
+손 목표 자세는 보내지 않는다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --clear-watchdog
+```
+
+그 뒤 `--verify-direct`를 다시 실행한다. 유휴 Bus Watchdog는 `0`이어야 한다.
+Direct 런치가 시작될 때 `100`(2초)으로 설정하고 읽어서 확인한 뒤 손
+TableSync를 켠다. Direct 세션이 끝나면 손 TableSync를 끄고 Watchdog를 `0`으로
+되돌린다.
 
 ## 3. 실물 Direct Mode 런치
 

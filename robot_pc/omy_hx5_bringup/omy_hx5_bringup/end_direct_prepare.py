@@ -25,6 +25,8 @@ def main(argv=None) -> int:
                       help="return HX5 controller to Preset Mode 1 without a goal")
     mode.add_argument("--verify-direct", action="store_true",
                       help="check Direct Mode and persistent aliases without applying them")
+    mode.add_argument("--clear-watchdog", action="store_true",
+                      help="clear an idle HX5 Bus Watchdog error without a motor goal")
     args = parser.parse_args(argv)
     try:
         from ament_index_python.packages import get_package_share_directory
@@ -58,6 +60,14 @@ def main(argv=None) -> int:
             watchdog = direct.verify_direct_setup()
             print(f"HX5 Direct Control Mode 0 and persistent aliases verified; "
                   f"idle Bus Watchdog={watchdog}; "
+                  "no motor goal sent.")
+            if direct.end_write_ack_timeouts:
+                print(f"END 210 write status packets missing {direct.end_write_ack_timeouts} "
+                      "time(s); each register value was confirmed by readback.")
+            return 0
+        if args.clear_watchdog:
+            prior, current = direct.clear_idle_watchdog()
+            print(f"HX5 idle Bus Watchdog cleared: prior={prior}, current={current}; "
                   "no motor goal sent.")
             if direct.end_write_ack_timeouts:
                 print(f"END 210 write status packets missing {direct.end_write_ack_timeouts} "
