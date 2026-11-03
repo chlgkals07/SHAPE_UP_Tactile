@@ -27,6 +27,8 @@ def main(argv=None) -> int:
                       help="check Direct Mode and persistent aliases without applying them")
     mode.add_argument("--clear-watchdog", action="store_true",
                       help="clear an idle HX5 Bus Watchdog error without a motor goal")
+    mode.add_argument("--diagnose", action="store_true",
+                      help="read one tick-verified HX5 status snapshot without hand writes")
     args = parser.parse_args(argv)
     try:
         from ament_index_python.packages import get_package_share_directory
@@ -48,6 +50,12 @@ def main(argv=None) -> int:
         if not port.setBaudRate(args.baud):
             raise EndProxyError(f"cannot set {args.port} to {args.baud} baud")
         direct = EndDirect(port, PacketHandler(2.0))
+        if args.diagnose:
+            state = direct.diagnose_hand()
+            print("HX5 via END 210, fresh hand tick: " +
+                  ", ".join(f"{key}={value}" for key, value in state.items()) +
+                  ". No hand or motor command sent.")
+            return 0
         if args.restore_preset:
             previous = direct.restore_preset_mode()
             print(f"HX5 Preset Motion Mode 1 ready; prior mode={previous}; "

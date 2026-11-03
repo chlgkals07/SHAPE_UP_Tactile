@@ -1,12 +1,10 @@
 # OMY 끝단 4핀으로 왼손 HX5 20관절 키보드 제어
 
-> **2026-11-03 실물 Direct 경로 검증 중단:** `--clear-watchdog`에서 손
-> watchdog 읽기값 `170`(공식 유효 범위 밖)과 END 복원 실패가 발생했다.
-> 아래 Direct 준비·런치·키보드 명령은 재검증 전 실행하지 않는다. 현재
-> END 설정이 Tool ID 140, TableSync 0, 읽기 주소 8로 남은 경우에는
-> `omy_hx5_end_recover`의 읽기 결과를 확인한 뒤, 이 상태를 복구하도록
-> 갱신된 코드로 기본 OMY END 설정을 복원한다. 복구 성공은 Direct 통신이나
-> 손 상태가 정상이라는 뜻이 아니다.
+> **2026-11-03 실물 Direct 재검증 대기:** 이전 `--clear-watchdog`에서
+> 유효 범위 밖의 watchdog `170`과 END 복원 실패가 발생했다. 이후 END의
+> 기본 OMY 설정은 실물에서 복구됐다. END 읽기 버퍼의 오래된 값이 손 상태로
+> 오인되지 않도록 HX5 Realtime Tick 검증을 추가했다. 아래 `--diagnose`
+> 결과를 확인하기 전에는 Direct 준비·런치·키보드 명령을 실행하지 않는다.
 
 이 경로는 OMY의 END ID 210을 통해 손 컨트롤러 ID 140으로 접근한다. 로봇 PC의
 별도 손 USB 포트나 외부 전원 제어 코드를 요구하지 않는다. 기존 Preset Mode 런치와
@@ -79,6 +77,17 @@ ros2 pkg prefix robotis_interfaces
 ```
 
 ## 2. 손 Direct Mode 준비
+
+먼저 손에 쓰지 않는 진단을 실행하고 `model=261`, `id=140`, 증가한 손
+`tick`, `mode`, `watchdog`, `status`, `voltage_centivolts`를 확인한다.
+`end_tool_status`는 END가 기록한 도구 통신 상태다. END의 통신 설정은
+진단 중 잠시 바뀌고 종료 시 원래 값으로 복구된다. `status`가 0이 아니거나,
+`watchdog`가 `0`, `1..127`, `255` 밖이면 다음 명령으로 진행하지 말고
+출력 전체를 기록한다. `255`는 오류 상태이며 자동 해제하지 않는다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --diagnose
+```
 
 기존 `omy_hx5_official_hand.launch.py`, 손 preset 노드, unpack/pack,
 다른 `/dev/ttyAMA4` 사용자들을 종료한 상태에서 수행한다. 로봇 팔이

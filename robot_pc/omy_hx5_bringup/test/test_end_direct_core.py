@@ -25,7 +25,7 @@ XACRO = (Path(__file__).resolve().parents[3] /
 
 class FakeBus:
     def __init__(self):
-        self.end = {13: 1, 46: 1, 48: 634, 50: 0, 52: 16, 54: 0,
+        self.end = {13: 1, 14: 0, 46: 1, 48: 634, 50: 0, 52: 16, 54: 0,
                     56: 665, 58: 0, 60: 12, 62: 0}
         self.buffer = bytearray(128)
         self.hand = bytearray(2020)
@@ -47,6 +47,8 @@ class FakeBus:
             self.motors[motor_id] = motor
         self.goals = {}
         self.end_writes = []
+        self.freeze_hand_tick = False
+        self.hand_reads_with_write_slot = 0
         for channel in range(5):
             base = READ_BLOCK_START + channel * 198
             for joint in range(4):
@@ -95,10 +97,15 @@ class FakeBus:
     def readTxRx(self, port, device_id, address, size):
         assert device_id == 210
         if address == 72:
-            if self.end[13] == 140 and self.end[48] == 634 and self.end[52] == 90:
+            if self.end[13] == 140 and self.end[60]:
+                self.hand_reads_with_write_slot += 1
+            if self.end[13] == 140 and self.end[46] and not self.freeze_hand_tick:
                 tick = (int.from_bytes(self.hand[100:102], "little") + 1) % 32768
                 self.hand[100:102] = pack("<H", tick)
-            data = [self._read_target(self.end[48] + i) for i in range(size)]
+            first_size = self.end[52]
+            data = [self._read_target(self.end[48] + i)
+                    if i < first_size else self._read_target(self.end[50] + i - first_size)
+                    for i in range(size)]
         elif address == 200:
             data = self.buffer[:size]
         else:
@@ -139,6 +146,7 @@ def test_vendor_configuration_and_20_goal_path_keep_persistent_aliases():
     assert mode == 1 and changed == [1, 2, 3, 4, 5]
     assert bus.hand[33] == 0
     assert not bus.goals
+    assert bus.hand_reads_with_write_slot == 0
     proxy.verify_direct_setup()
     with proxy.direct_session() as first:
         assert len(first.positions) == 20
@@ -178,6 +186,32 @@ def test_direct_verify_reports_unexpected_watchdog_value():
     bus.hand[8] = 255
     with pytest.raises(EndProxyError, match="Bus Watchdog is 255"):
         proxy.verify_direct_setup()
+
+
+def test_direct_read_rejects_stale_end_buffer_and_restores_end():
+    bus = FakeBus()
+    bus.hand[33] = 0
+    bus.freeze_hand_tick = True
+    original_end = bus.end.copy()
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    with pytest.raises(EndProxyError, match="did not receive a fresh HX5 response"):
+        proxy.verify_direct_setup()
+    assert bus.end == original_end
+    assert not bus.goals
+
+
+def test_direct_diagnosis_uses_fresh_hand_tick_without_hand_writes():
+    bus = FakeBus()
+    original_end = bus.end.copy()
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    state = proxy.diagnose_hand()
+    assert state["model"] == 261 and state["id"] == 140
+    assert state["mode"] == 1 and state["watchdog"] == 0
+    assert state["tick"] > 0 and state["voltage_centivolts"] == 2368
+    assert state["status"] == 0
+    assert state["end_tool_status"] == 0
+    assert bus.end == original_end
+    assert not bus.goals
 
 
 def test_clear_idle_watchdog_writes_only_error_reset_without_motor_goal():

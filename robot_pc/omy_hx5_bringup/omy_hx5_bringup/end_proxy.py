@@ -35,6 +35,8 @@ WRITE_SIZE_2 = 62
 READ_BUFFER = 72
 WRITE_BUFFER = 200
 COMM_RX_TIMEOUT = -3001
+HAND_TICK_ADDRESS = 100
+MAX_FRESH_PAYLOAD = 126  # END's two read slots share a 128-byte buffer.
 
 SAVED_REGISTERS = (
     (TOOL_ID, 1), (SYNC_ENABLE, 1),
@@ -90,6 +92,23 @@ class EndProxy:
             except EndProxyError as exc:
                 last_error = exc
         raise last_error
+
+    def wait_end_value(self, address: int, size: int, expected: int) -> None:
+        """Wait for a delayed END register update without repeating its write."""
+        last_observation = "no response"
+        for delay in (0, 0.05, 0.1, 0.2, 0.4, 0.8):
+            if delay:
+                self.sleep(delay)
+            try:
+                actual = int.from_bytes(self.read(address, size), "little")
+                if actual == expected:
+                    self._current[address] = expected
+                    return
+                last_observation = f"readback={actual}"
+            except EndProxyError as exc:
+                last_observation = str(exc)
+        raise EndProxyError(
+            f"END {address} did not settle to {expected}: {last_observation}")
 
     def write_end(self, address: int, size: int, value: int) -> None:
         if self._current.get(address) == value:
@@ -194,10 +213,11 @@ class EndProxy:
                 sync = int.from_bytes(self.read_end_after_recovery(SYNC_ENABLE, 1), "little")
                 if sync != 0:
                     self._current.pop(SYNC_ENABLE, None)
-                    self.write_end(SYNC_ENABLE, 1, 0)
-                if self.read_end_after_recovery(SYNC_ENABLE, 1) != b"\x00":
-                    raise EndProxyError("END TableSync could not be disabled")
-                self._current[SYNC_ENABLE] = 0
+                    try:
+                        self.write_end(SYNC_ENABLE, 1, 0)
+                    except EndProxyError:
+                        pass  # The write may have applied despite a missing ACK.
+                self.wait_end_value(SYNC_ENABLE, 1, 0)
             except EndProxyError as exc:
                 raise EndProxyError(
                     f"END restoration stopped: cannot verify TableSync off: {exc}; "
@@ -253,9 +273,11 @@ class EndProxy:
                 )
             if original[SYNC_ENABLE] != 0:
                 self._current.pop(SYNC_ENABLE, None)
-                self.write_end(SYNC_ENABLE, 1, original[SYNC_ENABLE])
-            if int.from_bytes(self.read_end_after_recovery(SYNC_ENABLE, 1), "little") != original[SYNC_ENABLE]:
-                raise EndProxyError("END TableSync restoration did not verify")
+                try:
+                    self.write_end(SYNC_ENABLE, 1, original[SYNC_ENABLE])
+                except EndProxyError:
+                    pass  # Readback below is authoritative.
+            self.wait_end_value(SYNC_ENABLE, 1, original[SYNC_ENABLE])
 
     def read_hand(self, address: int, size: int, *, stable: bool = False) -> bytes:
         """Read the selected END tool ID through its read-only buffer."""
@@ -275,30 +297,72 @@ class EndProxy:
             raise EndProxyError("END proxy read was unstable; no hand state accepted")
         return second
 
+    def read_hand_fresh(self, address: int, size: int) -> bytes:
+        """Accept a hand value only after its own realtime tick advances.
+
+        The END's second read slot carries HX5 Realtime Tick (100..101) next
+        to the requested data. Equal copies of the END buffer are not proof
+        that the downstream hand replied to the current window.
+        """
+        if (self._current.get(TOOL_ID) != HAND_ID or
+                not 0 <= address <= 1023 or
+                not 1 <= size <= MAX_FRESH_PAYLOAD or
+                address + size > 1024 or
+                self._current.get(WRITE_SIZE_1, 0) or
+                self._current.get(WRITE_SIZE_2, 0)):
+            raise EndProxyError("fresh HX5 read requires hand ID 140, no write slots, and 1..126 bytes")
+        self.write_end(SYNC_ENABLE, 1, 0)
+        self.write_end(READ_ADDRESS_1, 2, address)
+        self.write_end(READ_SIZE_1, 2, size)
+        self.write_end(READ_ADDRESS_2, 2, HAND_TICK_ADDRESS)
+        self.write_end(READ_SIZE_2, 2, 2)
+        self.write_end(SYNC_ENABLE, 1, 1)
+        self.sleep(0.10)
+        first = self.read(READ_BUFFER, size + 2)
+        tick = int.from_bytes(first[size:], "little")
+        for _ in range(10):
+            self.sleep(0.05)
+            current = self.read(READ_BUFFER, size + 2)
+            new_tick = int.from_bytes(current[size:], "little")
+            if tick <= 32767 and new_tick <= 32767 and new_tick != tick:
+                if address <= HAND_TICK_ADDRESS and address + size >= HAND_TICK_ADDRESS + 2:
+                    embedded = int.from_bytes(
+                        current[HAND_TICK_ADDRESS - address:
+                                HAND_TICK_ADDRESS + 2 - address], "little")
+                    if embedded != new_tick:
+                        continue
+                return current[:size]
+        raise EndProxyError(
+            f"END 210 did not receive a fresh HX5 response for {address}+{size}; "
+            f"hand realtime tick stayed at {tick}"
+        )
+
     def write_hand(self, address: int, data: bytes) -> None:
         """Forward a bounded write to the selected tool, then read it back.
 
         The caller must hold temporary_read_window(). This is for explicit
         configuration and must never be called for a motor goal on startup.
         """
-        if not (0 <= address <= 1023 and 1 <= len(data) <= 128
+        if not (0 <= address <= 1023 and 1 <= len(data) <= MAX_FRESH_PAYLOAD
                 and address + len(data) <= 1024):
-            raise ValueError("END can proxy only 1..128 bytes within address 0..1023")
+            raise ValueError("verified END hand write requires 1..126 bytes within address 0..1023")
         self.write_end(SYNC_ENABLE, 1, 0)
         self.write_end(READ_ADDRESS_1, 2, address)
         self.write_end(READ_SIZE_1, 2, len(data))
+        self.write_end(READ_ADDRESS_2, 2, HAND_TICK_ADDRESS)
+        self.write_end(READ_SIZE_2, 2, 2)
         self.write_end(WRITE_ADDRESS_1, 2, address)
         self.write_end(WRITE_SIZE_1, 2, len(data))
         self.write_end_buffer(data)
         try:
             self.write_end(SYNC_ENABLE, 1, 1)
-            self.sleep(0.20)
-            self.read(READ_BUFFER, len(data))
             self.sleep(0.05)
-            echoed = self.read(READ_BUFFER, len(data))
         finally:
             self.write_end(SYNC_ENABLE, 1, 0)
             self.write_end(WRITE_SIZE_1, 2, 0)
+        # Verify through a new read-only window, never by holding the END's
+        # write slot active while waiting for a fresh hand response.
+        echoed = self.read_hand_fresh(address, len(data))
         if echoed != data:
             raise EndProxyError(
                 f"ID {self._current[TOOL_ID]} write {address}+{len(data)} "

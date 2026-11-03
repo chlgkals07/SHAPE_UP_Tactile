@@ -3,9 +3,7 @@
 import pytest
 
 from omy_hx5_bringup.end_proxy import EndProxy, EndProxyError
-from omy_hx5_bringup.end_recover import (
-    INTERRUPTED_HAND_READ, STOCK_END, restore_stock,
-)
+from omy_hx5_bringup.end_recover import STOCK_END, restore_stock
 from test_end_proxy import FakePacket
 
 
@@ -36,9 +34,19 @@ def test_end_recovery_accepts_restored_sizes_with_sync_left_off():
 
 def test_end_recovery_restores_observed_hand_read_interruption():
     packet = FakePacket()
-    packet.end = INTERRUPTED_HAND_READ.copy()
+    packet.end.update({13: 140, 46: 0, 48: 8, 52: 1, 60: 0})
+    interrupted = packet.end.copy()
     before, after = restore_stock(EndProxy(None, packet, sleep=lambda _: None), apply=True)
-    assert before == INTERRUPTED_HAND_READ
+    assert before == interrupted
+    assert after == packet.end == STOCK_END
+    assert packet.hand_goals == []
+
+
+def test_end_recovery_accepts_interrupted_fresh_hand_read():
+    packet = FakePacket()
+    packet.end.update({13: 140, 46: 0, 48: 0, 50: 100,
+                       52: 107, 54: 2, 60: 0})
+    _, after = restore_stock(EndProxy(None, packet, sleep=lambda _: None), apply=True)
     assert after == packet.end == STOCK_END
     assert packet.hand_goals == []
 

@@ -172,6 +172,28 @@ def test_end_restoration_verifies_late_tool_id_write_after_lost_ack():
     assert packet.end == original
 
 
+def test_end_restoration_waits_for_delayed_sync_readback():
+    class DelayedSyncPacket(FakePacket):
+        stale_sync_reads = 0
+
+        def writeTxRx(self, port, device_id, address, size, data):
+            result = super().writeTxRx(port, device_id, address, size, data)
+            if address == 46 and data == [0]:
+                self.stale_sync_reads = 2
+            return result
+
+        def readTxRx(self, port, device_id, address, size):
+            if address == 46 and self.stale_sync_reads:
+                self.stale_sync_reads -= 1
+                return [1], 0, 0
+            return super().readTxRx(port, device_id, address, size)
+
+    packet = DelayedSyncPacket()
+    original = packet.end.copy()
+    assert EndProxy(None, packet, sleep=lambda _: None).probe()["hand_model"] == 261
+    assert packet.end == original
+
+
 def test_end_restore_checks_only_bytes_in_original_active_write_slot():
     packet = FakePacket()
     proxy = EndProxy(None, packet, sleep=lambda _: None)

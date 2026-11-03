@@ -80,6 +80,32 @@ def expected_channel_config(current: bytes, channel: int) -> bytes:
 
 
 class EndDirect(EndProxy):
+    def read_hand(self, address: int, size: int, *, stable: bool = False) -> bytes:
+        if self._current.get(TOOL_ID) == HAND_ID:
+            return self.read_hand_fresh(address, size)
+        return super().read_hand(address, size, stable=stable)
+
+    def diagnose_hand(self) -> dict[str, int]:
+        """Read one tick-verified HX5 control-table snapshot, no hand writes."""
+        with self.temporary_read_window():
+            data = self.read_hand(0, 107)
+            model = int.from_bytes(data[0:2], "little")
+            hand_id = data[7]
+            if model != LEFT_HAND_MODEL or hand_id != HAND_ID:
+                raise EndProxyError(
+                    f"END did not return the left HX5: model={model}, ID={hand_id}")
+            return {
+                "model": model,
+                "id": hand_id,
+                "mode": data[33],
+                "table_sync": data[70],
+                "watchdog": data[8],
+                "tick": int.from_bytes(data[100:102], "little"),
+                "voltage_centivolts": int.from_bytes(data[102:104], "little"),
+                "status": data[106],
+                "end_tool_status": self.read(14, 1)[0],
+            }
+
     def audit_motors(self, expected: dict[int, MotorExpected]) -> list[str]:
         """Inspect the 20 actuators through END, without actuator writes."""
         issues = []
@@ -121,13 +147,17 @@ class EndDirect(EndProxy):
         model, result, error = self.packet.ping(self.port, END_ID)
         if result != 0 or error or model != END_MODEL:
             raise EndProxyError("END 210 did not identify as model 230")
-        hand_model = int.from_bytes(self.read_hand(0, 2, stable=True), "little")
-        mode = self.read_hand(33, 1, stable=True)[0]
-        sync = self.read_hand(70, 1, stable=True)[0]
-        status = self.read_hand(106, 1)[0]
-        if hand_model != LEFT_HAND_MODEL or status or mode not in (0, 1) or sync not in (0, 1):
+        control = self.read_hand(0, 107)
+        hand_model = int.from_bytes(control[0:2], "little")
+        hand_id = control[7]
+        mode = control[33]
+        sync = control[70]
+        status = control[106]
+        if (hand_model != LEFT_HAND_MODEL or hand_id != HAND_ID or status or
+                mode not in (0, 1) or sync not in (0, 1)):
             raise EndProxyError(
-                f"left HX5 not healthy: model={hand_model}, mode={mode}, status={status}")
+                f"left HX5 not healthy: model={hand_model}, id={hand_id}, "
+                f"mode={mode}, TableSync={sync}, status={status}")
         if required_mode is not None and mode != required_mode:
             raise EndProxyError(f"HX5 mode={mode}; required Direct Control Mode 0")
         if sync != 0 and not allow_sync:
@@ -136,13 +166,13 @@ class EndDirect(EndProxy):
 
     def _alias_bytes(self, start: int, size: int) -> bytes:
         chunks = []
-        for offset in range(0, size, 128):
-            chunks.append(self.read_hand(start + offset, min(128, size - offset)))
+        for offset in range(0, size, 126):
+            chunks.append(self.read_hand(start + offset, min(126, size - offset)))
         return b"".join(chunks)
 
     def _set_alias_bytes(self, start: int, data: bytes) -> None:
-        for offset in range(0, len(data), 128):
-            self.write_hand(start + offset, data[offset:offset + 128])
+        for offset in range(0, len(data), 126):
+            self.write_hand(start + offset, data[offset:offset + 126])
 
     def _read_channel_config(self, channel: int) -> bytes:
         aliases = pack("<54H", *(1024 + CHANNEL_SIZE * channel + i
@@ -213,14 +243,14 @@ class EndDirect(EndProxy):
     def clear_idle_watchdog(self) -> tuple[int, int]:
         """Clear only a stopped HX5 watchdog while its TableSync is idle."""
         with self.temporary_read_window():
-            model = int.from_bytes(self.read_hand(0, 2, stable=True), "little")
-            mode = self.read_hand(33, 1, stable=True)[0]
-            sync = self.read_hand(70, 1, stable=True)[0]
-            status = self.read_hand(106, 1)[0]
-            prior = self.read_hand(8, 1, stable=True)[0]
-            if model != LEFT_HAND_MODEL or mode != 0 or sync != 0 or status & ~0x40:
+            control = self.read_hand(0, 107)
+            model = int.from_bytes(control[0:2], "little")
+            hand_id = control[7]
+            mode, sync, status, prior = control[33], control[70], control[106], control[8]
+            if (model != LEFT_HAND_MODEL or hand_id != HAND_ID or
+                    mode != 0 or sync != 0 or status & ~0x40):
                 raise EndProxyError(
-                    f"cannot clear HX5 watchdog: model={model}, mode={mode}, "
+                    f"cannot clear HX5 watchdog: model={model}, id={hand_id}, mode={mode}, "
                     f"TableSync={sync}, status={status}, watchdog={prior}")
             if prior not in (0, 255):
                 raise EndProxyError(
