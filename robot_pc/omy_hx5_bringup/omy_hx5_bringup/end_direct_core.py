@@ -14,7 +14,7 @@ from struct import pack
 from xml.etree import ElementTree
 
 from .end_layout import (
-    INDIRECT_TARGETS, READ_WINDOW, STATE_SIZE, WRITE_SIZE, WRITE_WINDOW,
+    INDIRECT_TARGETS, READ_SIZE, READ_WINDOW, STATE_SIZE, WRITE_SIZE, WRITE_WINDOW,
     HandSnapshot, decode_snapshot, encode_command,
 )
 from .end_proxy import (
@@ -104,6 +104,32 @@ class EndDirect(EndProxy):
                 "voltage_centivolts": int.from_bytes(data[102:104], "little"),
                 "status": data[106],
                 "end_tool_status": self.read(14, 1)[0],
+            }
+
+    def compare_indirect_health(self) -> dict[str, object]:
+        """Compare the full END indirect read window to direct HX5 health bytes.
+
+        The hand's own TableSync remains off; no hand or motor goal is sent.
+        """
+        with self.temporary_read_window():
+            self._check_hand(required_mode=0)
+            indirect = []
+            for _ in range(3):
+                data = EndProxy.read_hand(self, READ_WINDOW, STATE_SIZE)
+                indirect.append({
+                    "tick": int.from_bytes(data[READ_SIZE:READ_SIZE + 2], "little"),
+                    "voltage_centivolts": int.from_bytes(
+                        data[READ_SIZE + 2:READ_SIZE + 4], "little"),
+                    "status": data[READ_SIZE + 4],
+                })
+            direct = self.read_hand(100, 7)
+            return {
+                "indirect": indirect,
+                "direct": {
+                    "tick": int.from_bytes(direct[0:2], "little"),
+                    "voltage_centivolts": int.from_bytes(direct[2:4], "little"),
+                    "status": direct[6],
+                },
             }
 
     def audit_motors(self, expected: dict[int, MotorExpected]) -> list[str]:

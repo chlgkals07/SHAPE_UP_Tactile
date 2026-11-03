@@ -294,6 +294,25 @@ def test_direct_verify_reports_unexpected_watchdog_value():
         proxy.verify_direct_setup()
 
 
+def test_indirect_health_probe_exposes_corrupt_full_window_without_hand_goals():
+    class CorruptLongReadBus(FakeBus):
+        def readTxRx(self, port, device_id, address, size):
+            data, result, error = super().readTxRx(port, device_id, address, size)
+            if address == 72 and self.end[48] == 634 and size == 90:
+                data[89] = 32
+            return data, result, error
+
+    bus = CorruptLongReadBus()
+    proxy = EndDirect(None, bus, sleep=lambda _: None)
+    proxy.prepare_direct(apply=True)
+    original_end = bus.end.copy()
+    result = proxy.compare_indirect_health()
+    assert [item["status"] for item in result["indirect"]] == [32] * 3
+    assert result["direct"]["status"] == 0
+    assert bus.end == original_end
+    assert bus.goals == {}
+
+
 def test_direct_read_rejects_stale_end_buffer_and_restores_end():
     bus = FakeBus()
     bus.hand[33] = 0

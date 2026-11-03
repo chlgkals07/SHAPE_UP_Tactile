@@ -3,7 +3,9 @@
 > **2026-11-03 실물 진행:** 손 컨트롤러 ID 140, 모드 0, watchdog 0,
 > 23.77 V, 상태 0과 증가하는 Realtime Tick을 확인했다. 모터 20개 모두
 > Torque Enable 1, Hardware Error 0으로 읽혔고 END 설정은 기존 OMY 값으로
-> 복원됐다. Direct 런치의 첫 상태 읽기와 실제 손가락 명령은 아직 검증 전이다.
+> 복원됐다. 첫 Direct 런치에서 간접 상태 `status=32`가 나와 중단됐다.
+> 종료 후 손 주소 106의 직접 읽기는 `status=0`이었다. 아래 간접/직접
+> 상태 비교 결과를 확인하기 전에는 Direct 런치를 재시도하지 않는다.
 
 이 경로는 OMY의 END ID 210을 통해 손 컨트롤러 ID 140으로 접근한다. 로봇 PC의
 별도 손 USB 포트나 외부 전원 제어 코드를 요구하지 않는다. 기존 Preset Mode 런치와
@@ -121,6 +123,14 @@ ros2 run omy_hx5_bringup omy_hx5_end_torque_on --port /dev/ttyAMA4
 
 ```bash
 ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --diagnose
+```
+
+첫 Direct 런치의 간접 상태 읽기에서 `status=32`가 나온 경우, 손 TableSync를
+켜지 않은 상태에서 END의 90바이트 간접 읽기와 직접 상태 주소를 비교한다.
+모터 목표값은 보내지 않는다.
+
+```bash
+ros2 run omy_hx5_bringup omy_hx5_end_direct_prepare --port /dev/ttyAMA4 --compare-health-alias
 ```
 
 기존 `omy_hx5_official_hand.launch.py`, 손 preset 노드, unpack/pack,
