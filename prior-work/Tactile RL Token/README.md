@@ -7,6 +7,7 @@ Tactile RL Token 연구와 관련된 논문 정리 목록입니다. 논문을 �
 | Paper | Venue | Year |
 | --- | --- | --- |
 | [RL Token: Bootstrapping Online RL with Vision-Language-Action Models](./RL%20Token.md) | CoRL (Oral) | 2026 |
+| [TORL-VLA: Tactile Guided Online Reinforcement Learning for Contact-Rich Manipulation](./TORL-VLA.md) | arXiv | 2026 |
 
 ---
 
