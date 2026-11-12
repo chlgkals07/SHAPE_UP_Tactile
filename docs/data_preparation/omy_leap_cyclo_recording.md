@@ -53,7 +53,7 @@ Cyclo는 로봇 config에 적힌 **ROS 토픽만** rosbag2(MCAP)에 기록하고
 | 실행표 단계 | 이 문서에서 |
 |---|---|
 | A3 `omy_env.sh` | 변경 없음. 호스트에서 `leap_teleop`을 돌릴 때도 같은 `ROS_DOMAIN_ID`, `RMW_IMPLEMENTATION`, `ZENOH_CONFIG_OVERRIDE`를 export한다 |
-| B2 `omy_ai` | 손은 **주먹으로 대기**시킨 뒤 켠다. 팔이 움직이는 동안 손이 펴져 있으면 안 된다 (`--safe-pose fist`) |
+| B2 `omy_ai` | 손은 **주먹으로 대기**시킨 뒤 켠다. 팔이 움직이는 동안 손이 펴져 있으면 안 된다 (`--safe-pose fist`). 손목을 뒤집은 모드(손가락 위, 캠은 손 옆)는 `omy_ai` 대신 `ros2 launch omy_leap_bringup omy_ai_wrist_flip.launch.py` (`OMY_Tactile_Robot_PC` README). 이 모드에서는 state·action의 joint6이 π/2 근처다. **어느 모드로 녹화했는지 데이터셋 메타(태스크 설명 등)에 적고, 두 모드의 에피소드를 한 데이터셋에 섞지 않는다** |
 | B6 토픽 확인 | 카메라 토픽 실제 경로를 적는다. E2에서 이 값을 config에 넣는다 |
 | **B7 수집 설정 편집** | `omy_f3m_config.yaml`을 고치지 **않는다.** 대신 E2의 `omy_f3m_leap_config.yaml`을 복사한다 (새 로봇 타입) |
 | B8 Cyclo 실행 | E2 이후에 실행한다 (config는 시작 시 읽는다) |

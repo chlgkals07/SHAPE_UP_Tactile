@@ -106,6 +106,16 @@ export PYTHONPATH="src:$PYTHONPATH"
    export ROS_DOMAIN_ID=30
    ros2 launch open_manipulator_bringup omy_ai.launch.py     # 초기 이동·동기화가 끝날 때까지 기다린다
    ```
+   **손목 뒤집기 모드** (LEAP를 플랜지에서 오른쪽으로 90° 돌려 단 상태, 손가락이 위): `omy_ai` 대신 아래 명령을 쓴다.
+   - home 단계에서 손목이 왼쪽으로 90° 돈다(joint6 = π/2).
+   - leader 기준으로 +90° ~ −180°까지 돈다.
+   - 설치·원리·되돌리기: `OMY_Tactile_Robot_PC` README의 "손목 뒤집기".
+   ```bash
+   export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp   # 빠지면 DDS로 떠서 User PC가 팔 토픽을 못 본다
+   source /workspace/omy_ws/install/setup.bash
+   ros2 launch omy_leap_bringup omy_ai_wrist_flip.launch.py
+   ```
+   leader가 켜질 때는 leader 손목을 0 근처로 잡는다. 뒤집기 모드와 순정 모드는 joint6 값이 다르므로, 녹화 데이터를 한 데이터셋에 섞지 않는다.
 5. 실물:
    ```bash
    python3 -m leap_teleop.cli --source leader --safe-pose fist

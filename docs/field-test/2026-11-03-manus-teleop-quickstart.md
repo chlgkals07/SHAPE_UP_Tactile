@@ -85,6 +85,7 @@ leap_manus                                # 대응이 맞으면 엄지 IK. 엄�
 ## 4. 4단계: Manus + 팔
 
 1. Robot PC에서 `zenohd`(터미널 A), `omy_ai`(터미널 B)를 띄운다 (명령은 `user_pc/README.md` 2단계). **손은 주먹으로 대기**시킨 상태에서 켠다.
+   손목 뒤집기 모드(손가락 위)는 `omy_ai` 대신 `ros2 launch omy_leap_bringup omy_ai_wrist_flip.launch.py`를 쓴다 (같은 2단계 4번).
 2. User PC에서 Manus 노드(셸 1)는 그대로 두고:
    ```bash
    export LEAP_NO_ZENOH=1

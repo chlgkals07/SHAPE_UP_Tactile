@@ -90,6 +90,12 @@ ros2 topic list                   # /leader/joint_trajectory, /joint_states 가 
 - 그래서 **launch 즉시 팔이 움직인다** (home → ready까지 약 20초). 작업 공간을 비우고 비상 정지 수단을 확인한 뒤 실행한다.
 - 이 이동 중에는 leader가 아직 시작하지 않았으므로 leader를 잡고 있어도 된다. 3단계가 시작되면 leader가 follower와 동기화된다.
 - LEAP을 단 상태에서도 공식 `omy_ai`가 그대로 동작했다 (끝단 `rh_r1_joint` 항목은 토픽에 남는다) [실측 10/09]. 우리 패키지(`omy_leap_bringup`)는 필요 없었다.
+- **손목 뒤집기 모드** (`omy_leap_bringup/omy_ai_wrist_flip.launch.py`, `OMY_Tactile_Robot_PC` README) [미검증]
+  - 홈 자세에서 손가락이 위로 가게 한다. 180°를 나눠서 LEAP 기구 장착으로 90°(오른쪽), follower joint6으로 +π/2를 돌린다. D405는 link6에 붙어 있어서 90°만 돌아 손의 옆에 온다.
+  - leader broadcaster의 `offsets`에서 joint6을 π/2로 둔다 [소스 `joint_trajectory_command_broadcaster.cpp`: 발행값 = leader 위치 + offset]. 그리고 `home`/`ready`의 joint6을 π/2로 둔다.
+  - joint6 하나로 π를 돌리지 않는 이유: follower joint6 모터의 Min/Max Position Limit이 ±262144 pulse = **±π**다 [실측 11/12, `get_dxl_data`]. URDF ±2π보다 모터 한계가 우선한다. home π에서는 한쪽으로 돌 여유가 0이었다.
+  - π/2에서는 leader 기준 +90° ~ −180°까지 돈다.
+  - Homing Offset은 바꾸지 않는다. 그래서 URDF/TF가 실제 자세와 그대로 맞는다.
 - leader 로그에 `FastBulkRead Rx Fail [Dxl Size : 7]` / `BULK_READ_FAIL`(-3001, -3002)이 몇 초마다 찍히지만 허용 안이라 동작은 계속된다. 원인은 미조사이고 follower가 아니라 **leader 버스**(모터 7개) 로그다 [실측 10/09].
 - **텔레옵 중 leader가 갑자기 크게 튄 적이 있다.** 텔레옵하는 동안은 **leader를 반드시 손으로 잡는다** [실측 10/09].
 

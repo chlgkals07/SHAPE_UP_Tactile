@@ -2,6 +2,8 @@
 # (파일 이름 = 로봇 타입 omy_f3m_leap). 설계: docs/superpowers/specs/2026-10-29-ros-data-interface-design.md 5절.
 # 카메라 토픽은 세화형 실행표 B6에서 확인한 실제 값으로 바꿀 것 (미확인).
 # 손 토픽은 `leap-teleop --publish`가 낸다. 단위는 rad (effort만 mA).
+# 팔 joint6은 follower 기준이다. 손목 뒤집기 모드(omy_ai_wrist_flip)에서는 state와 action 둘 다 π/2 근처다.
+# 뒤집기 전에 녹화한 데이터와 한 데이터셋에 섞지 않는다.
 orchestrator:
   ros__parameters:
     omy_f3m_leap:
