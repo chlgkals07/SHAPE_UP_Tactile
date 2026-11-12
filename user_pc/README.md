@@ -208,6 +208,14 @@ leap_manus --dry-run        # 3-3. 실물은 leap_manus --thumb affine, 이후 l
 leap_record                 # 5단계: leap_manus --publish
 leap_topics                 # 토픽 확인
 ```
+진단 (11/12):
+```bash
+leap_manus --log-csv logs/run1.csv      # 틱마다 글러브·명령·전송값·위치·전류 기록 (logs/는 gitignore)
+python3 -m leap_teleop.tools.analyze_log logs/run1.csv --joints 0 1 2 3 --current-limit 350
+                                        # stall(전류 포화) / lag / clipped(범위·속도 제한) 구간 출력
+```
+게인 기본값은 공식 LEAP 값 P 600 / D 200 / 350 mA다 (11/12 전에는 450 / 1200 / 300). `--kp`, `--kd`, `--current-limit`로 바꾼다.
+모터 ID 그림: `docs/images/leap_motor_ids.png` (`scripts/render_leap_ids.py --meshes <dex-urdf leap_hand 폴더> --out ...`).
 Robot PC 쪽(`zenohd`, `omy_ai`)은 이 함수에 포함되지 않는다. 위 2단계의 ssh 명령을 쓴다.
 
 ## 켜는 순서 / 끄는 순서

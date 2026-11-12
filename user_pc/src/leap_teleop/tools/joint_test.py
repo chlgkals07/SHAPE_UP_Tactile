@@ -49,8 +49,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--current-limit",
         type=int,
         default=300,
-        help="Goal current limit in mA (maximum allowed by this test: 300)",
+        help="Goal current limit in mA (maximum allowed by this test: 350, the official LEAP value)",
     )
+    parser.add_argument("--kp", type=int, default=600,
+                        help="Position P gain (official LEAP: 600; side joints x0.75)")
+    parser.add_argument("--kd", type=int, default=200,
+                        help="Position D gain (official LEAP: 200; side joints x0.75)")
     parser.add_argument("--hold-seconds", type=float, default=1.0)
     parser.add_argument("--command-rate", type=float, default=50.0)
     parser.add_argument(
@@ -81,8 +85,10 @@ def validate_args(args: argparse.Namespace) -> None:
         or not 0.0 < args.max_joint_speed <= 60.0
     ):
         raise ValueError("--max-joint-speed must be greater than 0 and at most 60")
-    if not 1 <= args.current_limit <= 300:
-        raise ValueError("--current-limit must be between 1 and 300 mA")
+    if not 1 <= args.current_limit <= 350:
+        raise ValueError("--current-limit must be between 1 and 350 mA")
+    if not 0 <= args.kp <= 1000 or not 0 <= args.kd <= 2000:
+        raise ValueError("--kp must be 0-1000 and --kd 0-2000")
     if not np.isfinite(args.hold_seconds) or not 0.0 <= args.hold_seconds <= 5.0:
         raise ValueError("--hold-seconds must be between 0 and 5")
     if not np.isfinite(args.command_rate) or not 10.0 <= args.command_rate <= 100.0:
@@ -211,6 +217,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     controller = LeapHandHardwareController(
         args.port,
         current_limit_milliamps=args.current_limit,
+        position_p_gain=args.kp,
+        position_d_gain=args.kd,
         max_joint_speed_degrees_per_second=args.max_joint_speed,
         max_command_interval_seconds=0.1,
         motor_calibration=args.motor_calibration_file,

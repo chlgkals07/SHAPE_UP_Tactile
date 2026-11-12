@@ -284,6 +284,15 @@ ros2 topic echo /manus_glove_0 --once > ~/echo.txt
 
 ## 10. 단계 3-2: 글러브 캘리브레이션
 
+**먼저 Manus SDK 캘리브레이션** **[실측 11/12]**. 노드는 integrated 모드라 Dashboard 캘리브레이션이 적용되지 않는다. 안 하면 검지 PIP가 0에 붙어 검지가 중간에 멈춘다. 글러브를 충전한 상태에서 한다.
+
+```bash
+# ROS Manus 노드를 끈 상태에서 (동글은 프로그램 하나만 쓴다)
+cd third_party/manus/Python && python3 examples/sdk_client.py
+# 1 (Integrated) → C → H로 Right → S → 단계마다 E 실행, P 다음 → F → K 저장(.mcal)
+```
+그 뒤 노드를 다시 켜고, 아래 우리 캘리브레이션도 **다시** 한다 (글러브 각도가 바뀐다).
+
 작업자마다 한다. **글러브를 낀 손으로** 한다. LEAP은 필요 없다. 결과는 `config/manus_calibration.yaml` (gitignore).
 
 > **편 손은 충분히 쭉 편다.** 덜 편 채로 기록하면 평소 편 손이 "편 손"으로 읽혀 LEAP이 덜 펴진다. **[실측 11/03]** 더 펴서 다시 하니 해결. 주먹은 엄지를 검지·중지 위로 감싼다 (주먹 안에 넣지 않는다).

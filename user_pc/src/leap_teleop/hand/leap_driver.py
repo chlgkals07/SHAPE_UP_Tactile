@@ -23,6 +23,10 @@ class LeapHandDriver:
     def command(self, angles_degrees: np.ndarray) -> None:
         self._controller.command_degrees(angles_degrees)
 
+    def last_sent_degrees(self):
+        """Last command actually written (after LEAP bounds clip and slew limit)."""
+        return self._controller.last_command_degrees
+
     def read_feedback(self):
         """Feedback for recording only; None when a read fails (control must not stop)."""
         try:

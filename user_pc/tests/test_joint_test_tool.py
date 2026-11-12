@@ -63,6 +63,8 @@ class LeapHandJointTestTests(unittest.TestCase):
             command_rate=50.0,
             max_tracking_error=15.0,
             max_temperature=50.0,
+            kp=600,
+            kd=200,
         )
         validate_args(valid)
         valid.delta = 20.0

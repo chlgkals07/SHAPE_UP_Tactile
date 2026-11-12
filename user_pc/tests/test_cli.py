@@ -29,7 +29,8 @@ def test_parser_defaults():
     assert args.source == "keyboard"
     assert args.port == "/dev/ttyUSB0"
     assert args.rate == 50.0
-    assert args.current_limit == 300
+    assert args.current_limit == 350
+    assert (args.kp, args.kd) == (600, 200)
     assert args.dry_run is False
 
 

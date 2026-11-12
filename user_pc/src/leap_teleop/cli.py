@@ -44,7 +44,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rate", type=float, default=50.0, help="control loop Hz (10-200)")
     parser.add_argument("--stale-timeout", type=float, default=0.5)
     parser.add_argument("--release-timeout", type=float, default=3.0)
-    parser.add_argument("--current-limit", type=int, default=300, help="motor current limit in mA")
+    parser.add_argument("--current-limit", type=int, default=350, help="motor current limit in mA (official LEAP: 350)")
+    parser.add_argument("--kp", type=int, default=600, help="position P gain (official LEAP: 600; was 450 before 11/12)")
+    parser.add_argument("--kd", type=int, default=200, help="position D gain (official LEAP: 200; was 1200 before 11/12)")
     parser.add_argument(
         "--safe-pose",
         choices=("open", "fist"),
@@ -54,6 +56,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--publish", action="store_true",
         help="publish /leap/* topics for Cyclo recording (needs rclpy)",
+    )
+    parser.add_argument(
+        "--log-csv", type=Path,
+        help="write a per-tick CSV (glove, command, sent, position, current) for debugging",
     )
     parser.add_argument("--dry-run", action="store_true", help="log targets, do not touch hardware")
     return parser
@@ -112,6 +118,8 @@ def build_driver(args: argparse.Namespace) -> HandDriver:
     controller = LeapHandHardwareController(
         args.port,
         current_limit_milliamps=args.current_limit,
+        position_p_gain=args.kp,
+        position_d_gain=args.kd,
         motor_calibration=args.motor_calibration_file,
     )
     return LeapHandDriver(controller)
@@ -148,6 +156,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 publisher = RosPublisher()
             else:
                 publisher = None
+            if args.log_csv is not None:
+                from leap_teleop.diag_log import CsvLogger, Tee
+
+                logger = CsvLogger(args.log_csv, driver)
+                publisher = Tee(publisher, logger) if publisher is not None else logger
+                print(f"[teleop] logging to {args.log_csv}")
         except BaseException:
             source.close()
             raise
