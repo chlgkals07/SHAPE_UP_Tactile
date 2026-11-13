@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+.python-version
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Tests / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Data / recordings the user might generate locally
+runs/
+*.rrd
+sensor_comm.log
+
+# Don't ignore the registry assets
+!paxini_sdk/data/*.json
+
+# Local-only notes (do not publish)
+PUSH_TO_GITHUB.md

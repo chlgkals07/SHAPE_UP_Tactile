@@ -1,0 +1,69 @@
+{
+  "sensor_model": "PX6AX-GEN3-MC-M2020-Elite",
+  "vendor_part_code": "PXSR-STDMC03A",
+  "sensor_class": "MC",
+  "sensor_size_code": "M2020",
+  "grade": "Elite",
+  "geometry": "palm",
+  "nominal_size_mm": null,
+  "n_points": 9,
+  "units": "millimeters",
+  "source_xlsx": "Palm \u638c\u5fc3 M2020 PX6AX-GEN3-MC-M2020-Elite PXSR-STDMC03A.xlsx",
+  "source_provenance": "vendor zip GEN3\u6807\u51c6\u591a\u7ef4\u89e6\u89c9\u4f20\u611f\u5668\u4ea7\u54c1\u8d44\u6599\u5305_20251202.zip \u00a706",
+  "points": [
+    {
+      "index": 1,
+      "x_mm": -4.0908751,
+      "y_mm": 4.1091249,
+      "z_mm": 5.5
+    },
+    {
+      "index": 2,
+      "x_mm": -4.0908751,
+      "y_mm": 8.2,
+      "z_mm": 5.5
+    },
+    {
+      "index": 3,
+      "x_mm": -4.0908751,
+      "y_mm": 12.2908751,
+      "z_mm": 5.5
+    },
+    {
+      "index": 4,
+      "x_mm": 0.0,
+      "y_mm": 4.1091249,
+      "z_mm": 5.5
+    },
+    {
+      "index": 5,
+      "x_mm": 0.0,
+      "y_mm": 8.2,
+      "z_mm": 5.5
+    },
+    {
+      "index": 6,
+      "x_mm": 0.0,
+      "y_mm": 12.2908751,
+      "z_mm": 5.5
+    },
+    {
+      "index": 7,
+      "x_mm": 4.0908751,
+      "y_mm": 4.1091249,
+      "z_mm": 5.5
+    },
+    {
+      "index": 8,
+      "x_mm": 4.0908751,
+      "y_mm": 8.2,
+      "z_mm": 5.5
+    },
+    {
+      "index": 9,
+      "x_mm": 4.0908751,
+      "y_mm": 12.2908751,
+      "z_mm": 5.5
+    }
+  ]
+}
