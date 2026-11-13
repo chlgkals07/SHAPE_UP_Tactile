@@ -19,7 +19,7 @@ import numpy as np
 
 from tactile_rec import features
 from tactile_rec.config import DatasetConfig
-from tactile_rec.convert.episode import ConvertError, Converted, convert_episode
+from tactile_rec.convert.episode import Converted, ConvertError, convert_episode
 from tactile_rec.convert.load import Episode, find_episodes
 
 Log = Callable[[str], None]
@@ -157,7 +157,9 @@ def convert_many(
                 )
             result = episode.meta.get("result")
             if result != "success" and not include_failed:
-                reports.append({"episode": episode.name, "result": result, "skipped": "not success"})
+                reports.append(
+                    {"episode": episode.name, "result": result, "skipped": "not success"}
+                )
                 log(f"skip  {episode.name}: labelled {result}")
                 continue
             try:

@@ -57,7 +57,7 @@ def log_episode(rr: Any, episode: Episode, image_stride: int = 1) -> dict[str, i
                 newtons = to_newtons(values["resultant"])
                 for index in range(seconds.size):
                     _set_time(rr, float(seconds[index]))
-                    for axis, column in zip(("fx", "fy", "fz"), newtons[index]):
+                    for axis, column in zip(("fx", "fy", "fz"), newtons[index], strict=True):
                         rr.log(f"tactile/{place}/{axis}", _scalar(rr, float(column)))
                     count += 1
         else:
@@ -68,7 +68,8 @@ def log_episode(rr: Any, episode: Episode, image_stride: int = 1) -> dict[str, i
                 for index in range(seconds.size):
                     _set_time(rr, float(seconds[index]))
                     for joint in range(values.shape[1]):
-                        rr.log(f"{name}/{field}/{joint:02d}", _scalar(rr, float(values[index, joint])))
+                        value = float(values[index, joint])
+                        rr.log(f"{name}/{field}/{joint:02d}", _scalar(rr, value))
                     count += 1
         counts[name] = count
     return counts
@@ -81,7 +82,7 @@ def run(path: str, save: str | None, image_stride: int, out=print) -> int:
         out("error: rerun is not installed. Run: pip install rerun-sdk")
         return 2
     episode = Episode(path)
-    rr.init(f"tactile-rec {episode.name}", spawn=save is None)
+    rr.init("tactile_rec_" + episode.name.replace("/", "_"), spawn=save is None)
     if save is not None:
         rr.save(save)
     try:

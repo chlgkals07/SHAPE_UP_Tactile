@@ -94,7 +94,8 @@ def activities(episode: Episode) -> dict[str, tuple[np.ndarray, np.ndarray]]:
             out[f"{name}.force"] = (times, np.asarray(force, dtype=np.float64))
         elif "cur" in data:
             current = np.nan_to_num(data["cur"])
-            out[f"{name}.current"] = (times, np.abs(current - np.median(current, axis=0)).sum(axis=1))
+            change = np.abs(current - np.median(current, axis=0)).sum(axis=1)
+            out[f"{name}.current"] = (times, change)
             out[f"{name}.cmd"] = (times, _speed(times, data["cmd"]))
             out[f"{name}.pos"] = (times, _speed(times, data["pos"]))
         elif "ergo" in data:

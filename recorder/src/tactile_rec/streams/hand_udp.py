@@ -56,7 +56,8 @@ def parse_packet(raw: bytes) -> HandPacket:
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ValueError(f"not JSON: {error}") from error
     if not isinstance(packet, dict) or packet.get("v") != PACKET_VERSION:
-        raise ValueError(f"unsupported packet version {packet.get('v') if isinstance(packet, dict) else None}")
+        version = packet.get("v") if isinstance(packet, dict) else None
+        raise ValueError(f"unsupported packet version {version}")
     try:
         hand = {
             "cmd": _joint_array(packet["cmd"], "cmd"),
@@ -114,7 +115,7 @@ class HandUdpStream(ThreadedStream):
         assert self._socket is not None
         try:
             raw, _ = self._socket.recvfrom(MAX_DATAGRAM)
-        except socket.timeout:
+        except TimeoutError:
             return
         t_recv_ns = self.clock.now_ns()
         try:

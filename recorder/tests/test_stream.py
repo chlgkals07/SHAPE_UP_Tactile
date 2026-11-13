@@ -3,8 +3,8 @@ from __future__ import annotations
 import threading
 
 import numpy as np
-
 from conftest import numeric_stream, value
+
 from tactile_rec.clock import FakeClock
 from tactile_rec.stream import ThreadedStream
 from tactile_rec.streams import specs

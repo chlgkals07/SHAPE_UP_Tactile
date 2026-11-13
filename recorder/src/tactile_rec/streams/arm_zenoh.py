@@ -55,7 +55,7 @@ def joint_state_data(msg: Any, joints: Sequence[str]) -> dict[str, np.ndarray]:
     names = list(msg.name)
     pos = _select(names, list(msg.position), joints)
     if np.isnan(pos).any():
-        missing = [j for j, v in zip(joints, pos) if np.isnan(v)]
+        missing = [j for j, v in zip(joints, pos, strict=True) if np.isnan(v)]
         raise ValueError(f"joint_states has no position for {missing}; it has {names}")
     return {
         "pos": pos,
@@ -71,7 +71,7 @@ def joint_trajectory_data(msg: Any, joints: Sequence[str]) -> dict[str, np.ndarr
     names = list(msg.joint_names)
     pos = _select(names, list(msg.points[0].positions), joints)
     if np.isnan(pos).any():
-        missing = [j for j, v in zip(joints, pos) if np.isnan(v)]
+        missing = [j for j, v in zip(joints, pos, strict=True) if np.isnan(v)]
         raise ValueError(f"joint_trajectory has no position for {missing}; it has {names}")
     return {"pos": pos}
 
@@ -81,7 +81,9 @@ class ArmZenohStream(ThreadedStream):
         self.message = cfg["message"]
         self.joints = [str(j) for j in cfg["joints"]]
         super().__init__(
-            specs.arm_spec(name, self.message, self.joints, float(cfg["hz"]), bool(cfg["required"])),
+            specs.arm_spec(
+                name, self.message, self.joints, float(cfg["hz"]), bool(cfg["required"])
+            ),
             clock,
         )
         self.topic = str(cfg["topic"])

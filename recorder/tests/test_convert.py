@@ -12,15 +12,14 @@ import json
 
 import numpy as np
 import pytest
+from conftest import ManualRig
 
 from tactile_rec import features
 from tactile_rec.convert.dataset import LeRobotV21Writer, NpzWriter, convert_many, iter_frames
 from tactile_rec.convert.episode import ConvertError, convert_episode
 from tactile_rec.convert.load import Episode, find_episodes
 from tactile_rec.record.session import Recorder
-from tactile_rec.streams.fake import TAP_WIDTH_S, tap_level
-
-from conftest import ManualRig
+from tactile_rec.streams.fake import tap_level
 
 TAP_PERIOD_S = 4.0
 

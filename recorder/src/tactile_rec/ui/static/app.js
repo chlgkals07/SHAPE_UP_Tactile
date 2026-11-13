@@ -483,5 +483,6 @@ window.addEventListener("hashchange", () => show(location.hash.slice(1)));
 $("episodes-refresh").addEventListener("click", loadEpisodes);
 $("zero-btn").addEventListener("click", actZero);
 show(location.hash.slice(1));
-loadInfo();
+// Draw once from a plain request so a page is never empty while the socket connects.
+Promise.all([loadInfo(), api("GET", "/api/state").then(onState).catch(() => {})]).then(() => show(page));
 connect();

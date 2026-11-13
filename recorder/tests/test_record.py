@@ -6,7 +6,14 @@ import cv2
 import numpy as np
 import pytest
 
-from tactile_rec.record.session import IDLE, RECORDING, REVIEW, Recorder, RecorderError, list_episodes
+from tactile_rec.record.session import (
+    IDLE,
+    RECORDING,
+    REVIEW,
+    Recorder,
+    RecorderError,
+    list_episodes,
+)
 from tactile_rec.types import NO_TIME
 
 
@@ -52,7 +59,8 @@ def test_saved_episode_has_every_stream_with_preroll_and_stats(rig):
     # 1 s pre-roll + 2 s recording at 90 Hz
     assert 265 <= len(tactile["t_recv_ns"]) <= 275
     assert tactile["t_recv_ns"][0] == pytest.approx(start_ns - 1e9, abs=2e7)
-    assert tactile["payload"].shape[1] == meta["streams"]["tactile_a"]["meta"]["layout"]["payload_size"]
+    layout = meta["streams"]["tactile_a"]["meta"]["layout"]
+    assert tactile["payload"].shape[1] == layout["payload_size"]
     assert np.all(np.diff(tactile["seq"]) == 1)
     stats = meta["streams"]["tactile_a"]["stats"]
     assert stats["hz"] == pytest.approx(90, abs=1) and stats["missed"] == 0

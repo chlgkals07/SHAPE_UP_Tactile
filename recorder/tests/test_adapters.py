@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from conftest import PLACES_A, fake_config_dict
 
 from tactile_rec.config import ConfigError, parse_config
 from tactile_rec.streams import specs
@@ -17,8 +18,6 @@ from tactile_rec.streams.hand_udp import HandUdpStream, parse_packet
 from tactile_rec.streams.paxini import layout_from_board
 from tactile_rec.streams.realsense import frame_src_ns
 from tactile_rec.types import NO_TIME, STATUS_OK
-
-from conftest import PLACES_A, fake_config_dict
 
 # ---- arm ---------------------------------------------------------------------------------------
 

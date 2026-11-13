@@ -10,6 +10,7 @@ import asyncio
 import json
 import re
 import shutil
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -150,16 +151,27 @@ def episode_rows(task_dir: Path) -> list[dict[str, Any]]:
 
 
 def create_app(hub: Hub, recorder: Recorder) -> FastAPI:
-    app = FastAPI(title="Tactile Recorder", docs_url=None, redoc_url=None)
     clients: set[WebSocket] = set()
     notices: asyncio.Queue = asyncio.Queue()
     loop_holder: dict[str, asyncio.AbstractEventLoop] = {}
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        loop_holder["loop"] = asyncio.get_running_loop()
+        task = asyncio.create_task(pump())
+        try:
+            yield
+        finally:
+            task.cancel()
+
+    app = FastAPI(title="Tactile Recorder", docs_url=None, redoc_url=None, lifespan=lifespan)
 
     def on_recorder_event(kind: str, detail: dict[str, Any]) -> None:
         # Called from whichever thread ran the recorder command; hop onto the event loop.
         loop = loop_holder.get("loop")
         if loop is not None:
-            loop.call_soon_threadsafe(notices.put_nowait, {"type": "notice", "kind": kind, **detail})
+            message = {"type": "notice", "kind": kind, **detail}
+            loop.call_soon_threadsafe(notices.put_nowait, message)
 
     recorder.add_listener(on_recorder_event)
 
@@ -187,15 +199,6 @@ def create_app(hub: Hub, recorder: Recorder) -> FastAPI:
                 await broadcast(build_state(hub, recorder))
             if tick % live_every == 0:
                 await broadcast(build_live(hub))
-
-    @app.on_event("startup")
-    async def startup() -> None:
-        loop_holder["loop"] = asyncio.get_running_loop()
-        app.state.pump = asyncio.create_task(pump())
-
-    @app.on_event("shutdown")
-    async def shutdown() -> None:
-        app.state.pump.cancel()
 
     def run(command, *args):
         try:

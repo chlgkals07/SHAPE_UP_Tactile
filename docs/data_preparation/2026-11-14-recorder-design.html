@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>녹화기 확정안</title>
+<style>
+:root{--ink:#16181d;--ink2:#4a4f59;--muted:#7b808a;--line:#e4e5e8;--wash:#f7f7f8;--ok:#1b7f3b;--warn:#a15c00;--bad:#c62828;--mono:ui-monospace,"SF Mono",Consolas,monospace}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;color:var(--ink);background:#fff;font:15px/1.7 system-ui,-apple-system,"Segoe UI","Noto Sans KR",sans-serif}
+.wrap{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:220px minmax(0,1fr);gap:44px;padding:36px 24px 90px}
+nav{position:sticky;top:28px;align-self:start;font-size:13px;max-height:calc(100vh - 56px);overflow:auto}
+nav b{display:block;font-size:14px;margin-bottom:10px}
+nav a{display:block;color:var(--ink2);text-decoration:none;padding:4px 10px;border-left:2px solid var(--line)}
+nav a:hover{color:var(--ink);border-left-color:var(--ink)}
+nav .grp{margin:14px 0 4px;font-size:11px;color:var(--muted);font-weight:600}
+main{min-width:0}
+h1{font-size:30px;line-height:1.25;letter-spacing:-.02em;margin:0 0 8px}
+h2{font-size:21px;letter-spacing:-.01em;margin:56px 0 12px;padding-top:18px;border-top:1px solid var(--line)}
+h3{font-size:15px;margin:26px 0 8px}
+p{margin:0 0 12px}
+ul{margin:6px 0 14px;padding-left:1.2rem}
+li{margin:.25rem 0}
+.lead{font-size:16px;color:var(--ink2);max-width:74ch}
+.meta{color:var(--muted);font-size:13px;margin-bottom:22px}
+code{font:13px var(--mono);background:var(--wash);border:1px solid var(--line);border-radius:4px;padding:.05em .35em;overflow-wrap:anywhere}
+pre{background:var(--wash);border:1px solid var(--line);border-radius:6px;padding:14px 16px;font:12.5px/1.6 var(--mono);overflow:auto;margin:10px 0 16px}
+pre code{background:none;border:0;padding:0}
+.scroll{overflow-x:auto;margin:10px 0 18px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--ink);padding:6px 12px 6px 0;white-space:nowrap}
+td{border-bottom:1px solid var(--line);padding:8px 12px 8px 0;vertical-align:top}
+td:first-child{white-space:nowrap}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:10px;border:1px solid currentColor;white-space:nowrap}
+.done{color:var(--ok)}.field{color:var(--warn)}.later{color:var(--muted)}
+.box{border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin:14px 0}
+.box.warn{border-color:#e6c48f;background:#fffaf1}
+.box>:last-child{margin-bottom:0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:18px 0}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.kpi b{display:block;font:600 22px var(--mono);letter-spacing:-.02em}
+.kpi span{font-size:12px;color:var(--muted)}
+figure{margin:16px 0}
+figure img{width:100%;border:1px solid var(--line);border-radius:8px;display:block}
+figcaption{font-size:12px;color:var(--muted);margin-top:6px}
+svg text{font:12px system-ui,"Noto Sans KR",sans-serif;fill:var(--ink)}
+svg .s{font-size:11px;fill:var(--muted)}
+@media(max-width:860px){.wrap{grid-template-columns:1fr;gap:18px;padding:22px 16px 60px}nav{position:static;max-height:none}nav a{display:inline-block;border:0;padding:2px 8px 2px 0}nav .grp{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav aria-label="목차">
+  <b>녹화기 확정안</b>
+  <a href="#summary">요약</a>
+  <a href="#arch">구조</a>
+  <div class="grp">단계별 확정안</div>
+  <a href="#s0">0. 현장 확인</a>
+  <a href="#s1">1. 센서 계층</a>
+  <a href="#s2">2. 저장 방식</a>
+  <a href="#s3">3. 녹화 제어</a>
+  <a href="#s4">4. 변환기</a>
+  <a href="#s5">5. 검증</a>
+  <a href="#s6">6. 정책 쪽 재사용</a>
+  <a href="#s7">7. UI</a>
+  <div class="grp">구현</div>
+  <a href="#impl">폴더와 기술 스택</a>
+  <a href="#quality">오류를 줄이는 방법</a>
+  <a href="#verified">확인한 것</a>
+  <a href="#open">남은 것</a>
+</nav>
+
+<main>
+<h1>녹화기 확정안</h1>
+<p class="meta">2026-11-14 · 브랜치 <code>feat/recorder</code> · 선행 문서: <a href="2026-11-13-recorder-design-context.md">설계 컨텍스트</a>, <a href="2026-11-13-cyclo-analysis.md">Cyclo 분석</a> · 사용법: <a href="recorder_usage.md">recorder_usage.md</a></p>
+<p class="lead">팔(OMY) · 손(LEAP) · 글러브(Manus) · 촉각(Paxini) · 카메라(RealSense)를 한 시계로 기록하고, 나중에 openpi용 LeRobot v2.1 데이터셋으로 뽑는 프로그램이다. 11/13~14 논의에서 정한 것을 단계별로 적고, 무엇이 만들어졌고 무엇이 현장 확인을 기다리는지 표시한다.</p>
+
+<h2 id="summary">요약</h2>
+<div class="kpis">
+  <div class="kpi"><b>원본 먼저</b><span>센서별 원래 속도로 다 받고, 데이터셋은 변환기로 뽑는다</span></div>
+  <div class="kpi"><b>허브 1개</b><span>Python 프로세스 하나가 모든 장치를 읽고 한 시계로 시각을 찍는다</span></div>
+  <div class="kpi"><b>LeRobot v2.1</b><span>openpi가 고정한 버전으로 쓰기·읽기 확인</span></div>
+  <div class="kpi"><b>90 Hz 촉각</b><span>원본에 전부 남고, 데이터셋에는 스텝당 3개씩 들어간다</span></div>
+</div>
+<div class="scroll"><table>
+<thead><tr><th>정한 것</th><th>내용</th><th>이유</th></tr></thead>
+<tbody>
+<tr><td>방식</td><td>녹화 중에는 원본만 저장, 시간 맞추기는 오프라인 변환</td><td>최신 LeRobot은 Python 3.12 이상이라 User PC(3.10)에서 못 쓴다. 출력 형식도 v2.1 / v3.0 / zarr로 갈린다. 원본이 있으면 fps와 항목을 바꿔 다시 뽑을 수 있다</td></tr>
+<tr><td>구조</td><td>허브 프로세스 하나 (A안)</td><td>부품이 가장 적고, 한 시계로 시각을 찍으며, 촉각이 직렬화 없이 들어온다</td></tr>
+<tr><td>출력</td><td>LeRobot v2.1 (openpi <code>215abfb</code>가 고정한 lerobot <code>0cf8648</code>)</td><td>pi0.5 fine-tune 환경이 이 버전이다</td></tr>
+<tr><td>팔 통신</td><td>zenoh 유지. 팔 토픽만 <code>zenoh-ros2-sdk</code>로 ROS 없이 구독</td><td>막힌 곳은 Humble용 <code>rmw_zenoh</code>뿐이다. SDK는 Jazzy와 같은 방식으로 타입 해시를 만든다</td></tr>
+<tr><td>재사용</td><td>센서 읽기 부분을 추론·online RL과 공유</td><td>학습 때와 실행 때의 입력이 같아야 한다. 5080 PC가 오면 같은 허브에서 추론한다</td></tr>
+<tr><td>카메라</td><td>손목(D405) + 외부 고정(D435i 예정). 깊이는 뺀다. 회전은 설정값</td><td>pi0.5도 우리 모델도 깊이를 쓰지 않는다. 원본은 회전 없이 저장해서 방향을 나중에 바꿀 수 있다</td></tr>
+<tr><td>글러브</td><td>텔레옵 틱(50 Hz)으로 저장, 모든 관절 노드 포함</td><td>리타게터가 실제로 본 값이다. 전체 노드가 있으면 리타게팅을 오프라인으로 다시 돌릴 수 있다</td></tr>
+<tr><td>UI</td><td>브라우저 화면 (B안) + 디버깅용 터미널</td><td>미리보기와 조작이 한 화면이고, 로봇 옆 태블릿에서도 열린다</td></tr>
+<tr><td>범위</td><td>이번에는 녹화기까지. 정책 실행과 bring-up GUI는 다음</td><td>서로 독립적인 덩어리라서 나눴다</td></tr>
+</tbody></table></div>
+
+<h2 id="arch">구조</h2>
+<figure>
+<svg viewBox="0 0 900 380" role="img" aria-label="장치에서 허브를 거쳐 원본 에피소드와 데이터셋으로 가는 흐름">
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#16181d"/></marker></defs>
+  <g fill="#fff" stroke="#16181d">
+    <rect x="10" y="20" width="200" height="46" rx="6"/><rect x="10" y="84" width="200" height="46" rx="6"/>
+    <rect x="10" y="148" width="200" height="46" rx="6"/><rect x="10" y="212" width="200" height="46" rx="6"/>
+    <rect x="10" y="276" width="200" height="46" rx="6"/>
+    <rect x="330" y="60" width="210" height="222" rx="8" fill="#f7f7f8"/>
+    <rect x="660" y="20" width="230" height="52" rx="6"/><rect x="660" y="92" width="230" height="52" rx="6"/>
+    <rect x="660" y="164" width="230" height="52" rx="6"/><rect x="660" y="262" width="230" height="52" rx="6" stroke-dasharray="5 4"/>
+  </g>
+  <text x="22" y="40">팔 (Robot PC, Jazzy)</text><text class="s" x="22" y="57">zenohd → zenoh-ros2-sdk</text>
+  <text x="22" y="104">손 + 글러브</text><text class="s" x="22" y="121">leap_teleop → 로컬 UDP</text>
+  <text x="22" y="168">촉각 보드 A / B</text><text class="s" x="22" y="185">Paxini SDK, 시리얼 90 Hz</text>
+  <text x="22" y="232">손목 카메라 D405</text><text class="s" x="22" y="249">pyrealsense2</text>
+  <text x="22" y="296">외부 카메라 D435i</text><text class="s" x="22" y="313">pyrealsense2 (설치 예정)</text>
+  <text x="350" y="86" font-weight="600">허브 (User PC, Python)</text>
+  <text class="s" x="350" y="106">장치마다 스레드 하나</text>
+  <text class="s" x="350" y="124">도착 즉시 monotonic 시각 기록</text>
+  <text class="s" x="350" y="142">최근 2초 버퍼, Hz·끊김 계산</text>
+  <text x="350" y="176">latest()</text><text class="s" x="420" y="176">최신값</text>
+  <text x="350" y="198">subscribe()</text><text class="s" x="436" y="198">모든 샘플</text>
+  <text class="s" x="350" y="236">스트림: arm_state, arm_action,</text>
+  <text class="s" x="350" y="254">hand, glove, tactile_a/b, cam_*</text>
+  <text x="672" y="42">웹 UI / 터미널</text><text class="s" x="672" y="59">상태, 미리보기, 조작</text>
+  <text x="672" y="114">기록기</text><text class="s" x="672" y="131">에피소드 폴더 (npz + mjpeg)</text>
+  <text x="672" y="186">변환기 (학습 서버)</text><text class="s" x="672" y="203">원본 → LeRobot v2.1</text>
+  <text x="672" y="284">정책 (다음 프로젝트)</text><text class="s" x="672" y="301">같은 관측 함수 사용</text>
+  <g stroke="#16181d" fill="none" marker-end="url(#a)">
+    <path d="M210 43H270V120H330"/><path d="M210 107H330"/><path d="M210 171H330"/><path d="M210 235H330"/><path d="M210 299H270V250H330"/>
+    <path d="M540 130H600V46H660"/><path d="M540 160H620V118H660"/><path d="M775 144V164"/>
+    <path d="M540 210H600V288H660" stroke-dasharray="5 4"/>
+  </g>
+</svg>
+<figcaption>실선은 이번에 만든 것, 점선은 다음 프로젝트. 기록기는 <code>subscribe()</code>만, UI와 정책은 <code>latest()</code>만 쓴다.</figcaption>
+</figure>
+
+<h2 id="s0">0. 현장 확인 <span class="tag field">현장 대기</span></h2>
+<p>실물을 못 쓰는 동안 먼저 만들기로 했다. 확인이 안 된 세 가지는 모두 장치 어댑터 안에 갇혀 있고, 현장에서 명령 하나씩으로 확인한다.</p>
+<div class="scroll"><table>
+<thead><tr><th>확인</th><th>명령</th><th>안 되면</th></tr></thead>
+<tbody>
+<tr><td>팔 토픽이 SDK로 오는지</td><td><code>tactile-rec check arm_state</code>, <code>check arm_action</code></td><td>Robot PC 컨테이너에 작은 중계 노드를 둔다. 어댑터 파일 하나만 바뀐다</td></tr>
+<tr><td>Paxini 여러 센서 동시 스트림</td><td><code>tactile-rec check tactile_a</code></td><td>Hz가 낮으면 설정의 기대 Hz를 실측값으로 맞춘다</td></tr>
+<tr><td>카메라 두 대와 프레임 시각 종류</td><td><code>tactile-rec check cam_wrist</code></td><td>USB 대역이 모자라면 해상도·fps를 낮춘다</td></tr>
+</tbody></table></div>
+
+<h2 id="s1">1. 센서 계층 <span class="tag done">구현</span></h2>
+<p>모든 장치가 같은 모양의 "스트림"이다. 어댑터는 값을 받는 즉시 <code>push()</code>만 부르고, 버퍼·구독·Hz·끊김 계산은 공통 부품이 한다.</p>
+<pre><code>Sample:  t_recv_ns   허브 PC monotonic 시계, 도착 즉시
+         t_src_ns    장치가 준 시각. 없으면 -1
+         seq         허브가 센 번호
+         src_seq     장치가 센 번호 (프레임 번호, 텔레옵 틱). 빠진 개수를 여기서 센다
+         data        이름 붙은 배열들
+
+Stream:  latest()            최신값 (UI, 정책)
+         subscribe(fn)       모든 샘플 (기록기). 버퍼에 있던 직전 구간부터 이어서 받을 수 있다
+         health()            실제 Hz, 마지막 수신 후 경과, 빠진 수, 상태(정상 / 느림 / 끊김 / 오류)</code></pre>
+<div class="scroll"><table>
+<thead><tr><th>스트림</th><th>읽는 방법</th><th>내용</th><th>장치 시각</th><th>상태</th></tr></thead>
+<tbody>
+<tr><td><code>arm_state</code></td><td><code>zenoh-ros2-sdk</code>, <code>/joint_states</code></td><td>위치·속도·effort, 관절 이름 순서로 재배열</td><td>Robot PC <code>header.stamp</code></td><td><span class="tag field">현장 미검증</span></td></tr>
+<tr><td><code>arm_action</code></td><td><code>zenoh-ros2-sdk</code>, <code>/leader/joint_trajectory</code></td><td>leader 명령의 첫 점</td><td>대개 없음</td><td><span class="tag field">현장 미검증</span></td></tr>
+<tr><td><code>hand</code></td><td><code>leap-teleop --record-udp</code>가 틱마다 보냄</td><td>명령, 실제 전송값, 측정 위치·속도·전류, 모드</td><td>텔레옵 틱 시각 (같은 시계)</td><td><span class="tag done">시험 통과</span></td></tr>
+<tr><td><code>glove</code></td><td>같은 패킷</td><td>ergonomics 20개, 모든 관절 노드의 위치·방향</td><td>글러브 수신 시각 (같은 시계)</td><td><span class="tag done">시험 통과</span></td></tr>
+<tr><td><code>tactile_a/b</code></td><td>Paxini SDK, 보드당 스레드 하나</td><td>보드가 보낸 원시 바이트 그대로</td><td>없음</td><td><span class="tag field">다중 센서 미검증</span></td></tr>
+<tr><td><code>cam_*</code></td><td><code>pyrealsense2</code> 직접</td><td>BGR 프레임(회전 없음), 프레임 번호, 시각 종류</td><td>RealSense 프레임 시각</td><td><span class="tag field">현장 미검증</span></td></tr>
+</tbody></table></div>
+<ul>
+<li><b>텔레옵은 건드리지 않는다.</b> <code>leap_teleop</code>에는 기록 전용 싱크 하나(<code>record_sink.py</code>)와 옵션 하나만 추가했다. 싱크가 실패해도 손은 멈추지 않는다.</li>
+<li><b>잘못 꽂힌 센서는 녹화되지 않는다.</b> 보드가 보고한 모듈이 설정의 <code>places</code>와 다르면 그 스트림은 오류로 멈춘다.</li>
+<li><b>장치가 끊겼다 돌아오면 스스로 다시 연다.</b> 녹화기를 재시작할 필요가 없다.</li>
+</ul>
+
+<h2 id="s2">2. 저장 방식 <span class="tag done">구현</span></h2>
+<pre><code>&lt;데이터 루트&gt;/                      설정의 data_root 또는 --root
+  &lt;태스크 이름&gt;/                    예: pick_cup. 변환기는 이 폴더 단위로 데이터셋을 만든다
+    2026-11-20_1430_&lt;수집자&gt;/       세션
+      session.json                 설정 사본, 장착 모드, 코드 버전
+      ep_0001/
+        episode.json               태스크 문장, 시작·끝 시각, 결과, 끊김 표시, 스트림별 사양과 통계
+        arm_state.npz  arm_action.npz  hand.npz  glove.npz
+        tactile_a.npz  tactile_b.npz
+        cam_wrist.mjpeg  cam_wrist.npz     영상 + 프레임별 시각·파일 내 위치
+        events.jsonl               촉각 영점, 끊김·복구, 사용자 표시</code></pre>
+<div class="scroll"><table>
+<thead><tr><th>정한 것</th><th>내용</th></tr></thead>
+<tbody>
+<tr><td>숫자 스트림</td><td>메모리에 모았다가 정지할 때 스트림당 <code>.npz</code> 하나로 쓴다. 녹화 중 프로그램이 죽으면 그 에피소드 하나를 잃는다 (합의함)</td></tr>
+<tr><td>영상</td><td>카메라마다 별도 스레드가 JPEG(품질 95)로 압축해 <code>.mjpeg</code>에 이어 쓴다. 밀리면 프레임을 버리고 개수를 센다. 시각은 캡처 때 이미 찍혀 있다</td></tr>
+<tr><td>저장 확정</td><td><code>ep_0001.tmp/</code>에 쓰고 저장할 때 이름을 바꾼다. <code>.tmp</code>가 없는 폴더는 항상 완전하다</td></tr>
+<tr><td>시작 전 1초</td><td>녹화 시작 직전 1초를 버퍼에서 꺼내 같이 저장한다. 촉각 history가 첫 스텝에도 있다</td></tr>
+<tr><td>촉각</td><td>원시 바이트를 그대로 둔다. SDK가 자체 제작이고 해석 규칙이 작은 힘에서만 검증돼서, 규칙이 틀려도 다시 찍지 않고 고칠 수 있다</td></tr>
+<tr><td>결과 표시</td><td>저장할 때 성공 / 실패를 고른다. 실패도 지우지 않는다 (나중에 RL에 쓸 수 있다)</td></tr>
+<tr><td>장착 모드</td><td>에피소드마다 기록한다. 변환기가 서로 다른 장착이 섞인 입력을 거부한다</td></tr>
+</tbody></table></div>
+
+<h2 id="s3">3. 녹화 제어 <span class="tag done">구현</span></h2>
+<pre><code>대기 ──시작──▶ 녹화 중 ──정지──▶ 검토 ──성공 저장 / 실패 저장 / 버리기──▶ 대기</code></pre>
+<ul>
+<li><b>시작 전 점검</b>: 필수 스트림이 모두 정상이고, 텔레옵이 <code>live</code>이고, 디스크 여유가 있어야 시작된다. 아니면 이유를 보여 주고 거부한다. 강제 시작은 따로 있고, 그 에피소드에 표시가 남는다.</li>
+<li><b>녹화 중 센서 끊김</b>: 녹화는 계속하고, 화면과 소리로 알리고, 에피소드에 표시한다. 변환기는 이런 에피소드를 기본으로 제외한다.</li>
+<li><b>시간 제한</b>: 설정하면 자동으로 정지한다.</li>
+<li><b>제어 로직은 화면과 분리</b>: <code>Recorder</code> 객체 하나가 전부이고, 웹과 터미널은 같은 메서드를 부른다.</li>
+</ul>
+
+<h2 id="s4">4. 변환기 <span class="tag done">구현</span></h2>
+<pre><code>tactile-rec convert --config rig.yaml --in &lt;루트&gt;/pick_cup --out &lt;출력&gt; --repo-id shape_up/pick_cup</code></pre>
+<div class="scroll"><table>
+<thead><tr><th>키</th><th>차원</th><th>내용</th></tr></thead>
+<tbody>
+<tr><td><code>observation.state</code></td><td>22</td><td>팔 6 + 손 16 측정 위치 (rad)</td></tr>
+<tr><td><code>action</code></td><td>22</td><td>팔 leader 명령 6 + 손 명령 16 (rad). 손은 <code>cmd</code>(기본) 또는 <code>sent</code></td></tr>
+<tr><td><code>observation.hand_current</code></td><td>16</td><td>모터 전류 (mA)</td></tr>
+<tr><td><code>observation.tactile.resultant</code></td><td>8 x 3 = 24</td><td>센서별 합력 (N). 순서: 엄지 끝·마디, 검지, 중지, 약지</td></tr>
+<tr><td><code>observation.tactile.distributed</code></td><td>(4x52 + 4x25) x 3 = 924</td><td>측정점별 힘 (N)</td></tr>
+<tr><td><code>observation.tactile.resultant_hr</code></td><td>3 x 24 = 72</td><td>한 스텝 안의 90 Hz 샘플 3개. 마지막이 그 스텝의 값</td></tr>
+<tr><td><code>observation.images.&lt;카메라&gt;</code></td><td>H x W x 3</td><td>설정대로 회전한 RGB</td></tr>
+</tbody></table></div>
+<h3>시간 맞추기</h3>
+<ul>
+<li><b>격자</b>: 녹화 시작 이후, 모든 스트림이 값을 낸 시점부터 1/30초 간격.</li>
+<li><b>값 고르기</b>: 각 격자 시점에서 그 이전의 가장 최근 값. 미래 값을 쓰지 않고 보간하지 않는다.</li>
+<li><b>스트림별 시각 선택</b> (<code>dataset.time</code>): <code>recv</code> 수신 시각, <code>src</code> 장치 시각, <code>respread</code> 일정 주기 가정으로 USB 뭉침 제거. 기본은 손 <code>src</code>, 촉각 <code>respread</code>, 나머지 <code>recv</code>.</li>
+<li><b>지연 보정</b> (<code>dataset.latency_ms</code>): 스트림별로 빼 줄 지연. 현장 실측 뒤에 채운다. 원본은 그대로라서 값을 바꿔 다시 변환할 수 있다.</li>
+<li><b>품질 보고</b>: 에피소드마다 스트림별로 "값이 최대 몇 ms 오래됐는지"를 낸다. 150 ms를 넘거나 끊김 표시가 있으면 기본으로 제외한다.</li>
+</ul>
+<div class="box warn"><p><b>변환은 openpi 환경에서 돌린다.</b> 쓰는 쪽과 읽는 쪽의 <code>datasets</code> 라이브러리 세대가 다르면 읽기가 실패한다. 확인 과정에서 4.x로 쓴 것을 3.x로 읽지 못했다. openpi 환경 안에서 변환하면 같은 버전으로 맞는다.</p></div>
+
+<h2 id="s5">5. 검증 <span class="tag done">실물 없는 부분 완료</span> <span class="tag field">현장 대기</span></h2>
+<ul>
+<li><b>가짜 장치</b>가 4초마다 촉각 힘, 모터 전류, 카메라 밝기에 같은 순간의 "톡"을 넣는다. 녹화 → 저장 → 변환 뒤에 세 신호가 같은 스텝에 있는지 시험한다. 허용 오차는 규칙에서 나오는 값인 한 스텝이다.</li>
+<li><b>실측 도구</b> <code>tactile-rec tap</code>: 실제 에피소드에서 날카로운 사건을 찾아 스트림 간 시간 차이를 낸다. 결과를 <code>latency_ms</code>에 넣는다.</li>
+<li><b>재생</b> <code>tactile-rec replay</code>: 원본 에피소드를 Rerun으로 본다.</li>
+<li><b>현장 체크리스트</b>는 <a href="recorder_usage.md">사용법 문서</a> 5절에 있다.</li>
+</ul>
+
+<h2 id="s6">6. 정책 쪽 재사용 <span class="tag done">공유 함수까지</span> <span class="tag later">나머지는 다음 프로젝트</span></h2>
+<ul>
+<li><b>이번에 만든 것</b>: 단위·관절 순서·영상 회전·촉각 순서를 정하는 함수를 <code>features.py</code> 한 곳에 두고, 변환기와 실시간 관측(<code>live.observe()</code>)이 같이 쓴다.</li>
+<li><b>다음에 만들 것</b>: 팔 명령 발행(<code>/leader/joint_trajectory</code>에 zenoh SDK로), 손 명령(<code>leap_teleop</code>에 "정책" 입력 추가. 기존 hold / release 안전 동작 유지), <code>policy</code> 스트림(base chunk 번호, 실행 위치, residual), 사람 개입 기록.</li>
+</ul>
+
+<h2 id="s7">7. UI <span class="tag done">구현</span></h2>
+<figure><img src="../images/recorder_ui_record.png" alt="녹화 화면: 카메라 미리보기, 손가락별 촉각 분포, 손 관절, 상태와 버튼, 스트림 표"><figcaption>녹화 화면 (가짜 장치). 흰 배경에 색은 상태에만 쓴다.</figcaption></figure>
+<div class="scroll"><table>
+<thead><tr><th>페이지</th><th>내용</th></tr></thead>
+<tbody>
+<tr><td>녹화</td><td>카메라 미리보기(회전 적용), 손가락 4개의 끝·마디 촉각 분포와 합력, 손 관절의 명령 대 측정, 상태·타이머·큰 버튼, 시작 전 점검 결과, 스트림 표</td></tr>
+<tr><td>에피소드</td><td>이 태스크의 저장 목록, 길이·최대 공백·표시, 성공 / 실패 변경, 삭제, 변환 명령</td></tr>
+<tr><td>센서</td><td>스트림별 Hz 추이, 받은 수, 빠진 수, 항목, 펌웨어와 모듈 배치, 촉각 영점 보정</td></tr>
+<tr><td>설정</td><td>태스크 이름·문장, 수집자, 시간 제한 (대기 중에만). 장치 구성은 읽기 전용</td></tr>
+</tbody></table></div>
+<ul>
+<li><b>조작</b>: 버튼과 단일 키(Space, S, F, D, M, Z). 발판 스위치를 키로 매핑하면 그대로 쓴다.</li>
+<li><b>소리</b>: 시작, 정지, 저장, 끊김이 서로 다른 소리다.</li>
+<li><b>확장</b>: 왼쪽 메뉴에 항목을 추가하는 구조라서, 나중의 bring-up 화면이 여기에 붙는다.</li>
+<li><b>주의</b>: 로그인이 없다. 연구실 네트워크가 아니면 <code>ui.host: 127.0.0.1</code>로 둔다.</li>
+</ul>
+
+<h2 id="impl">폴더와 기술 스택</h2>
+<pre><code>recorder/
+  config/rig.example.yaml  rig.fake.yaml
+  src/tactile_rec/
+    types.py  clock.py  config.py      공통 형식, 시계, 설정 검증
+    stream.py                          스트림 공통 부품
+    streams/                           arm_zenoh, hand_udp, paxini, realsense, fake, specs
+    hub.py                             스트림 생성·시작·정지, 이벤트 기록
+    tactile.py  features.py  live.py   촉각 해석, 관측 만들기(공유), 최신값
+    record/                            writer(에피소드 쓰기), session(녹화 상태 흐름)
+    convert/                           load, align(시간 맞추기), episode, dataset(v2.1 쓰기)
+    ui/                                server(FastAPI), terminal, static/(HTML·JS·CSS)
+    tools/                             check, tap, inspect, replay
+    cli.py
+  tests/
+user_pc/src/leap_teleop/record_sink.py   손·글러브 값을 허브로 보내는 싱크</code></pre>
+<div class="scroll"><table>
+<thead><tr><th>부분</th><th>선택</th><th>이유</th></tr></thead>
+<tbody>
+<tr><td>언어</td><td>Python 3.10 이상</td><td>User PC와 학습 서버 양쪽에서 돈다</td></tr>
+<tr><td>저장</td><td>numpy <code>.npz</code>, JPEG</td><td>의존성이 적고 어디서나 읽힌다</td></tr>
+<tr><td>웹 UI</td><td>FastAPI + WebSocket, 빌드 없는 HTML / JS / CSS</td><td>Node와 빌드 단계가 없다</td></tr>
+<tr><td>장치 라이브러리</td><td><code>zenoh-ros2-sdk</code>, <code>paxini_sdk</code>, <code>pyrealsense2</code></td><td>모두 선택 설치. 해당 어댑터가 연결할 때만 불러온다</td></tr>
+<tr><td>데이터셋 쓰기</td><td>openpi가 고정한 <code>lerobot</code></td><td>서버에서만 필요하다. User PC에는 설치하지 않는다</td></tr>
+<tr><td>시험·검사</td><td>pytest, ruff</td><td>기존 <code>user_pc</code>와 같은 도구</td></tr>
+</tbody></table></div>
+
+<h2 id="quality">오류를 줄이는 방법</h2>
+<ul>
+<li><b>하드웨어를 어댑터 안에 가둔다.</b> 어댑터는 얇고, 로직은 공통 부품에 있다. 메시지 → 배열 변환 같은 부분은 순수 함수로 빼서 장치 없이 시험한다.</li>
+<li><b>가짜 장치로 전체를 돌린다.</b> <code>config/rig.fake.yaml</code>로 UI까지 그대로 뜬다.</li>
+<li><b>시계를 주입한다.</b> 시험에서는 가짜 시계로 정확한 시각에 샘플을 넣는다.</li>
+<li><b>시간 맞추기는 순수 함수다.</b> 파일도 장치도 없이 경계 경우를 시험한다.</li>
+<li><b>기록이 캡처를 막지 않는다.</b> 소비자가 예외를 내도 장치 스레드는 계속 돈다.</li>
+<li><b>설정 오류는 시작할 때 멈춘다.</b> 모르는 키, 없는 스트림 이름, 폴더 이름으로 못 쓰는 태스크 이름을 읽을 때 거부한다.</li>
+<li><b>검증 안 된 것은 그렇게 적는다.</b> 해당 어댑터 파일 맨 위에 <code>FIELD-UNVERIFIED</code>와 확인 명령이 적혀 있다.</li>
+</ul>
+
+<h2 id="verified">확인한 것 (2026-11-14, 이 PC에서)</h2>
+<div class="scroll"><table>
+<thead><tr><th>확인</th><th>결과</th></tr></thead>
+<tbody>
+<tr><td>녹화기 시험</td><td>78개 통과 (<code>recorder/tests</code>)</td></tr>
+<tr><td>기존 텔레옵 시험</td><td>155개 통과 (<code>user_pc/tests</code>, 싱크 시험 4개 포함). 기존 동작 변화 없음</td></tr>
+<tr><td>코드 검사</td><td>ruff 통과</td></tr>
+<tr><td>가짜 장치 실제 실행</td><td>9초 에피소드 2개. 팔 100 Hz, 손 50 Hz, 촉각 90 Hz, 카메라 30 Hz 그대로 기록, 빠짐 0</td></tr>
+<tr><td>LeRobot v2.1</td><td>openpi가 고정한 lerobot으로 쓰고 <code>LeRobotDataset</code>으로 다시 읽음. 프레임 542개, 위 표의 키와 차원 그대로</td></tr>
+<tr><td>실측 도구</td><td>가짜 신호에서 스트림 간 차이 13 ms 이내 (각 스트림의 한 주기 안)</td></tr>
+<tr><td>웹 UI</td><td>헤드리스 Chrome으로 네 페이지 렌더 확인, API로 시작 → 정지 → 저장 확인</td></tr>
+</tbody></table></div>
+
+<h2 id="open">남은 것</h2>
+<div class="scroll"><table>
+<thead><tr><th>항목</th><th>언제</th><th>비고</th></tr></thead>
+<tbody>
+<tr><td>현장 확인 세 가지와 실측</td><td>다음 현장</td><td>사용법 문서 5절 순서대로</td></tr>
+<tr><td>설정의 "확인 필요" 값</td><td>다음 현장</td><td>팔 Hz, 촉각 <code>places</code>, 손목 카메라 회전 방향(90 / 270), 외부 카메라 시리얼</td></tr>
+<tr><td>openpi 데이터 설정 파일</td><td>첫 실제 데이터셋이 나온 뒤</td><td>우리 키를 pi0.5 입력에 연결하고 학습 몇 스텝을 돌려 본다</td></tr>
+<tr><td>두 PC 시계 맞추기 (chrony)</td><td>실측에서 팔 지연이 문제일 때</td><td>지금은 수신 시각 기준이다</td></tr>
+<tr><td>정책 실행, bring-up GUI</td><td>다음 프로젝트</td><td>6절, 7절</td></tr>
+</tbody></table></div>
+</main>
+</div>
+</body>
+</html>

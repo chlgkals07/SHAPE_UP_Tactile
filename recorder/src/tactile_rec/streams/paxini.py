@@ -40,7 +40,7 @@ def layout_from_board(
     models = models or [""] * len(module_names)
     modules = tuple(
         Module(name, int(points), places[name], model)
-        for name, points, model in zip(module_names, point_counts, models)
+        for name, points, model in zip(module_names, point_counts, models, strict=True)
     )
     return TactileLayout(modules, has_resultant, has_distributed)
 

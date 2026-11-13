@@ -16,7 +16,7 @@ from tactile_rec.config import Config, ConfigError, load_config
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="tactile-rec",
-        description="Record arm + hand + tactile + camera episodes and convert them to LeRobot v2.1.",
+        description="Record arm + hand + tactile + camera episodes; convert to LeRobot v2.1.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
