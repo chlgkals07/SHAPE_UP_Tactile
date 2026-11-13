@@ -117,19 +117,29 @@ button:focus-visible,.chk:focus-within{outline:3px solid #6fc8bd;outline-offset:
   <div class="eyebrow">이해</div>
   <h2>전체 구조</h2>
   <p class="lead">팔은 Robot PC 안에서, 손은 User PC에서 따로 돈다. 두 PC는 zenoh로 토픽을 주고받는다.</p>
+  <div class="ok">
+    <b>현재 상태 (11/13)</b>
+    <ul style="margin-bottom:0">
+      <li>LEAP은 플랜지에서 <b>오른쪽 90° 돌려 단 것이 최종 장착</b>이다. 팔은 <code>omy_ai</code> 대신 <code>omy_ai_wrist_flip</code>으로 띄운다 (“zenohd와 omy_ai” 단계).</li>
+      <li>Manus → LEAP 텔레옵은 약 80% 완성. 남은 것: 잡기 위한 리타겟팅/IK 보정, 글러브 SDK 캘리브레이션을 다시 한 뒤 엄지 IK 확인.</li>
+      <li>손목 카메라 D405 <span class="tag meas">실측 11/12</span>, Paxini 촉각 센서 연동 <span class="tag meas">실측 11/12</span> 확인.</li>
+      <li>Cyclo 기록(단계 5)은 <b>보류</b>. Humble↔Jazzy <code>rmw_zenoh</code> 불통으로 막혔고, 촉각도 같이 모아야 해서 자체 녹화 프로그램(LeRobot 형식)을 만든다.</li>
+    </ul>
+  </div>
   <div class="diagram">
     <div class="box robot">
       <h4>ROBOT PC <small>(OMY 본체, 컨테이너)</small></h4>
       <div class="item"><b>zenohd</b> 라우터 :7447</div>
-      <div class="item"><b>omy_ai</b><br>① follower(OMY-F3M)<br>② home → ready 이동<br>③ leader(OMY-L100) 동기화</div>
+      <div class="item"><b>omy_ai_wrist_flip</b> <small>(90° 장착)</small><br>① follower(OMY-F3M)<br>② home → ready 이동<br>③ leader(OMY-L100) 동기화</div>
       <div class="item">/leader/joint_trajectory · /joint_states</div>
     </div>
     <div class="link"><b>zenoh</b>client<br>ROS_DOMAIN_ID=30</div>
     <div class="box user">
       <h4>USER PC</h4>
       <div class="item"><b>Manus 노드</b> → /manus_glove_0</div>
-      <div class="item"><b>leap_teleop</b> → LEAP Hand (USB, 5V)</div>
-      <div class="item">RealSense ×3 · Cyclo (5단계)</div>
+      <div class="item"><b>leap_teleop</b> → LEAP Hand (USB, 5V, 90° 장착)</div>
+      <div class="item"><b>D405</b> 손목 카메라 (OMY Camera 포트 → USB)</div>
+      <div class="item"><b>Paxini</b> 촉각 (통신 보드 USB)</div>
       <div class="item">/leap/* 기록용 발행</div>
     </div>
   </div>
@@ -143,21 +153,23 @@ button:focus-visible,.chk:focus-within{outline:3px solid #6fc8bd;outline-offset:
     <tr><th>장치</th><th>역할</th></tr>
     <tr><td>OMY-F3M (follower)</td><td>실제 움직이는 팔. 6축 + 끝단(원래 그리퍼, 우리는 LEAP으로 교체)</td></tr>
     <tr><td>OMY-L100 (leader)</td><td>사람이 잡는 팔. 7모터(6축 + 트리거 <code>rh_r1_joint</code>)</td></tr>
-    <tr><td>LEAP Hand v1</td><td>16모터 손. 5V 전원 + FTDI USB(<code>/dev/ttyUSB0</code>). ROS 밖에서 직접 구동</td></tr>
+    <tr><td>LEAP Hand v1</td><td>16모터 손. 5V 전원 + FTDI USB(<code>/dev/ttyUSB0</code>). ROS 밖에서 직접 구동. 플랜지에서 오른쪽 90° 돌려 장착</td></tr>
     <tr><td>Manus 글러브</td><td>사람 손 입력. 동글 USB, SDK ROS 2 노드</td></tr>
+    <tr><td>RealSense D405</td><td>손목 카메라. <code>link6</code>에 붙어 있어 90° 장착에서는 손 옆에 온다</td></tr>
+    <tr><td>Paxini GEN3</td><td>촉각 센서. SDK는 <code>third_party/paxini</code></td></tr>
   </table></div>
 </section>
 
 <section class="step" data-group="이해" data-title="단계별로 켜야 할 것">
   <div class="eyebrow">이해</div>
   <h2>단계별로 켜져 있어야 하는 것</h2>
-  <p class="lead">오늘 목표: 팔은 팔대로, 손은 Manus로, 그리고 Cyclo 기록까지.</p>
+  <p class="lead">목표: 팔은 팔대로, 손은 Manus로, 그리고 팔·손·촉각·카메라를 같은 시간축으로 기록.</p>
   <div class="tblw"><table>
     <tr><th>단계</th><th>하는 일</th><th>Robot PC<br>(zenohd, omy_ai)</th><th>Manus 노드</th><th>LEAP 5V</th><th>zenoh 환경</th></tr>
     <tr><td><b>2</b></td><td>leader 트리거 → LEAP <small>(검증 끝)</small></td><td class="y">필요</td><td class="n">불필요</td><td class="y">필요</td><td class="y">켠다</td></tr>
     <tr><td><b>3</b></td><td>Manus → LEAP, <b>팔 없음</b></td><td class="n">불필요</td><td class="y">필요</td><td class="y">필요<br><small>(dry-run은 불필요)</small></td><td class="z">끈다<br>LEAP_NO_ZENOH=1</td></tr>
     <tr><td><b>4</b></td><td>Manus + 팔</td><td class="y">필요</td><td class="y">필요</td><td class="y">필요</td><td class="z">끈다</td></tr>
-    <tr><td><b>5</b></td><td>Cyclo 기록</td><td class="y">필요</td><td class="y">필요</td><td class="y">필요</td><td class="y">켠다</td></tr>
+    <tr><td><b>5</b></td><td>Cyclo 기록 <small>(보류)</small></td><td class="y">필요</td><td class="y">필요</td><td class="y">필요</td><td class="y">켠다</td></tr>
   </table></div>
   <div class="warn"><b>같은 RMW 규칙.</b> Manus 노드와 <code>leap_teleop</code>은 같은 RMW를 써야 서로 토픽이 보인다. 3·4단계는 둘 다 기본 RMW(zenoh 끔), 5단계는 둘 다 zenoh(켬). 한쪽만 zenoh이면 <code>[teleop] waiting</code>에서 멈춘다.</div>
   <ul>
@@ -184,7 +196,7 @@ export PYTEST_ADDOPTS="-p no:anyio" # ~/.local anyio 플러그인과 apt pytest(
   <div class="tblw"><table>
     <tr><th>단축 명령</th><th>하는 일</th></tr>
     <tr><td><code>leap_env</code></td><td>ROS + Manus msgs + PYTHONPATH, <code>user_pc/</code>로 이동. <code>LEAP_NO_ZENOH</code>가 있으면 남은 zenoh 변수도 지운다</td></tr>
-    <tr><td><code>leap_manus</code></td><td>Manus → LEAP (엄지 IK, 주먹 safe-pose). <code>--dry-run</code>, <code>--thumb affine</code></td></tr>
+    <tr><td><code>leap_manus</code></td><td>Manus → LEAP (엄지 IK, 주먹 safe-pose). <code>--dry-run</code>, <code>--thumb affine</code>, <code>--kp</code>/<code>--kd</code> (기본 공식값 P 600 / D 200 / 350 mA), <code>--log-csv logs/run.csv</code> (틱마다 기록 → <code>python3 -m leap_teleop.tools.analyze_log</code>)</td></tr>
     <tr><td><code>leap_glovecal --force</code></td><td>글러브 캘리브레이션 (편 손 → 주먹)</td></tr>
     <tr><td><code>leap_check</code></td><td>LEAP 모터 ID 0~15 응답 확인</td></tr>
     <tr><td><code>leap_leader</code> / <code>leap_record</code> / <code>leap_topics</code></td><td>2단계 leader 트리거 / 5단계 기록용 발행 / 토픽 목록</td></tr>
@@ -192,7 +204,10 @@ export PYTEST_ADDOPTS="-p no:anyio" # ~/.local anyio 플러그인과 apt pytest(
   <h3>①-b Humble용 패키지 (한 번)</h3>
   <p><code>dynamixel_sdk</code>는 <code>python3-serial</code>이 없으면 import가 안 된다 (pytest는 하드웨어 없이 돌아서 통과해 버린다). <span class="tag meas">실측 11/03</span> 설치함.</p>
   <div class="cmd"><pre><code>sudo apt install ros-humble-rmw-zenoh-cpp ros-humble-dynamixel-sdk python3-serial</code></pre></div>
-  <p>Robot PC 컨테이너는 Jazzy다. Humble의 <code>rmw_zenoh_cpp</code>와 Jazzy <code>zenohd</code>가 서로 붙는지는 <b>[미검증]</b>이다. 2·5단계에서 <code>leap_topics</code>가 비어 있으면 이것부터 의심한다. 3·4단계(zenoh 끔)는 상관없다.</p>
+  <div class="warn">Robot PC 컨테이너는 Jazzy다. Humble <code>rmw_zenoh_cpp</code>(0.1.11)로 붙으면 <b>토픽 목록은 보이지만 Robot PC 토픽의 메시지는 0개</b>다 <span class="tag meas">실측 11/12</span>. 타입 해시 차이로 추정. 팔·손 텔레옵(2~4단계)은 영향 없다. User PC에서 팔 토픽을 받아야 하는 기록에서만 문제다 (<code>docs/field-test/2026-11-12-results.md</code> 8절).</div>
+  <h3>①-d 손목 카메라와 Paxini (한 번)</h3>
+  <div class="cmd"><pre><code>sudo apt install ros-humble-realsense2-camera              # D405 (librealsense2 2.58)
+pip install -e ~/SHAPE_UP_Tactile/third_party/paxini       # Paxini SDK (의존성은 pyserial)</code></pre></div>
   <h3>①-c 영점 파일 (한 번)</h3>
   <p><code>leap_env</code>는 <code>user_pc/</code>로 이동하므로 영점 파일은 <code>user_pc/config/hardware_motors.yaml</code>이어야 한다. 이 PC에는 아직 없고, 예전 작업 폴더에 하나 있다. 같은 LEAP 실물의 최신 파일인지 확인한 뒤 복사한다.</p>
   <div class="cmd"><pre><code>cp ~/Documents/antigravity/charming-pascal/leap-hand/calibration/hardware_motors.yaml \
@@ -248,6 +263,9 @@ echo 1 | sudo tee /sys/bus/usb-serial/devices/ttyUSB0/latency_timer</code></pre>
     <li>이더넷으로 Robot PC ↔ User PC를 연결한다.</li>
     <li>SSH 접속 (비밀번호 없음. 안 되면 <code>robotis@</code>):</li>
   </ol>
+  <div class="note"><b>로봇이 IP를 못 받으면</b> (<code>ping</code>이 <code>Time to live exceeded</code>, USB 랜이 <code>getting IP configuration</code>) User PC를 공유 모드로 한 번 바꾼다. 저장되어 유지된다. <span class="tag meas">실측 11/12</span>
+    <div class="cmd"><pre><code>nmcli connection modify "Wired connection 1" ipv4.method shared   # User PC 10.42.0.1, 로봇은 약 10초 뒤 10.42.0.241</code></pre></div>
+  </div>
   <span class="where user">USER PC</span>
   <div class="cmd"><pre><code>ssh root@omy-snpr44b1050.local     # = 10.42.0.241. 이름이 안 풀리면 ssh root@10.42.0.241</code></pre></div>
   <span class="where robot">ROBOT PC</span>
@@ -277,23 +295,65 @@ export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp</code></pre></div>
   <label class="chk"><input type="checkbox"><span><code>ros2 topic list</code>가 에러 없이 나온다</span></label>
   <span class="where robot">ROBOT PC · 터미널 B</span>
   <div class="danger"><b>손은 주먹으로 대기</b>시킨 뒤 실행한다. 팔이 즉시 움직인다 (home → ready, 약 20초). leader 트리거를 쥔 채로 둔다.</div>
+  <h3>LEAP 90° 장착 (현재 기본): <code>omy_ai_wrist_flip</code> <span class="tag meas">실측 11/12</span></h3>
   <div class="cmd"><pre><code>ssh root@omy-snpr44b1050.local
 cd /data/docker/open_manipulator &amp;&amp; ./docker/container.sh enter
-ros2 launch open_manipulator_bringup omy_ai.launch.py     # alias: omy_ai</code></pre></div>
+export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp   # 빠지면 DDS로 떠서 User PC가 팔 토픽을 못 본다
+source /workspace/omy_ws/install/setup.bash
+ros2 launch omy_leap_bringup omy_ai_wrist_flip.launch.py</code></pre></div>
+  <ul>
+    <li>LEAP을 플랜지에서 <b>오른쪽 90°</b> 돌려 달고, follower joint6을 <b>+π/2</b> 돌려서 home에서 손가락이 위를 향한다.</li>
+    <li>home 단계에서 손목이 왼쪽으로 90° 돈다. home·ready의 joint6 = π/2 (ready = [0, −90°, 152°, −62°, 90°, <b>90°</b>]).</li>
+    <li>leader 기준으로 joint6은 +90° ~ −180°까지 돈다. <b>leader가 켜질 때 leader 손목을 0 근처로 잡는다.</b></li>
+    <li>원리: leader broadcaster가 <code>leader 위치 + offsets</code>를 보내므로 joint6 offset만 π/2로 둔다. Homing Offset·순정 파일·모터 설정은 바꾸지 않았다. 코드: <code>OMY_Tactile_Robot_PC/omy_leap_bringup</code>.</li>
+    <li>joint6만 π 돌리는 방식은 쓰지 않는다. follower joint6 모터 한계가 <b>±π</b>라 한쪽으로 못 돈다.</li>
+    <li>D405는 <code>link6</code> 몸통에 붙어 있어서 90°만 돌아 <b>손 옆</b>에 온다.</li>
+  </ul>
+  <div class="warn">녹화하면 joint6이 π/2 근처다. <b>순정 장착 데이터와 한 데이터셋에 섞지 않는다.</b> leader self-collision 검사는 offset 전 각도와 그리퍼 모델로 판단한다. 11/12에는 막힌 적이 없지만 정확하지 않다.</div>
+  <h3>순정 장착(손가락 아래)일 때만: <code>omy_ai</code></h3>
+  <div class="cmd"><pre><code>ros2 launch open_manipulator_bringup omy_ai.launch.py     # alias: omy_ai</code></pre></div>
   <h3>omy_ai가 하는 일</h3>
   <div class="tblw"><table>
     <tr><th>순서</th><th>실행</th><th>하는 일</th></tr>
     <tr><td>1</td><td><code>omy_f3m_follower_ai</code></td><td>follower(OMY-F3M) ros2_control 시작</td></tr>
-    <tr><td>2</td><td><code>joint_trajectory_executor</code></td><td>초기 자세로 이동. <b>home → ready</b> (각 10초). ready = [0, −90°, 152°, −62°, 90°, 0]</td></tr>
+    <tr><td>2</td><td><code>joint_trajectory_executor</code></td><td>초기 자세로 이동. <b>home → ready</b> (각 10초). ready = [0, −90°, 152°, −62°, 90°, 0] (wrist_flip은 joint6 = 90°)</td></tr>
     <tr><td>3</td><td><code>omy_l100_leader_ai</code></td><td>executor가 끝난 뒤 leader 시작. 중력 보상 + 동기화</td></tr>
   </table></div>
-  <p>LEAP을 단 상태에서도 공식 <code>omy_ai</code>가 그대로 동작한다. <span class="tag meas">실측 10/09</span></p>
+  <p>LEAP을 단 상태에서도 공식 <code>omy_ai</code>가 그대로 동작한다. <span class="tag meas">실측 10/09</span> <code>omy_ai_wrist_flip</code>도 순서는 같고 joint6 값만 다르다.</p>
   <div class="note">leader 로그에 <code>BULK_READ_FAIL</code>(−3001, −3002)이 몇 초마다 찍히지만 허용 안이라 동작은 계속된다. 원인은 미조사다.</div>
   <h3>확인 (터미널 C)</h3>
   <div class="cmd"><pre><code>ros2 control list_controllers                            # arm_controller, joint_state_broadcaster가 active
 ros2 topic echo /leader/joint_trajectory --field points  # 값 7개 (마지막이 leader 트리거)</code></pre></div>
   <label class="chk"><input type="checkbox"><span>leader를 움직이면 follower가 따라온다</span></label>
   <label class="chk"><input type="checkbox"><span>트리거를 쥐면 7번째 값이 변한다</span></label>
+  <label class="chk"><input type="checkbox"><span>(wrist_flip) home에서 손가락이 위를 향하고, leader 손목을 양쪽으로 돌려도 follower가 따라온다</span></label>
+</section>
+
+<section class="step" data-group="로봇 켜기" data-title="손목 카메라와 Paxini">
+  <div class="eyebrow">센서</div>
+  <h2>손목 카메라와 Paxini 촉각</h2>
+  <h3>D405 손목 카메라 <span class="tag meas">실측 11/12</span></h3>
+  <p>OMY <code>Camera</code> 포트 → User PC USB.</p>
+  <span class="where user">USER PC</span>
+  <div class="cmd"><pre><code>ros2 launch realsense2_camera rs_launch.py camera_namespace:=camera camera_name:=cam_wrist \
+  enable_depth:=false depth_module.color_profile:=424x240x30
+ros2 run rqt_image_view rqt_image_view               # /camera/cam_wrist/color/image_raw/compressed</code></pre></div>
+  <ul>
+    <li>컬러 토픽은 <code>color/image_raw</code>다. config들에 적힌 <code>color/image_rect_raw</code>는 이 드라이버에서는 없다.</li>
+    <li>지금은 <b>USB 2.0(480M)으로만</b> 잡힌다. 기본 설정(848x480 + 깊이)은 9.3 Hz, 위 설정(424x240@30, 깊이 끔)은 18~30 Hz. 노트북 본체 USB3 직결과 USB3 케이블은 아직 시험하지 않았다.</li>
+    <li>큰 이미지는 <code>ros2 topic hz</code>가 값을 못 낸다. 작은 rclpy 구독자로 잰다.</li>
+    <li><code>backend-hid.cpp ... Failed to read busnum/devnum</code> 경고는 노트북 내장 센서 때문이라 무시한다.</li>
+  </ul>
+  <div class="warn"><b>OMY를 다시 켜면 카메라가 USB에서 사라진다.</b> 다시 꽂는다.</div>
+  <label class="chk"><input type="checkbox"><span>rqt_image_view에 손목 영상이 나온다</span></label>
+  <h3>Paxini 촉각 <span class="tag meas">실측 11/12</span></h3>
+  <p>연동은 확인했다. 실행 절차는 정리 중이다.</p>
+  <ul>
+    <li>설치: <code>pip install -e ~/SHAPE_UP_Tactile/third_party/paxini</code> (“처음 한 번 설정” ①-d)</li>
+    <li>사용법: <code>third_party/paxini/README.md</code>, <code>docs/SETUP_LINUX.md</code>, <code>docs/USAGE_GUIDE.md</code></li>
+    <li>이 SDK는 공식 Paxini SDK가 아니라 커뮤니티 래퍼다 (<code>docs/FINDINGS.md</code>).</li>
+  </ul>
+  <label class="chk"><input type="checkbox"><span>Paxini 값이 들어온다</span></label>
 </section>
 
 <!-- ============ 단계 2 ============ -->
@@ -354,6 +414,15 @@ ros2 topic echo /manus_glove_0 --once &gt; ~/echo.txt</code></pre></div>
 <section class="step" data-group="단계 3 · Manus 단독" data-title="글러브 캘리브레이션">
   <div class="eyebrow">단계 3 · Manus 단독</div>
   <h2>글러브 캘리브레이션</h2>
+  <h3>① 먼저 Manus SDK 캘리브레이션 <span class="tag meas">실측 11/12</span></h3>
+  <p>노드는 integrated 모드라 Dashboard 캘리브레이션이 적용되지 않는다. 안 하면 검지 PIP가 0에 붙어 검지가 중간에 멈춘다 (11/12: PIP가 0에 붙는 비율 60% → 1%).</p>
+  <div class="danger"><b>글러브를 완전히 충전한 상태에서</b> 한다. 11/12에는 배터리 <code>DEAD</code> 상태에서 해서 엄지 IK가 오히려 나빠졌다. 엄지 단계를 신경 써서 하고, <b><code>K</code>로 <code>.mcal</code>을 꼭 저장한다.</b> 글러브를 껐다 켜도 유지되는지는 아직 모른다.</div>
+  <span class="where user">USER PC · ROS Manus 노드를 끈 상태에서 (동글은 프로그램 하나만 쓴다)</span>
+  <div class="cmd"><pre><code>cd ~/SHAPE_UP_Tactile/third_party/manus/Python &amp;&amp; python3 examples/sdk_client.py
+# 1 (Integrated) → C → H로 Right → S → 단계마다 E 실행, P 다음 → F → K 저장(.mcal)</code></pre></div>
+  <p>그 뒤 노드를 다시 켜고, 아래 우리 캘리브레이션도 <b>다시</b> 한다 (글러브 각도가 바뀐다).</p>
+  <label class="chk"><input type="checkbox"><span>SDK 캘리브레이션 완료, <code>.mcal</code> 저장</span></label>
+  <h3>② 우리 캘리브레이션 (<code>leap_glovecal</code>)</h3>
   <p class="lead">작업자마다 한다. <b>글러브를 낀 손으로</b> 한다. LEAP은 필요 없다. 결과는 <code>config/manus_calibration.yaml</code> (gitignore).</p>
   <div class="note"><b>편 손은 충분히 쭉 편다.</b> 덜 편 채로 기록하면 평소 편 손이 "편 손"으로 읽혀 LEAP이 덜 펴진다. <span class="tag meas">실측 11/03</span> 더 펴서 다시 하니 해결. 주먹은 엄지를 검지·중지 위로 감싼다 (주먹 안에 넣지 않는다).</div>
   <span class="where user">USER PC</span>
@@ -408,7 +477,9 @@ leap_manus                    # 엄지 IK (기본). 편 손, 주먹, 손가락 �
     <li>엄지가 이상함 → <code>--thumb affine</code>으로 대응표부터 맞춘 뒤 IK</li>
     <li>엄지 맨 위 관절이 덜/더 젖혀짐 → <code>thumb_ip_extend_max_deg</code></li>
     <li>pinch 틈이 큼 → 15번 고정 때문일 수 있다. <code>ip_joint: ik</code>와 비교</li>
-    <li><b>검지가 끊김</b> <span class="tag meas">실측 11/03</span>: 글러브 <code>IndexPIPStretch</code>가 MCP가 굽는 동안에도 0~1°에 붙어 있는 구간이 있었다 (수신은 120 Hz로 정상). 장갑을 다시 끼고 센서 위치를 확인, 그래도면 Dashboard에서 글러브 캘리브레이션 후 Dashboard를 끄고 노드 재실행. 계속되면 PIP=0이고 MCP가 굽었을 때 MCP 비율을 빌리는 보정을 검토 <span class="tag unk">미검증</span></li>
+    <li><b>검지가 끊김</b> <span class="tag meas">실측 11/12 해결</span>: 글러브 <code>IndexPIPStretch</code>가 0에 붙던 것. 원인은 Manus <b>SDK 캘리브레이션 누락</b>이었다 (“글러브 캘리브레이션” ①). Dashboard 캘리브레이션은 integrated 모드에 적용되지 않는다.</li>
+    <li><b>엄지가 안 펴짐 / 엄지 맨 위 관절이 튐</b> <span class="tag unk">11/12 미해결</span>: SDK 캘리브레이션 뒤 <code>ThumbCMCStretch</code> 범위가 5°로 줄었다. 글러브를 충전하고 SDK 캘리브레이션(<code>.mcal</code> 저장) → <code>leap_glovecal --force</code> → <code>leap_manus --log-csv logs/run_ik.csv</code>로 다시 본다.</li>
+    <li>빠르게 움직이면 LEAP이 최대 0.5초 늦다 (속도 제한 120°/s). 250~300°/s로 올리는 것을 검토 중이다.</li>
     <li>IK에서 손끝 틈이 남음 → pinch snap 추가 검토 (spec 7절)</li>
     <li>pinch 결과는 <code>docs/field-test/</code>에 10/09 형식으로 남긴다</li>
   </ul>
@@ -421,7 +492,7 @@ leap_manus                    # 엄지 IK (기본). 편 손, 주먹, 손가락 �
   <p class="lead">팔은 leader, 손은 글러브. 두 프로세스는 독립이고 leader 트리거는 LEAP에 영향이 없다 (<code>--source manus</code>).</p>
   <ol>
     <li>3단계를 끝낸 뒤 <code>leap_manus</code>를 <code>Ctrl+C</code>로 종료하고, LEAP을 <b>주먹</b>으로 대기시킨다 (safe-pose가 주먹).</li>
-    <li><span class="where robot">ROBOT PC</span> 터미널 A <code>zenohd</code>, 터미널 B <code>omy_ai</code> (앞의 “zenohd와 omy_ai” 단계). leader 트리거를 쥔 채로.</li>
+    <li><span class="where robot">ROBOT PC</span> 터미널 A <code>zenohd</code>, 터미널 B <code>omy_ai_wrist_flip</code> (90° 장착, 앞의 “zenohd와 omy_ai” 단계). leader 트리거를 쥔 채로.</li>
     <li>Manus 노드(셸 1)는 그대로 두고:</li>
   </ol>
   <span class="where user">USER PC</span>
@@ -434,9 +505,10 @@ leap_manus</code></pre></div>
 </section>
 
 <!-- ============ 단계 5 ============ -->
-<section class="step" data-group="단계 5 · Cyclo 기록" data-title="Cyclo 준비">
-  <div class="eyebrow">단계 5 · Cyclo 기록</div>
+<section class="step" data-group="단계 5 · Cyclo 기록 (보류)" data-title="Cyclo 준비">
+  <div class="eyebrow">단계 5 · Cyclo 기록 (보류)</div>
   <h2>Cyclo 준비</h2>
+  <div class="danger"><b>보류 (11/13).</b> User PC(Humble)가 Robot PC(Jazzy) 토픽의 메시지를 못 받는다 <span class="tag meas">실측 11/12</span>. 그래서 Cyclo(Jazzy 컨테이너)에서는 반대로 손·카메라가 안 보일 것으로 예상한다. 촉각도 같이 모아야 해서 <b>자체 녹화 프로그램(LeRobot 형식)</b>으로 간다. 이 단계는 참고용으로 남긴다.</div>
   <p class="lead">세화형의 <code>omy_demonstration_runbook.md</code>(카메라 3대 기록)를 그대로 쓰고, 달라지는 점만 더한다.</p>
   <div class="tblw"><table>
     <tr><th>무엇</th><th>토픽</th><th>Cyclo 역할</th></tr>
@@ -461,8 +533,8 @@ nano ~/cyclo_intelligence/shared/shared/robot_configs/omy_f3m_leap_config.yaml</
   <label class="chk"><input type="checkbox"><span>config 복사, 카메라 topic 수정</span></label>
 </section>
 
-<section class="step" data-group="단계 5 · Cyclo 기록" data-title="기록하기">
-  <div class="eyebrow">단계 5 · Cyclo 기록</div>
+<section class="step" data-group="단계 5 · Cyclo 기록 (보류)" data-title="기록하기">
+  <div class="eyebrow">단계 5 · Cyclo 기록 (보류)</div>
   <h2>leap_record와 녹화</h2>
   <div class="warn"><b>zenoh를 켠다.</b> Manus 노드(셸 1)를 <code>Ctrl+C</code> 하고, <code>unset LEAP_NO_ZENOH</code> 한 셸에서 다시 띄운다. 둘 다 같은 환경이어야 한다.</div>
   <span class="where user">셸 1 · Manus 노드</span>
@@ -495,13 +567,13 @@ ros2 topic hz /leap/joint_command /leap/joint_states     # 50 Hz 근처인지</c
   <ol>
     <li>녹화가 끝났는지 확인한다.</li>
     <li><b><code>leap_*</code> 셸 <code>Ctrl+C</code></b> (Torque OFF). 손이 풀려 처지니 물체가 손에 없는지 본다.</li>
-    <li>카메라 터미널들, Cyclo 터미널.</li>
-    <li><b><code>omy_ai</code> <code>Ctrl+C</code></b> — <b>팔이 처질 수 있으니 손으로 받친다.</b></li>
+    <li>카메라 터미널(realsense), 촉각 기록, Cyclo 터미널.</li>
+    <li><b><code>omy_ai_wrist_flip</code>(또는 <code>omy_ai</code>) <code>Ctrl+C</code></b> — <b>팔이 처질 수 있으니 손으로 받친다.</b></li>
     <li><code>zenohd</code> <code>Ctrl+C</code>, Manus 노드 종료.</li>
     <li><b>LEAP 5V OFF.</b></li>
     <li>보관하려면 다음 단계의 pack, 그다음 로봇 전원 OFF.</li>
   </ol>
-  <div class="note">켜는 순서: <code>LEAP 5V(편 손)</code> → <code>Manus 노드</code> → <code>zenohd</code> → <code>omy_ai</code> → <code>leap_*</code> → <code>Cyclo 녹화</code>. 끄는 순서는 반대.</div>
+  <div class="note">켜는 순서: <code>LEAP 5V(편 손)</code> → <code>Manus 노드</code> → <code>zenohd</code> → <code>omy_ai_wrist_flip</code> → <code>leap_*</code> → <code>카메라·촉각</code> → <code>녹화</code>. 끄는 순서는 반대.</div>
 </section>
 
 <section class="step" data-group="마무리" data-title="pack / unpack">
@@ -547,6 +619,12 @@ ros2 topic hz /leap/joint_command /leap/joint_states     # 50 Hz 근처인지</c
     <tr><td>pytest <code>No module named '_pytest.scope'</code></td><td><code>-p no:anyio</code> (또는 <code>PYTEST_ADDOPTS</code>)</td></tr>
     <tr><td><code>ncursesw/ncurses.h</code> (Manus 빌드)</td><td><code>sudo apt install libncurses-dev</code></td></tr>
     <tr><td>텔레옵 중 leader가 튐</td><td>원인 미확인. leader를 손으로 잡는다</td></tr>
+    <tr><td><code>ping 10.42.0.241</code>이 <code>Time to live exceeded</code></td><td>USB 랜이 IP를 못 받음. <code>nmcli connection modify "Wired connection 1" ipv4.method shared</code> (“전원과 연결” 단계)</td></tr>
+    <tr><td>follower joint6이 한쪽으로 덜 돎</td><td>joint6을 π 근처에 두면 모터 한계(±π)에 걸린다. 90° 장착 + <code>omy_ai_wrist_flip</code>(π/2)을 쓴다</td></tr>
+    <tr><td><code>leap_check</code>에서 한 모터만 ±180°</td><td>혼이 반 바퀴 돌아 조립됨 (11/12 ID 11). 편 손에서 1·5·9번(약 −85°) 말고는 0 근처(±15°)여야 한다</td></tr>
+    <tr><td>LEAP 일부 ID(예: 0~3)만 ping 실패</td><td>그 손가락 쪽 케이블을 다시 꽂는다 <span class="tag meas">실측 11/12</span></td></tr>
+    <tr><td>User PC에서 Robot PC 토픽이 보이는데 메시지 0개</td><td>Humble↔Jazzy <code>rmw_zenoh</code> 불통 (“처음 한 번 설정”). 텔레옵은 무관</td></tr>
+    <tr><td>D405가 안 보임 / 느림</td><td>OMY를 다시 켰으면 다시 꽂는다. USB2로 잡히면 424x240@30, 깊이 끔 (“손목 카메라와 Paxini” 단계)</td></tr>
   </table></div>
 </section>
 
@@ -559,8 +637,10 @@ ros2 topic hz /leap/joint_command /leap/joint_states     # 50 Hz 근처인지</c
     <tr><td><s>손목 <code>Invalid</code>, 엄지 <code>DIP</code>, ergonomics 도 단위, Integrated 라이선스</s></td><td colspan="2"><span class="tag meas">실측 11/03</span> 모두 맞음 (Dashboard를 끄면 Integrated 라이선스 OK)</td></tr>
     <tr><td>엄지 IP 젖힘 (<code>thumb_ip_extend_max_deg</code> 20°)</td><td>3-4 편 손에서 엄지 젖히기</td><td>각도 조정, 0이면 끔</td></tr>
     <tr><td>15번 affine 고정 시 pinch 정확도</td><td>3-4 pinch</td><td><code>ip_joint: ik</code>와 비교</td></tr>
-    <tr><td>검지 PIP가 0에 붙음 (센서? 착용?)</td><td>재착용 후 <code>ros2 topic echo</code></td><td>Dashboard 캘리브레이션 / MCP 비율 보정</td></tr>
-    <tr><td>Humble <code>rmw_zenoh</code>(User PC) ↔ Jazzy <code>zenohd</code>(Robot PC)</td><td>2·5단계 <code>leap_topics</code></td><td>User PC 쪽 버전 맞추기</td></tr>
+    <tr><td><s>검지 PIP가 0에 붙음</s></td><td colspan="2"><span class="tag meas">실측 11/12</span> SDK 캘리브레이션 누락이 원인 (“글러브 캘리브레이션” ①)</td></tr>
+    <tr><td>엄지 IK (SDK 캘리브레이션 뒤 나빠짐)</td><td>충전 후 재캘리브레이션, <code>--log-csv</code></td><td><code>ThumbCMCStretch</code> 범위 확인</td></tr>
+    <tr><td>SDK 캘리브레이션이 글러브 재부팅 후 유지되는가</td><td>껐다 켜고 PIP 확인</td><td>ROS 노드가 <code>.mcal</code>을 불러오게 (<code>CoreSdk_SetGloveCalibration</code>)</td></tr>
+    <tr><td><s>Humble <code>rmw_zenoh</code>(User PC) ↔ Jazzy <code>zenohd</code>(Robot PC)</s></td><td><span class="tag meas">실측 11/12</span> 탐색만 되고 데이터 0개</td><td>DDS 통일 / Jazzy 컨테이너 / 24.04</td></tr>
     <tr><td>호스트 <code>leap_teleop</code> 토픽이 컨테이너 Cyclo에 보이는가</td><td>5단계 <code>leap_topics</code></td><td>호스트 zenoh 환경을 맞춘다</td></tr>
     <tr><td><code>/leap/joint_states</code> 주기 (16모터 피드백 비용)</td><td><code>ros2 topic hz</code></td><td>발행 주기를 낮춘다</td></tr>
     <tr><td>UI에 <b>OMY F3M + LEAP</b>이 나타나는가</td><td>Cyclo 실행 후 Home</td><td>Cyclo 컨테이너 재시작</td></tr>
@@ -591,7 +671,7 @@ ros2 topic hz /leap/joint_command /leap/joint_states     # 50 Hz 근처인지</c
   var current = 0;
 
   // localStorage는 이 브라우저에서만 남는 편의 기능이다. 막혀 있어도 페이지는 동작한다.
-  var KEY = 'manus-teleop-guide-v1';
+  var KEY = 'manus-teleop-guide-v2';  // 체크박스 id가 순서 기반이라 단계를 추가하면 버전을 올린다
   var saved = {};
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { saved = {}; }
   function persist() { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} }

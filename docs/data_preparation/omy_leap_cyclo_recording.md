@@ -10,6 +10,8 @@
 설계 근거: `../superpowers/specs/2026-10-29-ros-data-interface-design.md`. 손 구동 절차: `../../user_pc/README.md`.
 상태: 코드와 config는 만들었고(2026-11-03, `--publish`), **Cyclo 컨테이너에서 녹화·변환까지는 아직 해 보지 않았다.** `[미검증]`은 실물에서 처음 확인하는 항목이다.
 
+> **보류 (2026-11-13).** User PC Humble `rmw_zenoh`가 Robot PC Jazzy 토픽 데이터를 못 받는다 (`../field-test/2026-11-12-results.md` 8절). 촉각까지 같은 시간축으로 모으려고 자체 녹화 프로그램(LeRobot 형식)을 설계한다. 이 문서의 토픽·차원 정의(1–2절)는 그 설계의 참고로 쓴다.
+
 ---
 
 ## 1. 무엇이 기록되나
