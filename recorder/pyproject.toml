@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tactile-rec"
+version = "0.1.0"
+description = "Arm + hand + tactile + camera recorder for the OMY/LEAP/Paxini rig; raw episodes -> LeRobot v2.1"
+requires-python = ">=3.10"
+dependencies = ["numpy", "PyYAML", "opencv-python-headless", "rich"]
+
+[project.optional-dependencies]
+ui = ["fastapi", "uvicorn[standard]"]
+arm = ["zenoh-ros2-sdk"]
+tactile = ["pyserial>=3.5"]  # plus `pip install -e ../third_party/paxini`
+camera = ["pyrealsense2"]
+viz = ["rerun-sdk>=0.18"]
+dev = ["pytest", "ruff", "httpx", "fastapi", "uvicorn[standard]"]
+# `lerobot` is NOT listed: the v2.1 writer runs inside the openpi environment, which pins it.
+
+[project.scripts]
+tactile-rec = "tactile_rec.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+tactile_rec = ["ui/static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "../user_pc/src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

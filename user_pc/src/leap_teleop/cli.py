@@ -61,6 +61,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--log-csv", type=Path,
         help="write a per-tick CSV (glove, command, sent, position, current) for debugging",
     )
+    parser.add_argument(
+        "--record-udp", nargs="?", const="127.0.0.1:47800", metavar="HOST:PORT",
+        help="send hand + glove data to the tactile-rec hub over UDP (default 127.0.0.1:47800)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="log targets, do not touch hardware")
     return parser
 
@@ -162,6 +166,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 logger = CsvLogger(args.log_csv, driver)
                 publisher = Tee(publisher, logger) if publisher is not None else logger
                 print(f"[teleop] logging to {args.log_csv}")
+            if args.record_udp is not None:
+                from leap_teleop.diag_log import Tee
+                from leap_teleop.record_sink import UdpRecordSink
+
+                host, _, port = args.record_udp.rpartition(":")
+                if not host or not port.isdigit():
+                    raise ValueError("--record-udp expects HOST:PORT, e.g. 127.0.0.1:47800")
+                sink = UdpRecordSink(host, int(port), driver)
+                publisher = Tee(publisher, sink) if publisher is not None else sink
+                print(f"[teleop] sending record data to udp://{host}:{port}")
         except BaseException:
             source.close()
             raise

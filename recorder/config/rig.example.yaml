@@ -1,0 +1,81 @@
+# 실제 장비용 설정 예시. 복사해서 rig.yaml 로 쓰고, "확인 필요" 표시된 값을 현장에서 맞춘다.
+#   tactile-rec record --config config/rig.yaml
+rig:
+  name: omy_f3m_leap
+  mount: wrist_flip          # LEAP 90도 장착 + omy_ai_wrist_flip. 순정 장착 데이터와 섞지 않는다
+data_root: ~/data/shape_up   # 에피소드가 쌓이는 곳. 외장 SSD 경로도 된다
+
+session: {task: pick_cup, text: "Pick up the cup", operator: hamin}
+
+record:
+  preroll_s: 1.0             # 녹화 시작 직전 몇 초를 같이 저장할지 (최대 1.5)
+  time_limit_s: 0            # 0 이면 제한 없음
+  jpeg_quality: 95
+  min_free_gb: 5
+
+streams:
+  # 팔: Robot PC 의 zenohd 에 ROS 없이 붙는다. hz 는 기대값이며 현장에서 측정해 맞춘다 (확인 필요)
+  arm_state:
+    type: arm_zenoh
+    message: joint_state
+    topic: /joint_states
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6]
+    hz: 100
+    router: "10.42.0.241:7447"
+    domain_id: 30
+  arm_action:
+    type: arm_zenoh
+    message: joint_trajectory
+    topic: /leader/joint_trajectory
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6]
+    hz: 100
+    router: "10.42.0.241:7447"
+    domain_id: 30
+
+  # 손 + 글러브: `leap-teleop ... --record-udp` 가 보내는 것을 받는다. glove 스트림이 같이 생긴다
+  hand: {type: hand_udp, hz: 50, port: 47800, glove: true}
+
+  # 촉각: 보드당 스트림 하나. places 는 "보드가 보고하는 모듈 이름 -> 손의 위치" (확인 필요)
+  tactile_a:
+    type: paxini
+    port: /dev/ttyACM0
+    hz: 90
+    places: {Thumb-Tip: thumb_tip, Thumb-Middle: thumb_pad, Index-Tip: index_tip, Index-Middle: index_pad}
+  tactile_b:
+    type: paxini
+    port: /dev/ttyACM1
+    hz: 90
+    places: {Middle-Tip: middle_tip, Middle-Middle: middle_pad, Ring-Tip: ring_tip, Ring-Middle: ring_pad}
+
+  # 카메라: 원본은 회전 없이 저장하고 rotation_deg 는 변환·미리보기에서 적용한다
+  cam_wrist:
+    type: realsense
+    serial: "335122272125"   # D405
+    width: 424
+    height: 240
+    fps: 30
+    rotation_deg: 90         # 손 옆에 달려 있어서. 방향이 반대면 270 (확인 필요)
+    exposure_us: 0           # 0 = 자동 노출. 고정하려면 마이크로초 값
+  cam_ext:
+    type: realsense
+    serial: ""               # 외부 고정 카메라 (D435i 예정). 시리얼 확인 필요
+    width: 640
+    height: 480
+    fps: 30
+    required: false          # 아직 설치 전이므로 없어도 녹화가 시작된다
+
+dataset:
+  fps: 30
+  robot_type: omy_f3m_leap
+  arm_dof: 6
+  hand_action: cmd           # cmd = 리타게팅 결과, sent = 범위·속도 제한 후 모터에 쓴 값
+  tactile: [tactile_a, tactile_b]
+  tactile_order: [thumb_tip, thumb_pad, index_tip, index_pad, middle_tip, middle_pad, ring_tip, ring_pad]
+  tactile_hr: 3              # 데이터셋 한 스텝에 묶어 넣는 고주파 촉각 샘플 수 (90 Hz / 30 fps)
+  tactile_hr_distributed: false
+  cameras: [cam_wrist]       # 외부 카메라를 달면 cam_ext 추가
+  max_staleness_ms: 150
+  time: {hand: src, tactile_a: respread, tactile_b: respread}
+  latency_ms: {}             # 톡 치기 실측 뒤에 채운다. 예: {cam_wrist: 35}
+
+ui: {host: 0.0.0.0, port: 8800, preview_hz: 10, preview_width: 480}

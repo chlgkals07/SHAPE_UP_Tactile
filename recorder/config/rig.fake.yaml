@@ -1,0 +1,34 @@
+# 하드웨어 없이 녹화기 전체를 돌려 보는 설정. 모든 장치가 가짜 신호를 낸다.
+#   tactile-rec record --config config/rig.fake.yaml
+# 4초마다 촉각·모터 전류·카메라 밝기가 동시에 튀는 "톡 치기" 신호가 들어 있다.
+rig: {name: fake_rig, mount: wrist_flip}
+data_root: ./data_fake
+
+session: {task: demo_task, text: "Demo task with fake sensors", operator: tester}
+record: {preroll_s: 1.0, time_limit_s: 0, jpeg_quality: 95, min_free_gb: 1}
+
+streams:
+  arm_state:  {type: fake, like: arm_state, hz: 100}
+  arm_action: {type: fake, like: arm_action, hz: 100}
+  hand:       {type: fake, like: hand, hz: 50}
+  glove:      {type: fake, like: glove, hz: 50, required: false}
+  tactile_a:
+    type: fake
+    like: tactile
+    hz: 90
+    places: {Thumb-Tip: thumb_tip, Thumb-Middle: thumb_pad, Index-Tip: index_tip, Index-Middle: index_pad}
+  tactile_b:
+    type: fake
+    like: tactile
+    hz: 90
+    places: {Middle-Tip: middle_tip, Middle-Middle: middle_pad, Ring-Tip: ring_tip, Ring-Middle: ring_pad}
+  cam_wrist:  {type: fake, like: camera, hz: 30, width: 424, height: 240, rotation_deg: 90}
+  cam_ext:    {type: fake, like: camera, hz: 30, width: 640, height: 480}
+
+dataset:
+  fps: 30
+  tactile: [tactile_a, tactile_b]
+  cameras: [cam_wrist, cam_ext]
+  time: {hand: src, tactile_a: respread, tactile_b: respread}
+
+ui: {host: 127.0.0.1, port: 8800, preview_hz: 10, preview_width: 480}
