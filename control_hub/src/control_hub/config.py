@@ -156,7 +156,8 @@ def _strings(value: Any, where: str) -> tuple[str, ...]:
 def _known_keys(data: dict[str, Any], allowed: set[str], where: str) -> None:
     unknown = sorted(set(data) - allowed)
     if unknown:
-        raise _fail(where, f"모르는 키 {', '.join(unknown)} (쓸 수 있는 키: {', '.join(sorted(allowed))})")
+        raise _fail(where, f"모르는 키 {', '.join(unknown)} "
+                           f"(쓸 수 있는 키: {', '.join(sorted(allowed))})")
 
 
 def _check_id(value: str, where: str) -> None:
@@ -286,7 +287,8 @@ def _process(pid: str, raw: Any, hosts: dict[str, Host], envs: dict[str, Any]) -
     confirm_stop = _confirms(raw.get("confirm_stop"), f"{where}.confirm_stop")
     for confirm in confirm_start + confirm_stop:
         if confirm.unless_flag is not None and confirm.unless_flag not in flag_ids:
-            raise _fail(where, f"unless_flag '{confirm.unless_flag}' 는 이 프로세스의 flag 가 아닙니다")
+            raise _fail(
+                where, f"unless_flag '{confirm.unless_flag}' 는 이 프로세스의 flag 가 아닙니다")
 
     try:
         grace = float(raw.get("stop_grace_s", 10.0))
@@ -375,8 +377,9 @@ def load_config(path: Path | str) -> HubConfig:
                 raise _fail(f"processes.{pid}.conflicts", f"'{ref}' 는 프로세스가 아닙니다")
             conflicts[pid].add(ref)
             conflicts[ref].add(pid)  # a conflict holds both ways
-        if proc.ready is not None and proc.ready.check is not None and proc.ready.check not in checks:
-            raise _fail(f"processes.{pid}.ready.check", f"'{proc.ready.check}' 는 checks 에 없습니다")
+        ready_check = proc.ready.check if proc.ready is not None else None
+        if ready_check is not None and ready_check not in checks:
+            raise _fail(f"processes.{pid}.ready.check", f"'{ready_check}' 는 checks 에 없습니다")
     processes = {
         pid: Process(**{**proc.__dict__, "conflicts": tuple(sorted(conflicts[pid]))})
         for pid, proc in processes.items()
@@ -422,7 +425,8 @@ def load_config(path: Path | str) -> HubConfig:
         path=path, repo=repo, hosts=hosts, envs=envs, processes=processes, checks=checks,
         profiles=tuple(profiles), chains=tuple(chains), hints=_hints(raw.get("hints"), "hints"),
         ui_host=str(ui.get("host", "127.0.0.1")), ui_port=int(ui.get("port", 8700)),
-        tmux_socket=str(tmux.get("socket", "shapeup")), tmux_session=str(tmux.get("session", "hub")),
+        tmux_socket=str(tmux.get("socket", "shapeup")),
+        tmux_session=str(tmux.get("session", "hub")),
         log_dir=Path(raw.get("log_dir", "~/.local/state/control_hub/logs")).expanduser(),
         check_interval_s=float(raw.get("check_interval_s", 3.0)),
     )

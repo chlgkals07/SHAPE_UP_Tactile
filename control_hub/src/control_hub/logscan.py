@@ -60,6 +60,9 @@ class LogScanner:
         self.last_line = ""
         self._offset = 0
         self._partial = ""
+        # The first line of every log is the command itself ("$ ssh ..."). Its words must not
+        # count as output: a command that mentions "leader" is not a ready leader.
+        self._header_seen = False
 
     def poll(self) -> None:
         while True:
@@ -71,10 +74,14 @@ class LogScanner:
             self._partial = lines.pop()
             for line in lines:
                 self._line(line.rstrip())
-        if self.ready is not None and not self.ready_seen and self.ready.search(self._partial):
+        if (self._header_seen and self.ready is not None and not self.ready_seen
+                and self.ready.search(self._partial)):
             self.ready_seen = True  # a prompt without a newline can be the "ready" sign
 
     def _line(self, line: str) -> None:
+        if not self._header_seen:
+            self._header_seen = True
+            return
         if not line.strip():
             return
         self.last_line = line

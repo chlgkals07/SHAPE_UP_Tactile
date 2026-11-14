@@ -75,6 +75,19 @@ def test_start_ready_stop(cfg, tmux):
     assert sup.runs("server")  # the log of the finished run stays
 
 
+def test_command_line_is_not_output(cfg, tmux):
+    """The log starts with the command; its words are neither "ready" nor an error."""
+    sup = Supervisor(cfg, tmux)
+    sup.start("slow")
+    wait_for(lambda: "sleep 2" in sup.read_log("slow")["text"], what="header")
+    info = sup.status()["slow"]
+    assert info["state"] == "starting" and info["issues"] == []
+    info = until(sup, "slow", "ready")
+    wait_for(lambda: sup.status()["slow"]["issues"], what="issue")
+    assert [i["line"] for i in sup.status()["slow"]["issues"]] == ["it failed"]
+    sup.kill("slow")
+
+
 def test_requires_conflicts_and_confirm(cfg, tmux):
     sup = Supervisor(cfg, tmux)
     assert sup.status()["client"]["blockers"] == ["먼저 필요: 서버 (꺼짐)"]

@@ -47,6 +47,10 @@ processes:
     title: 실패
     cmd: 'echo "boom: device busy"; nosuchcommand_xyz; exit 3'
     hints: [{{match: "device busy", hint: "다른 프로그램이 장치를 잡고 있습니다"}}]
+  slow:
+    title: 느린 시작
+    cmd: 'sleep 2; echo "now [slow] up"; echo "it failed"; sleep 60'
+    ready: {{log: "\\\\[slow\\\\] up"}}
   once:
     title: 한 번
     kind: tool

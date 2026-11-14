@@ -14,7 +14,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ANCHOR = "_hub"  # an idle shell window that keeps the session alive
-_FORMAT = "#{window_name}\t#{window_id}\t#{pane_dead}\t#{pane_dead_status}\t#{pane_dead_signal}\t#{pane_pid}"
+_FORMAT = "\t".join(
+    f"#{{{name}}}" for name in
+    ("window_name", "window_id", "pane_dead", "pane_dead_status", "pane_dead_signal", "pane_pid")
+)
 # Wait for the hub to attach the log pipe, then run the script: the first line is never lost.
 _GATE = 'until [ -e "$1.go" ]; do sleep 0.05; done; exec bash "$1"'
 

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Control Hub</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">Control Hub</div>
+    <nav id="nav">
+      <a href="#run" data-page="run">실행</a>
+      <a href="#all" data-page="all">전체</a>
+      <a href="#links" data-page="links">연결</a>
+    </nav>
+    <div class="side-chains" id="side-chains"></div>
+    <div class="side-foot">
+      <div><span class="dot" id="conn-dot"></span><span id="conn-text">연결 중</span></div>
+      <button class="btn small" id="reload-btn" title="hub.yaml 을 다시 읽습니다. 도는 프로세스는 건드리지 않습니다">설정 다시 읽기</button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="banner bad" id="config-error" hidden></div>
+    <div class="banner bad" id="failed-banner" hidden></div>
+
+    <div class="work" id="work">
+      <section class="col-list">
+        <!-- 실행 -->
+        <div class="page" id="page-run">
+          <header class="bar">
+            <div class="tabs" id="profile-tabs"></div>
+            <button class="btn small danger right" id="stop-all">전체 끄기</button>
+          </header>
+          <p class="muted profile-help" id="profile-help"></p>
+          <ol class="steps" id="steps"></ol>
+        </div>
+        <!-- 전체 -->
+        <div class="page" id="page-all" hidden>
+          <header class="bar"><h1>전체 프로세스와 도구</h1></header>
+          <div id="groups"></div>
+        </div>
+      </section>
+
+      <aside class="col-detail" id="detail"></aside>
+    </div>
+
+    <!-- 연결 -->
+    <div class="page" id="page-links" hidden>
+      <header class="bar"><h1>연결 상태</h1>
+        <span class="muted">신호가 흐르는 순서입니다. 처음으로 막힌 곳이 원인입니다.</span></header>
+      <div id="chains"></div>
+      <div class="panel">
+        <div class="panel-head"><h2>점검 전체</h2></div>
+        <table id="checks-table"></table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<dialog id="confirm">
+  <form method="dialog">
+    <h2 id="confirm-title"></h2>
+    <p class="muted" id="confirm-sub"></p>
+    <div id="confirm-items"></div>
+    <div class="dialog-actions">
+      <button class="btn" value="cancel">취소</button>
+      <button class="btn primary" id="confirm-ok" value="ok">확인</button>
+    </div>
+  </form>
+</dialog>
+<div class="toast" id="toast" hidden></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
