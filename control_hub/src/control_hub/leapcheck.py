@@ -19,25 +19,28 @@ LEAP_JOINTS = (
 )  # fmt: skip
 
 _LINES = {
-    "ids": re.compile(r"Motor IDs/model numbers: (\{.*\})"),
-    "pos": re.compile(r"Positions: (\[.*\])"),
-    "temp": re.compile(r"Temperatures: (\[.*\])"),
-    "volt": re.compile(r"Input voltages: (\[.*\])"),
-    "hw_err": re.compile(r"Hardware errors: (\[.*\])"),
-    "missing": re.compile(r"Missing or unresponsive DYNAMIXEL IDs: (\[.*\])"),
+    "ids": re.compile(r"Motor IDs/model numbers: (\{[^}]*\})"),
+    "pos": re.compile(r"Positions: (\[[^\]]*\])"),
+    "temp": re.compile(r"Temperatures: (\[[^\]]*\])"),
+    "volt": re.compile(r"Input voltages: (\[[^\]]*\])"),
+    "hw_err": re.compile(r"Hardware errors: (\[[^\]]*\])"),
+    "missing": re.compile(r"Missing or unresponsive DYNAMIXEL IDs: (\[[^\]]*\])"),
 }
 
 
 def parse_leap_check(text: str) -> dict | None:
     found = {}
-    for key, pattern in _LINES.items():
-        match = pattern.search(text)
-        if match is None:
+    for line in text.splitlines():
+        if line.startswith("$ "):  # the command header may echo the very same words
             continue
-        try:
-            found[key] = ast.literal_eval(match.group(1))
-        except (ValueError, SyntaxError):
-            continue
+        for key, pattern in _LINES.items():
+            match = pattern.search(line)
+            if match is None:
+                continue
+            try:
+                found[key] = ast.literal_eval(match.group(1))
+            except (ValueError, SyntaxError):
+                continue
     if not found:
         return None
     ids = list(found["ids"]) if "ids" in found else list(range(len(LEAP_JOINTS)))
@@ -53,3 +56,11 @@ def parse_leap_check(text: str) -> dict | None:
         motors.append(row)
     ok = not missing and "ids" in found and not any(found.get("hw_err", []))
     return {"ok": ok, "missing": missing, "motors": motors}
+
+
+def problem_text(table: dict) -> str | None:
+    """One line naming each motor that did not answer or has a hardware error bit set."""
+    bad = [f"ID {m['id']} 응답 없음" if m["responded"] is False
+           else f"ID {m['id']} 오류 비트 {m['hw_err']}"
+           for m in table["motors"] if m["responded"] is False or m["hw_err"]]
+    return "모터 확인: " + ", ".join(bad) if bad else None

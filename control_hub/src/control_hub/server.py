@@ -23,6 +23,7 @@ from control_hub.checks import CheckRunner
 from control_hub.command import build_command
 from control_hub.config import LOCAL, ConfigError, HubConfig, Process, load_config
 from control_hub.incidents import Incidents
+from control_hub.leapcheck import LEAP_JOINTS
 from control_hub.session import SessionLog
 from control_hub.supervisor import HubError, Supervisor
 from control_hub.tmux import Tmux, TmuxError
@@ -97,7 +98,8 @@ def describe(cfg: HubConfig, tmux: Tmux) -> dict[str, Any]:
         "devices": {
             d.id: {"id": d.id, "title": d.title, "kind": d.kind, "help": d.help,
                    "recorder_stream": list(d.recorder_stream), "checks": list(d.checks),
-                   "processes": list(d.processes), "tools": list(d.tools)}
+                   "processes": list(d.processes), "tools": list(d.tools),
+                   "joints": list(LEAP_JOINTS) if d.kind == "leap" else []}
             for d in cfg.devices.values()
         },
     }

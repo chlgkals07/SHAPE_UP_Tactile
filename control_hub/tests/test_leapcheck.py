@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from control_hub.leapcheck import LEAP_JOINTS, parse_leap_check
+from control_hub.leapcheck import LEAP_JOINTS, parse_leap_check, problem_text
 
 IDS = list(range(16))
 OK = f"""$ leap_check
@@ -46,3 +46,17 @@ def test_hw_error_nonzero_marks_not_ok():
 
 def test_parse_unknown_returns_none():
     assert parse_leap_check("$ leap_check\nbash: leap_check: command not found\n") is None
+
+
+def test_command_header_echoing_the_same_text_is_ignored():
+    header = "$ bash -c 'echo \"Positions: [9.9] deg\"; echo \"Temperatures: [1.0] C\"'\n"
+    table = parse_leap_check(header + OK.split("\n", 1)[1])
+    assert table["motors"][15]["temp"] == 45.0 and table["motors"][1]["pos"] == -85.0
+
+
+def test_problem_text_names_each_bad_motor():
+    table = {"motors": [{"id": 3, "responded": False, "hw_err": None},
+                        {"id": 7, "responded": True, "hw_err": 32},
+                        {"id": 8, "responded": True, "hw_err": 0}]}
+    assert problem_text(table) == "모터 확인: ID 3 응답 없음, ID 7 오류 비트 32"
+    assert problem_text({"motors": [{"id": 8, "responded": True, "hw_err": 0}]}) is None

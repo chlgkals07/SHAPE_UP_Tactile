@@ -5,15 +5,28 @@
 const $ = (id) => document.getElementById(id);
 const LABEL = { off: "꺼짐", starting: "켜는 중", ready: "준비됨", stopping: "끄는 중", done: "끝남", failed: "오류" };
 const ALIVE = ["starting", "ready", "stopping"];
+const PAGES = ["home", "device", "scan", "run", "logs", "all"];
+const WORK_PAGES = ["run", "all"];  // pages with the process detail column
+const LEVEL_LABEL = { ok: "정상", warn: "주의", bad: "문제", idle: "꺼짐" };
+const FINGERS = [["검지", 0], ["중지", 4], ["약지", 8], ["엄지", 12]];
+const MOTOR_HOT_C = 60;  // shown as a warning; tune on the real hand
+const INFO_LABEL = {
+  path: "경로", by_id: "by-id", serial: "시리얼", usb_id: "USB id", product: "제품",
+  speed_mbps: "USB 속도", latency_timer: "latency timer", rw: "읽기·쓰기", bus_path: "버스 위치", ms: "지연",
+};
 const ERROR_LINE = /\b(error|fatal|traceback|exception|failed|failure|no such file|not found|refused|denied|timed out|unreachable|cannot|abort(ed)?|segmentation fault|killed)\b/i;
 
 let D = null;            // describe
 let S = null;            // state
-let page = "run";
+let page = "home";
+let pageArg = null;      // device id on the device page
 let profileId = localStorage.getItem("hub.profile");
 let selected = null;     // process id shown in the detail panel
 const flagChoice = {};   // pid -> [flag ids] chosen on this page
 const log = { pid: null, run: null, offset: 0, chosen: "", runsFor: null, busy: false };
+const logsView = { sid: null, dev: "", level: "", incident: null, file: null, detail: null,
+                   sessions: [], events: [], incidents: [], loadedAt: 0, busy: false };
+const devEvents = { id: null, list: [], at: 0, busy: false };
 
 // ---------- helpers ----------
 function esc(value) {
@@ -57,6 +70,17 @@ function chosenFlags(pid) {
   const proc = D.processes[pid];
   if (!proc) return [];
   return flagChoice[pid] ?? proc.flags.filter((f) => f.default).map((f) => f.id);
+}
+function clock(t) {
+  const d = new Date(t * 1000);
+  return [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => String(n).padStart(2, "0")).join(":");
+}
+const devState = (id) => (S.devices && S.devices[id]) || { level: "idle", summary: "" };
+function infoValue(key, value) {
+  if (key === "rw") return value ? "가능" : "권한 없음";
+  if (key === "speed_mbps") return `${value} Mbps`;
+  if (key === "ms") return `${value} ms`;
+  return Array.isArray(value) ? value.join(", ") : String(value);
 }
 function notesDone() {
   try { return JSON.parse(localStorage.getItem("hub.notes") || "{}"); } catch { return {}; }
@@ -301,36 +325,17 @@ function renderDetail() {
   setHTML($("d-top"), html);
 }
 
-// ---------- rendering: chains and checks ----------
-function evalNode(id) {
-  if (D.checks[id]) {
-    const r = S.checks[id] || { ok: null, detail: "" };
-    return { id, type: "check", title: D.checks[id].title, status: r.ok === true ? "ok" : r.ok === null ? "wait" : "bad",
-             detail: r.ok === null ? "확인 중" : r.detail, fix: D.checks[id].help };
-  }
-  const st = stateOf(id);
-  const status = ["ready", "done"].includes(st.state) ? "ok" : st.state === "starting" ? "wait" : "bad";
-  const issue = st.issues && st.issues.length ? st.issues[st.issues.length - 1] : null;
-  let fix = "";
-  if (st.state === "failed") fix = issue ? (issue.hint || issue.line) : "로그를 봅니다";
-  else if (st.state === "off") fix = st.blockers && st.blockers.length ? st.blockers.join(" / ") : "꺼져 있습니다. 실행 페이지에서 켭니다";
-  return { id, type: "proc", title: titleOf(id), status, detail: LABEL[st.state] + (st.state === "failed" ? ` (코드 ${st.exit_code ?? "?"})` : ""), fix };
-}
-function evalChain(chain) {
-  const nodes = chain.items.map(evalNode);
-  return { nodes, broken: nodes.findIndex((n) => n.status !== "ok") };
-}
-function renderSide() {
-  setHTML($("side-chains"), D.chains.map((chain) => {
-    const { nodes, broken } = evalChain(chain);
-    if (broken < 0) return `<div class="chain-line" data-action="page" data-id="links"><span class="dot ok"></span><b>${esc(chain.title)}</b><small>전부 정상</small></div>`;
-    const node = nodes[broken];
-    return `<div class="chain-line ${node.status === "bad" ? "bad" : ""}" data-action="page" data-id="links"><span class="dot ${node.status}"></span><b>${esc(chain.title)}</b>
-      <small>${esc(node.title)}: ${esc(node.detail)}</small></div>`;
+// ---------- rendering: frame ----------
+function renderNav() {
+  setHTML($("nav-devices"), Object.values(D.devices).map((d) => {
+    const on = page === "device" && pageArg === d.id;
+    return `<a href="#device/${d.id}" class="sub ${on ? "on" : ""}" data-page="device" data-arg="${d.id}">
+      <span class="dot ${devState(d.id).level}"></span>${esc(d.title)}</a>`;
   }).join(""));
+  document.querySelectorAll("#nav > a").forEach((a) => a.classList.toggle("on", a.dataset.page === page));
   const failed = Object.keys(S.processes).filter((pid) => stateOf(pid).state === "failed");
-  const nav = document.querySelector('#nav a[data-page="all"]');
-  setHTML(nav, `전체${failed.length ? `<span class="count">${failed.length}</span>` : ""}`);
+  setHTML(document.querySelector('#nav > a[data-page="all"]'),
+    `전체${failed.length ? `<span class="count">${failed.length}</span>` : ""}`);
   const banner = $("failed-banner");
   banner.hidden = !failed.length;
   setHTML(banner, failed.length ? "오류로 끝난 프로세스: " + failed.map((pid) =>
@@ -340,29 +345,220 @@ function renderSide() {
   error.hidden = !S.config_error;
   error.textContent = S.config_error ? `설정 파일 오류 (이전 설정으로 동작 중)\n${S.config_error}` : "";
 }
-function renderLinks() {
-  setHTML($("chains"), D.chains.map((chain) => {
-    const { nodes, broken } = evalChain(chain);
-    const html = nodes.map((node, i) => {
-      const cls = broken < 0 || i < broken ? "ok" : i === broken ? "broken" : "after";
-      const action = node.type === "proc" ? `data-action="select" data-id="${node.id}"` : "";
-      return `${i ? '<span class="arrow">→</span>' : ""}<div class="node ${cls} ${node.type}" ${action}>
-        <div class="name"><span class="dot ${i === broken ? node.status : cls === "ok" ? "ok" : ""}"></span>${esc(node.title)}</div>
-        <small>${esc(i === broken && node.status === "bad" ? "여기서 끊김 · " + node.detail : node.detail)}</small></div>`;
-    }).join("");
-    const fix = broken >= 0 && nodes[broken].fix
-      ? `<div class="notice ${nodes[broken].status === "bad" ? "bad" : "warn"} fix"><b>${esc(nodes[broken].title)}</b>: ${esc(nodes[broken].fix)}</div>` : "";
-    return `<div class="panel chain"><div class="panel-head"><h2>${esc(chain.title)}</h2>
-      <span class="tag ${broken < 0 ? "ok" : "bad"}">${broken < 0 ? "전부 정상" : "끊김"}</span></div>
-      <div class="chain-nodes">${html}</div>${fix}</div>`;
-  }).join("") || '<p class="muted">설정에 사슬(chains)이 없습니다.</p>');
-  setHTML($("checks-table"), `<tr><th>상태</th><th>점검</th><th>결과</th><th>대상</th></tr>` + Object.values(D.checks).map((check) => {
-    const r = S.checks[check.id] || { ok: null, detail: "" };
-    const tag = r.ok === true ? '<span class="tag ok">정상</span>' : r.ok === null ? '<span class="tag">확인 중</span>' : '<span class="tag bad">실패</span>';
-    const link = check.link && r.ok ? ` <a href="${esc(check.target)}" target="_blank" rel="noopener">${esc(check.link)}</a>` : "";
-    const fix = r.ok === false && check.help ? `<div class="fixline">${esc(check.help)}</div>` : "";
-    return `<tr><td>${tag}</td><td><b>${esc(check.title)}</b>${fix}</td><td>${esc(r.detail)}${link}</td><td class="mono muted">${esc(check.kind)}: ${esc(check.target)}</td></tr>`;
-  }).join(""));
+function checkDot(r) {
+  if (r.ok === null || r.ok === undefined) return "wait";
+  if (!r.ok) return "bad";
+  return r.warn ? "warn" : "ok";
+}
+function renderRail() {
+  const checks = Object.values(D.checks).map((c) => {
+    const r = S.checks[c.id] || { ok: null, detail: "" };
+    const note = r.info && r.info.ms !== undefined ? `${r.info.ms} ms` : r.ok === false ? r.detail : "";
+    return `<li title="${esc(c.help)}"><span class="dot ${checkDot(r)}"></span><span class="name">${esc(c.title)}</span>
+      <small class="${r.ok === false ? "bad" : ""}">${esc(note)}</small>${r.warn ? `<div class="warnline">${esc(r.warn)}</div>` : ""}</li>`;
+  }).join("");
+  const services = Object.values(D.processes).filter((p) => p.kind !== "tool");
+  const running = services.filter((p) => ALIVE.includes(stateOf(p.id).state)).length;
+  const problems = (S.problems || []).filter((e) => S.time - e.t <= 60);
+  setHTML($("rail"), `<h3>상태</h3><ul class="rail-checks">${checks}</ul>
+    <div class="rail-sum"><span>프로세스 ${running}/${services.length} 실행 중</span>
+      <a href="#logs" data-page="logs" class="${problems.some((e) => e.level === "bad") ? "bad" : ""}">최근 1분 문제 ${problems.length} ▸</a></div>`);
+}
+
+// ---------- rendering: home ----------
+function deviceLine(d) {
+  const st = devState(d.id);
+  if (st.summary) return st.summary;
+  for (const cid of d.checks) {
+    const r = S.checks[cid];
+    if (r && r.ok) return r.info && r.info.ms !== undefined ? `${D.checks[cid].title} ${r.info.ms} ms` : r.detail;
+  }
+  const alive = [...d.processes, ...d.tools].filter((pid) => ALIVE.includes(stateOf(pid).state));
+  return alive.length ? alive.map(titleOf).join(", ") : LEVEL_LABEL[st.level];
+}
+function problemRow(e) {
+  const dev = e.dev ? D.devices[e.dev] : null;
+  const tool = dev && dev.tools[0];
+  let open = "";
+  if (e.data.incident) open = `data-action="incident" data-id="${esc(e.data.incident)}"`;
+  else if (e.data.pid) open = `data-action="jump" data-id="${e.data.pid}" data-run="${esc(e.data.run || "")}"`;
+  return `<li class="problem ${e.level}" ${open}><span class="time">${clock(e.t)}</span>
+    <span class="dev">${esc(dev ? dev.title : "기타")}</span>
+    <span class="text">${esc(e.text)}${e.data.count > 1 ? ` <b>×${e.data.count}</b>` : ""}${e.data.hint ? `<small>→ ${esc(e.data.hint)}</small>` : ""}</span>
+    ${tool && e.level === "bad" ? `<button class="btn small" data-action="start" data-id="${tool}">▸ ${esc(titleOf(tool))}</button>` : ""}</li>`;
+}
+function renderHome() {
+  const tiles = Object.values(D.devices).map((d) => {
+    const level = devState(d.id).level;
+    return `<a class="tile ${level}" href="#device/${d.id}" data-page="device" data-arg="${d.id}">
+      <div class="tile-head"><span class="dot ${level}"></span><b>${esc(d.title)}</b><span class="tag ${level}">${LEVEL_LABEL[level]}</span></div>
+      <small>${esc(deviceLine(d))}</small></a>`;
+  }).join("");
+  const shown = Object.keys(S.processes).filter((pid) => [...ALIVE, "failed"].includes(stateOf(pid).state));
+  const chips = shown.map((pid) => `<button class="chip" data-action="select" data-id="${pid}">
+    <span class="dot ${stateOf(pid).state}"></span>${esc(titleOf(pid))}</button>`).join("");
+  const problems = (S.problems || []).map(problemRow).join("");
+  setHTML($("page-home"), `<header class="bar"><h1>홈</h1><span class="muted right">세션 ${esc(S.session || "")}</span></header>
+    <div class="tiles">${tiles}</div>
+    <div class="panel"><div class="panel-head"><h2>프로세스</h2></div>
+      <div class="chips">${chips || '<span class="muted">켜진 프로세스가 없습니다. 실행표에서 켭니다.</span>'}</div></div>
+    <div class="panel"><div class="panel-head"><h2>최근 문제</h2><a class="right" href="#logs" data-page="logs">전체 기록 ▸</a></div>
+      <ul class="problems">${problems || '<li class="muted">문제가 없습니다</li>'}</ul></div>`);
+}
+
+// ---------- rendering: device ----------
+function checkCard(cid) {
+  const c = D.checks[cid];
+  const r = S.checks[cid] || { ok: null, detail: "확인 중", info: {} };
+  const info = Object.entries(r.info || {}).filter(([k, v]) => INFO_LABEL[k] && v !== null && v !== "" && !(Array.isArray(v) && !v.length));
+  const link = c.link && r.ok ? ` <a href="${esc(c.target)}" target="_blank" rel="noopener">${esc(c.link)}</a>` : "";
+  return `<div class="check-card ${checkDot(r)}"><div class="check-head"><span class="dot ${checkDot(r)}"></span><b>${esc(c.title)}</b>
+      <span class="muted">${esc(r.detail || "")}</span>${link}</div>
+    ${info.length ? `<dl>${info.map(([k, v]) => `<dt>${INFO_LABEL[k]}</dt><dd>${esc(infoValue(k, v))}</dd>`).join("")}</dl>` : ""}
+    ${r.warn ? `<div class="notice warn">${esc(r.warn)}</div>` : ""}
+    ${r.ok === false && c.help ? `<div class="notice bad">${esc(c.help)}</div>` : ""}</div>`;
+}
+function toolResult(result) {
+  if (!result) return '<p class="muted">아직 이 장치의 확인 도구를 돌리지 않았습니다.</p>';
+  return `<div class="meta"><span>${esc(titleOf(result.pid))}</span><span>${clock(result.t)}</span>
+    <span>종료 코드 ${result.exit_code ?? "?"}</span></div><pre class="tool-out">${esc(result.tail)}</pre>`;
+}
+function motorCell(index, d, table, fromLog) {
+  const m = table ? table.motors[index] : null;
+  const seen = fromLog[index] || fromLog[String(index)];
+  let cls = "";
+  if (m && m.responded) cls = m.hw_err ? "bad" : m.temp >= MOTOR_HOT_C ? "warn" : "ok";
+  if ((m && m.responded === false) || seen) cls = "bad";
+  const lines = [];
+  if (m && m.responded) {
+    lines.push([[m.pos, "°"], [m.temp, "°C"], [m.volt, " V"]].filter(([v]) => v !== null)
+      .map(([v, unit]) => v + unit).join(" · "));
+  }
+  if (m && m.hw_err) lines.push(`오류 비트 ${m.hw_err}`);
+  if (m && m.responded === false) lines.push("응답 없음");
+  if (seen) lines.push(`${clock(seen.t)} ${seen.text}`);
+  return `<td class="motor ${cls}"><div class="mid">ID ${m ? m.id : index}</div>
+    <div class="joint">${esc(d.joints[index] || "")}</div>${lines.map((l) => `<div>${esc(l)}</div>`).join("")}</td>`;
+}
+function motorTable(d, st) {
+  const result = st.check;
+  const table = result && result.table;
+  const tool = d.tools[0];
+  const rows = FINGERS.map(([finger, start]) =>
+    `<tr><th>${finger}</th>${[0, 1, 2, 3].map((k) => motorCell(start + k, d, table, st.motors || {})).join("")}</tr>`).join("");
+  const how = tool ? `아래에서 "${titleOf(tool)}"을 실행하면 모터별 값이 채워집니다` : "";
+  return `<div class="panel-head"><h2>모터</h2>
+      <span class="muted">${table ? `${esc(titleOf(result.pid))} ${clock(result.t)} 결과` : esc(how)}</span></div>
+    <table class="motors">${rows}</table>
+    ${result && !table ? toolResult(result) : ""}`;
+}
+async function loadDevEvents(id) {
+  if (devEvents.busy || !S.session) return;
+  devEvents.busy = true;
+  try {
+    const { events } = await api(`/api/sessions/${S.session}/events?dev=${encodeURIComponent(id)}`);
+    Object.assign(devEvents, { id, list: events.slice(-50).reverse(), at: Date.now() });
+    render();
+  } catch { /* shown as empty; the state poll reports a lost connection */ } finally { devEvents.busy = false; }
+}
+function renderDevice(id) {
+  const d = D.devices[id];
+  const st = devState(id);
+  if (devEvents.id !== id || Date.now() - devEvents.at > 3000) loadDevEvents(id);
+  const events = devEvents.id === id ? devEvents.list : [];
+  const procs = [...d.processes, ...d.tools];
+  const recorder = d.recorder_stream.length
+    ? `<p class="muted">녹화기 스트림: ${esc(d.recorder_stream.join(", "))}. 실시간 값과 영상은 녹화기 화면에서 봅니다.</p>` : "";
+  setHTML($("page-device"), `<header class="bar"><span class="dot ${st.level}"></span><h1>${esc(d.title)}</h1>
+      <span class="tag ${st.level}">${LEVEL_LABEL[st.level]}</span><span class="muted">${esc(st.summary)}</span></header>
+    ${d.help ? `<p class="help">${esc(d.help)}</p>` : ""}${recorder}
+    <div class="panel"><div class="panel-head"><h2>연결</h2></div>
+      ${d.checks.map(checkCard).join("") || '<p class="muted">이 장치에 걸린 점검이 없습니다.</p>'}</div>
+    ${d.kind === "leap" ? `<div class="panel">${motorTable(d, st)}</div>`
+      : `<div class="panel"><div class="panel-head"><h2>마지막 확인 결과</h2></div>${toolResult(st.check)}</div>`}
+    <div class="panel"><div class="panel-head"><h2>프로세스와 도구</h2></div>
+      ${procs.length ? `<ol class="steps">${procs.map((pid) => processRow(pid)).join("")}</ol>` : '<p class="muted">없음</p>'}</div>
+    <div class="panel"><div class="panel-head"><h2>이 장치의 기록</h2><span class="muted">현재 세션, 최신 50개</span></div>
+      <ul class="problems">${events.map(problemRow).join("") || '<li class="muted">기록이 없습니다</li>'}</ul></div>`);
+}
+
+// ---------- rendering: discovery ----------
+function renderScan() {
+  const scan = S.scan || { devices: [], misplaced: [] };
+  const rows = scan.devices.map((u) => `<tr><td><b>${esc(u.label || u.product || u.usb_id)}</b>
+      <div class="muted">${esc([u.manufacturer, u.product].filter(Boolean).join(" "))}</div></td>
+    <td class="mono">${esc(u.usb_id)}</td><td class="mono">${esc(u.serial)}</td>
+    <td>${u.speed_mbps ? `${u.speed_mbps} Mbps` : ""}</td>
+    <td class="mono">${esc([...u.ttys, ...u.videos].join(", "))}${u.by_id.length ? `<div class="muted">${esc(u.by_id.join(", "))}</div>` : ""}</td>
+    <td class="mono">${esc(u.bus_path)}</td></tr>`).join("");
+  setHTML($("page-scan"), `<header class="bar"><h1>장치 탐색</h1>
+      <span class="muted">지금 꽂힌 USB 장치입니다. 보여 주기만 합니다 (포트 자동 지정은 추후).</span></header>
+    ${scan.misplaced.map((m) => `<div class="notice warn">${esc(m.text)} (설정: ${esc(m.expected)})</div>`).join("")}
+    <div class="panel"><table><tr><th>장치</th><th>vendor:product</th><th>시리얼</th><th>속도</th><th>포트</th><th>버스</th></tr>
+      ${rows || '<tr><td colspan="6" class="muted">USB 장치가 없습니다</td></tr>'}</table></div>`);
+}
+
+// ---------- rendering: session log and incidents ----------
+async function loadLogs(force) {
+  if (logsView.busy || (!force && Date.now() - logsView.loadedAt < 3000)) return;
+  logsView.busy = true;
+  try {
+    const { current, sessions } = await api("/api/sessions");
+    if (!sessions.some((s) => s.id === logsView.sid)) logsView.sid = current;
+    const sid = logsView.sid;
+    const query = new URLSearchParams();
+    if (logsView.dev) query.set("dev", logsView.dev);
+    if (logsView.level) query.set("level", logsView.level);
+    const [{ events }, { incidents }] = await Promise.all([
+      api(`/api/sessions/${sid}/events?${query}`), api(`/api/sessions/${sid}/incidents`)]);
+    Object.assign(logsView, { sessions, events: events.reverse(), incidents, loadedAt: Date.now() });
+    logsView.detail = logsView.incident
+      ? await api(`/api/sessions/${sid}/incidents/${encodeURIComponent(logsView.incident)}`) : null;
+  } catch (error) { toast(error.message, true); } finally { logsView.busy = false; }
+  render();
+}
+function incidentView() {
+  const detail = logsView.detail;
+  if (!detail) return '<div class="panel empty muted">사고를 누르면 내용이 여기에 나옵니다.</div>';
+  const names = Object.keys(detail.files);
+  if (!names.includes(logsView.file)) logsView.file = names[0] || null;
+  const href = `/api/sessions/${logsView.sid}/export?incident=${encodeURIComponent(logsView.incident)}`;
+  return `<div class="panel"><div class="panel-head"><h2>사고</h2><a class="btn small right" href="${href}">zip 받기</a></div>
+    <pre class="summary">${esc(detail.summary)}</pre>
+    <div class="tabs files">${names.map((n) => `<button class="${n === logsView.file ? "on" : ""}" data-action="file" data-id="${esc(n)}">${esc(n)}</button>`).join("")}</div>
+    ${logsView.file ? `<pre class="log">${esc(detail.files[logsView.file])}</pre>` : ""}</div>`;
+}
+function renderLogs() {
+  loadLogs(false);
+  const v = logsView;
+  const options = (items, chosen, all) => `<option value="">${all}</option>` +
+    items.map(([value, label]) => `<option value="${esc(value)}" ${value === chosen ? "selected" : ""}>${esc(label)}</option>`).join("");
+  const sessions = v.sessions.map((s) => `<option value="${s.id}" ${s.id === v.sid ? "selected" : ""}>${s.id}${s.id === S.session ? " (현재)" : ""} · 사고 ${s.incidents}</option>`).join("");
+  const incidents = v.incidents.map((i) => `<li class="problem bad ${i.id === v.incident ? "on" : ""}" data-action="incident" data-id="${esc(i.id)}">
+      <span class="time">${clock(i.t)}</span><span class="dev">${esc(i.dev ? (D.devices[i.dev] || { title: i.dev }).title : "기타")}</span>
+      <span class="text">${esc(i.text)}${i.count > 1 ? ` <b>×${i.count}</b>` : ""}</span></li>`).join("");
+  setHTML($("page-logs"), `<header class="bar"><h1>로그</h1>
+      <select id="logs-sid" aria-label="세션">${sessions}</select>
+      <button class="btn small" data-action="new-session">새 세션</button>
+      <a class="btn small" href="/api/sessions/${v.sid}/export">세션 zip</a>
+      <select id="logs-dev" class="right" aria-label="장치">${options(Object.values(D.devices).map((d) => [d.id, d.title]), v.dev, "모든 장치")}</select>
+      <select id="logs-level" aria-label="수준">${options([["bad", "문제"], ["warn", "주의"], ["info", "정보"]], v.level, "모든 수준")}</select></header>
+    <div class="logs-grid"><div>
+      <div class="panel"><div class="panel-head"><h2>사고 ${v.incidents.length}</h2><span class="muted">오류마다 로그와 상태를 모은 폴더</span></div>
+        <ul class="problems">${incidents || '<li class="muted">사고가 없습니다</li>'}</ul></div>
+      <div class="panel"><div class="panel-head"><h2>사건</h2><span class="muted">최신이 위</span></div>
+        <ul class="problems">${v.events.map(problemRow).join("") || '<li class="muted">사건이 없습니다</li>'}</ul></div>
+    </div>${incidentView()}</div>`);
+}
+function openIncident(id) {
+  Object.assign(logsView, { incident: id, file: null, sid: page === "logs" ? logsView.sid : S.session });
+  setPage("logs");
+}
+function jumpToLog(pid, run) {  // that run's whole log, held still; error lines show in red
+  setPage("all");
+  select(pid);
+  Object.assign(log, { chosen: run || "", run: null, offset: 0 });
+  $("follow").checked = false;
 }
 
 // ---------- log ----------
@@ -417,15 +613,17 @@ async function pollLog() {
 // ---------- main loop ----------
 function render() {
   if (!D || !S) return;
-  document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("on", a.dataset.page === page));
-  $("page-run").hidden = page !== "run";
-  $("page-all").hidden = page !== "all";
-  $("work").hidden = page === "links";
-  $("page-links").hidden = page !== "links";
-  renderSide();
-  if (page === "run") renderRun();
-  if (page === "all") renderAll();
-  if (page === "links") renderLinks(); else renderDetail();
+  PAGES.forEach((p) => { $(`page-${p}`).hidden = page !== p; });
+  $("work").hidden = !WORK_PAGES.includes(page);
+  renderNav();
+  renderRail();
+  if (page === "home") renderHome();
+  else if (page === "device") renderDevice(pageArg);
+  else if (page === "scan") renderScan();
+  else if (page === "logs") renderLogs();
+  else if (page === "run") renderRun();
+  else if (page === "all") renderAll();
+  if (WORK_PAGES.includes(page)) renderDetail();
 }
 let knownLoad = null;
 async function tick() {
@@ -445,9 +643,16 @@ async function tick() {
     $("conn-text").textContent = "hub 와 끊김 (프로세스는 tmux 에서 계속 돕니다)";
   }
 }
-function setPage(next) {
-  page = ["run", "all", "links"].includes(next) ? next : "run";
-  if (location.hash !== "#" + page) history.replaceState(null, "", "#" + page);
+function setPage(next, arg) {
+  page = PAGES.includes(next) ? next : "home";
+  pageArg = null;
+  if (page === "device") {
+    pageArg = D && D.devices[arg] ? arg : null;
+    if (!pageArg) page = "home";
+  }
+  const hash = "#" + page + (pageArg ? "/" + pageArg : "");
+  if (location.hash !== hash) history.pushState(null, "", hash);
+  if (page === "logs") loadLogs(true);
   render();
 }
 
@@ -461,13 +666,22 @@ document.addEventListener("click", (event) => {
   else if (action === "kill") act(() => killProcess(id));
   else if (action === "clear") act(() => api(`/api/process/${id}/clear`, {}));
   else if (action === "profile") { profileId = id; localStorage.setItem("hub.profile", id); render(); }
-  else if (action === "page") setPage(id);
   else if (action === "select") {
-    if (event.target.closest("button")) return;
-    if (page === "links") setPage(D.processes[id] && D.profiles.some((p) => p.id === profileId && p.steps.some((s) => s.process === id)) ? "run" : "all");
+    if (event.target.closest("button") && event.target.closest("button") !== target) return;
+    if (!WORK_PAGES.includes(page)) setPage("all");
     select(id);
     render();
   }
+  else if (action === "incident") openIncident(id);
+  else if (action === "jump") jumpToLog(id, target.dataset.run);
+  else if (action === "file") { logsView.file = id; render(); }
+  else if (action === "new-session") act(async () => { await api("/api/sessions/new", {}); logsView.sid = null; await loadLogs(true); });
+});
+document.addEventListener("click", (event) => {
+  const link = event.target.closest("a[data-page]");
+  if (!link) return;
+  event.preventDefault();
+  setPage(link.dataset.page, link.dataset.arg);
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && event.target.classList?.contains("row") && event.target.dataset.id) { select(event.target.dataset.id); render(); }
@@ -484,6 +698,10 @@ document.addEventListener("change", (event) => {
     if (el.checked) set.add(el.dataset.flag); else set.delete(el.dataset.flag);
     flagChoice[selected] = [...set];
     render();
+  } else if (["logs-sid", "logs-dev", "logs-level"].includes(el.id)) {
+    logsView[el.id.slice(5)] = el.value;
+    if (el.id === "logs-sid") Object.assign(logsView, { incident: null, detail: null });
+    loadLogs(true);
   } else if (el.id === "run-select") {
     log.chosen = el.value; log.run = null; log.offset = 0;
     $("log").textContent = "";
@@ -498,14 +716,14 @@ document.addEventListener("submit", (event) => {
   field.value = "";
   act(() => api(`/api/process/${selected}/input`, { text }));
 });
-document.querySelectorAll("#nav a").forEach((a) => a.addEventListener("click", (event) => { event.preventDefault(); setPage(a.dataset.page); }));
 $("stop-all").addEventListener("click", () => act(stopAll));
 $("reload-btn").addEventListener("click", async () => {
   try { await api("/api/reload", {}); toast("설정을 다시 읽었습니다"); } catch (error) { toast("설정 오류: 이전 설정을 유지합니다\n" + error.message, true); }
   tick();
 });
 
-page = location.hash.slice(1) || "run";
-tick().then(() => { setPage(page); });
+const routeFromHash = () => { const [name, arg] = location.hash.slice(1).split("/"); setPage(name || "home", arg); };
+window.addEventListener("hashchange", routeFromHash);
+tick().then(routeFromHash);
 setInterval(tick, 1000);
 setInterval(pollLog, 1000);

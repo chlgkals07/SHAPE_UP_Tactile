@@ -96,3 +96,49 @@ def test_tool_done_keeps_last_result(cfg, tmux):
     result = watcher.snapshot()["devices"]["hand"]["check"]
     assert result["pid"] == "once" and result["exit_code"] == 0 and "done" in result["tail"]
     assert result["table"] == parse_leap_check("done")  # None: not leap_check output
+
+
+def test_snapshot_lists_recent_problems_with_incident(cfg, tmux):
+    runner = FakeRunner()
+    _, _, watcher = make(cfg, tmux, runner)
+    runner.now = {"port": CheckResult(True, "ok")}
+    watcher.step()
+    runner.now = {"port": CheckResult(False, "없음")}
+    watcher.step()
+    [problem] = watcher.snapshot()["problems"]
+    assert problem["text"] == "포트 없음: 없음" and problem["data"]["incident"]
+
+
+def test_tool_rerun_between_looks_is_seen(cfg, tmux):
+    sup, _, watcher = make(cfg, tmux)
+    sup.start("once")
+    wait_for(lambda: sup.status()["once"]["state"] == "done", what="first run")
+    watcher.step()  # first look: done already
+    first = sup.status()["once"]["run"]
+    sup.start("once")  # finishes before the next look: done -> done, new run
+    wait_for(lambda: sup.status()["once"]["run"] != first
+             and sup.status()["once"]["state"] == "done", what="second run")
+    watcher.step()
+    assert watcher.snapshot()["devices"]["hand"]["check"]["run"] != first
+
+
+def test_incident_is_named_after_the_log_line_not_the_exit(cfg, tmux):
+    sup, session, watcher = make(cfg, tmux)
+    watcher.step()
+    sup.start("boom")  # prints "device busy" then exits 3, both seen in one look
+    wait_for(lambda: sup.status()["boom"]["state"] == "failed", what="boom fails")
+    watcher.step()
+    [row] = watcher.incidents.list(session.current)
+    assert row["text"].startswith("boom: device busy")
+    sup.clear("boom")
+
+
+def test_bad_motor_check_is_written_down(cfg, tmux, monkeypatch):
+    table = {"ok": False, "missing": [], "motors": [{"id": 7, "responded": True, "hw_err": 32}]}
+    monkeypatch.setattr("control_hub.watcher.parse_leap_check", lambda text: table)
+    sup, session, watcher = make(cfg, tmux)
+    watcher.step()
+    sup.start("once")
+    wait_for(lambda: sup.status()["once"]["state"] == "done", what="tool done")
+    watcher.step()
+    assert ("hand", "warn", "모터 확인: ID 7 오류 비트 32") in texts(session)

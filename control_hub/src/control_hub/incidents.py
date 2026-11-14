@@ -8,7 +8,8 @@
         others/*.log   every other running process: 100 lines before and 30 s after
         <tool>.txt     a check tool of that device run within 5 min after (leap_check)
 
-The same error on the same device within 30 s only raises the count of the open folder.
+Any error of the same device within 30 s of the last one goes into the open folder: one fault
+often prints a log line and then exits, and that is one incident, not two.
 """
 
 from __future__ import annotations
@@ -86,10 +87,12 @@ class Incidents:
             return None
         sid = self.session.current
         for inc in self._open:
-            if (inc["sid"] == sid and inc["dev"] == ev.dev and inc["text"] == ev.text
+            if (inc["sid"] == sid and inc["dev"] == ev.dev
                     and ev.t - inc["last_t"] <= self.group_s):
                 inc["count"] += 1
                 inc["last_t"] = ev.t
+                if ev.text != inc["text"] and ev.text not in inc["also"]:
+                    inc["also"].append(ev.text)
                 self._write_summary(inc)
                 return inc["id"]
         base = f"{time.strftime('%H%M%S', time.localtime(ev.t))}_{ev.dev or 'other'}_" \
@@ -103,7 +106,8 @@ class Incidents:
         pid = ev.data.get("pid")
         inc = {
             "id": iid, "sid": sid, "dev": ev.dev, "text": ev.text, "t": ev.t, "last_t": ev.t,
-            "count": 1, "pid": pid, "line": ev.data.get("line", ""), "hint": ev.data.get("hint"),
+            "count": 1, "also": [], "pid": pid, "line": ev.data.get("line", ""),
+            "hint": ev.data.get("hint"),
             "running": dict(running), "logs_done": False,
             # where each running log ended when the error came in
             "marks": {p: _size(self.log_path(p, r)) for p, r in running.items()},
@@ -191,6 +195,8 @@ class Incidents:
             f"- 장치: {inc['dev'] or '기타'}",
             f"- 횟수: {inc['count']} (마지막 {_clock(inc['last_t'])})",
         ]
+        if inc["also"]:
+            lines.append(f"- 같이 난 오류: {' / '.join(inc['also'])}")
         if inc["pid"]:
             lines.append(f"- 프로세스: {inc['pid']}")
         if inc["line"]:

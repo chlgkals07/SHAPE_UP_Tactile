@@ -15,13 +15,14 @@ from control_hub.config import HubConfig
 from control_hub.devices import device_states
 from control_hub.discovery import scan
 from control_hub.incidents import Incidents
-from control_hub.leapcheck import parse_leap_check
+from control_hub.leapcheck import parse_leap_check, problem_text
 from control_hub.logscan import read_chunk
 from control_hub.session import Event, SessionLog
 from control_hub.supervisor import Supervisor
 
 ALIVE = ("starting", "ready", "stopping")
 TOOL_TAIL_LINES = 30
+PROBLEMS = 20  # newest bad/warn events shown on the home page
 
 
 class Watcher:
@@ -38,7 +39,7 @@ class Watcher:
         self.interval_s = interval_s
         self._now = now
         self._checks: dict[str, CheckResult] = {}
-        self._procs: dict[str, str] | None = None  # None: not looked yet
+        self._procs: dict[str, tuple] | None = None  # pid -> (state, run); None: not looked yet
         self._usb: dict[tuple, str] | None = None
         self._tool_results: dict[str, dict] = {}  # device id -> last check tool result
         self._snapshot: dict = {}
@@ -86,14 +87,18 @@ class Watcher:
         return out
 
     def _process_events(self, procs: dict[str, dict], now: float) -> list[Event]:
-        before, self._procs = self._procs, {pid: info["state"] for pid, info in procs.items()}
+        before = self._procs
+        self._procs = {pid: (info["state"], info.get("run")) for pid, info in procs.items()}
         if before is None:
             return []
         out = []
         for pid, info in procs.items():
-            state, prev = info["state"], before.get(pid, "off")
-            if state == prev:
+            state = info["state"]
+            prev, prev_run = before.get(pid, ("off", None))
+            if (state, info.get("run")) == (prev, prev_run):
                 continue
+            if state == prev:  # a run that started and ended between two looks
+                prev = "off"
             title, dev = self._title(pid), self._device_of(pid)
             data = {"pid": pid, "run": info.get("run")}
             if prev not in ALIVE and state != "off" and info.get("run"):
@@ -110,22 +115,28 @@ class Watcher:
             elif state == "done":
                 out.append(Event(now, dev, "process", "info", f"{title} 끝남", data))
             if state in ("done", "failed") and info.get("run"):
-                self._tool_finished(pid, info, now)
+                out += self._tool_finished(pid, info, now)
         return out
 
-    def _tool_finished(self, pid: str, info: dict, now: float) -> None:
+    def _tool_finished(self, pid: str, info: dict, now: float) -> list[Event]:
         devices = [d for d in self.cfg.devices.values() if pid in d.tools]
         if not devices:
-            return
+            return []
         _, text = read_chunk(self.supervisor.log_path(pid, info["run"]), 0)
+        out = []
         for device in devices:
             self.incidents.on_tool_done(device.id, pid, info["run"])
+            table = parse_leap_check(text) if device.kind == "leap" else None
             self._tool_results[device.id] = {
                 "pid": pid, "run": info["run"], "t": now, "state": info["state"],
                 "exit_code": info.get("exit_code"),
-                "tail": "\n".join(text.splitlines()[-TOOL_TAIL_LINES:]),
-                "table": parse_leap_check(text) if device.kind == "leap" else None,
+                "tail": "\n".join(text.splitlines()[-TOOL_TAIL_LINES:]), "table": table,
             }
+            problem = problem_text(table) if table else None
+            if problem:
+                out.append(Event(now, device.id, "process", "warn", problem,
+                                 {"pid": pid, "run": info["run"]}))
+        return out
 
     def _log_events(self, procs: dict[str, dict]) -> list[Event]:
         out = []
@@ -158,21 +169,27 @@ class Watcher:
         procs = self.supervisor.status()
         checks = self.runner.results()
         found = self.scan_fn(cfg, checks)
-        events = [*self._check_events(checks, now), *self._process_events(procs, now),
-                  *self._log_events(procs), *self._usb_events(found, now)]
+        # log lines before process states: the line says why, the exit only that it ended
+        events = [*self._check_events(checks, now), *self._log_events(procs),
+                  *self._process_events(procs, now), *self._usb_events(found, now)]
         running = {pid: info["run"] for pid, info in procs.items()
                    if info["state"] in ALIVE and info.get("run")}
         checks_json = {cid: r.to_json() for cid, r in checks.items()}
         for event in events:
+            incident = self.incidents.on_event(event, running, checks_json, found)
+            if incident is not None:
+                event.data["incident"] = incident
             self.session.add(event)
-            self.incidents.on_event(event, running, checks_json, found)
         self.incidents.tick()
-        devices = device_states(cfg, procs, checks, self.session.recent(), now)
+        recent = self.session.recent()
+        devices = device_states(cfg, procs, checks, recent, now)
+        problems = [e.to_json() for e in reversed(recent) if e.level in ("bad", "warn")]
         for dev, result in self._tool_results.items():
             if dev in devices:
                 devices[dev]["check"] = result
         with self._lock:
-            self._snapshot = {"devices": devices, "scan": found, "session": self.session.current}
+            self._snapshot = {"devices": devices, "scan": found, "session": self.session.current,
+                              "problems": problems[:PROBLEMS]}
 
     # ---- thread ----
     def start(self) -> None:

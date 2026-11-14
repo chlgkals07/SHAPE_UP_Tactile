@@ -106,3 +106,14 @@ def test_read_and_zip(rig):
     assert f"{iid}/summary.md" in names
     whole = zipfile.ZipFile(io.BytesIO(incidents.zip(session.current, None))).namelist()
     assert f"{session.current}/incidents/{iid}/summary.md" in whole
+
+
+def test_other_errors_of_the_same_device_join_the_open_incident(rig):
+    clock, session, incidents, _ = rig
+    first = incidents.on_event(bad(clock, "ERROR: Resource busy"), {}, {}, {})
+    clock.t += 1
+    second = incidents.on_event(bad(clock, "카메라 오류 (종료 코드 1)"), {}, {}, {})
+    other_dev = incidents.on_event(bad(clock, "x", dev="arm"), {}, {}, {})
+    assert second == first and other_dev != first
+    summary = (session.dir() / "incidents" / first / "summary.md").read_text()
+    assert "카메라 오류 (종료 코드 1)" in summary

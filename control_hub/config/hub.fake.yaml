@@ -6,6 +6,7 @@
 ui: {host: 127.0.0.1, port: 8701}
 tmux: {socket: shapeup-fake, session: hub}
 log_dir: ~/.local/state/control_hub/fake-logs
+session_dir: ~/.local/state/control_hub/fake-sessions
 check_interval_s: 1
 
 envs:
