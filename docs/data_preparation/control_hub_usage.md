@@ -1,7 +1,7 @@
 # Control Hub 사용법
 
 `control_hub/` 는 가이드(`docs/manus_teleop_guide.html`)의 명령을 브라우저 한 화면에서 켜고, 끄고, 상태와 로그를 보는 프로그램이다.
-터미널 여러 개에 명령을 복붙하던 것을 대신한다. 설계는 [`docs/superpowers/specs/2026-11-14-control-hub-design.md`](../superpowers/specs/2026-11-14-control-hub-design.md) 에 있다.
+터미널 여러 개에 명령을 복붙하던 것을 대신한다. 설계는 [`2026-11-14-control-hub-design.md`](../superpowers/specs/2026-11-14-control-hub-design.md) (프로세스·실행표), [`2026-11-15-control-hub-devices-design.md`](../superpowers/specs/2026-11-15-control-hub-devices-design.md) (홈·장치·탐색·로그) 에 있다.
 
 실물로 확인하지 않은 부분에는 **[현장 미검증]** 표시가 있다. 5절이 그 확인 절차다.
 
@@ -42,6 +42,8 @@ control-hub serve --config config/hub.fake.yaml        # http://localhost:8701
 
 - **전체 → 가짜 로봇 전원 켜기** 를 실행하면 "로봇 ping" 점검이 통과하고 zenoh 라우터를 켤 수 있게 된다.
 - **오류 연습** 실행표: 오류로 끝나는 프로세스, Ctrl+C 를 무시하는 프로세스, 입력을 받는 도구가 있다.
+- **Manus → LEAP 텔레옵(가짜)** 을 켜면 3초 뒤 "모터 응답 없음: 7" 이 나고 LEAP 칸이 빨개지며 사고 폴더가 생긴다. 끈 뒤 **LEAP 모터 확인(가짜)** 을 실행하면 모터 표가 채워진다 (7번 오류 비트).
+- 가짜 세션·사고는 `~/.local/state/control_hub/fake-sessions/` 에 따로 쌓인다.
 - 끝나면 `tmux -L shapeup-fake kill-server` 로 가짜 프로세스를 모두 지운다.
 
 ## 4. 쓰는 법
@@ -57,12 +59,16 @@ control-hub serve --config config/hub.yaml             # http://localhost:8700
 
 | 메뉴 | 내용 |
 |---|---|
-| **실행** | 실행표(수집, 팔 + 손, 손만, leader 트리거, 센서 확인)를 고르면 단계가 순서대로 나온다. 위에서부터 하나씩 켠다. 체크박스 줄은 사람이 직접 하는 단계다 (5V 투입 등) |
+| **홈** | 장치 7칸(로봇 PC, 팔, LEAP, 글러브, 촉각, 손목 카메라, 외부 카메라)의 상태, 켜진 프로세스, 최근 문제. 문제 줄 옆 버튼으로 그 장치의 확인 도구(`leap_check` 등)를 바로 돌린다 |
+| **장치 / 각 장치** | 연결 정보(경로, by-id, 시리얼, USB 속도, latency timer, ping 지연), 관련 프로세스와 도구, 마지막 확인 결과, 이 장치의 기록. LEAP 은 모터 16개 표 (손가락 × 관절) |
+| **장치 탐색** | 지금 꽂힌 USB 장치 목록과 설정과 다른 곳에 꽂힌 것 경고. 보여 주기만 한다 (포트 자동 지정은 추후) |
+| **실행표** | 실행표(수집, 팔 + 손, 손만, leader 트리거, 센서 확인)를 고르면 단계가 순서대로 나온다. 위에서부터 하나씩 켠다. 체크박스 줄은 사람이 직접 하는 단계다 (5V 투입 등) |
+| **로그** | 세션별 사건 기록과 사고 폴더. 장치·수준으로 거른다. 사건을 누르면 그 실행의 로그가, 사고를 누르면 모아 둔 파일이 열린다 |
 | **전체** | 실행표와 무관하게 모든 프로세스와 도구. 캘리브레이션, pack / unpack, 확인 도구가 여기 있다 |
-| **연결** | 신호가 흐르는 순서대로 점검을 늘어놓은 것. 처음 막힌 곳에 "여기서 끊김"과 조치가 나온다 |
 
-- 왼쪽 아래에 팔 / 손 / 녹화 사슬의 상태가 항상 보인다. 빨간 줄이 지금 끊긴 곳이다.
-- 줄을 누르면 오른쪽에 설명, 실제 실행되는 명령, 로그가 나온다.
+- 오른쪽 띠에 모든 점검(ping 지연, 포트, USB)이 항상 보인다. 창이 좁으면 위로 올라간다.
+- 카메라 영상은 hub 에 없다. 장치 상세에 정보만 나오고 영상은 녹화기 화면에서 본다.
+- 실행표·전체에서 줄을 누르면 오른쪽에 설명, 실제 실행되는 명령, 로그가 나온다.
 - 상태: **꺼짐**, **켜는 중**(떴지만 준비 조건을 아직 못 봄), **준비됨**, **끄는 중**, **끝남**(도구가 정상 종료), **오류**(예상 밖 종료).
 - 켤 수 없을 때는 버튼이 흐려지고 이유가 줄 아래에 나온다 ("먼저 필요: zenoh :7447").
 - 팔 bringup 처럼 위험한 것은 확인 항목을 모두 체크해야 켜진다. 끌 때도 묻는다 ("팔을 손으로 받치고 있다").
@@ -73,6 +79,26 @@ control-hub serve --config config/hub.yaml             # http://localhost:8700
 - 상세 화면의 "로그에서 찾은 문제"에 오류 줄과 조치(가이드의 문제 해결 표)가 같이 나온다.
 - 로그 창에서 오류 줄은 붉게 보인다. 위의 선택 상자로 지난 실행의 로그도 본다 (프로세스당 30개 보관, `~/.local/state/control_hub/logs/`).
 - hub 자체가 죽으면 왼쪽 아래가 "hub 와 끊김"이 된다. 프로세스는 계속 돌고 있으니 hub 만 다시 띄운다.
+
+### 기록: 세션과 사고 폴더
+
+브라우저를 열지 않아도 hub 가 1초마다 상태를 보고 바뀐 것을 적는다. 제어 주기에는 끼어들지 않는다 (로그 파일과 sysfs 를 읽기만 한다).
+
+```
+~/.local/state/control_hub/sessions/<YYYY-MM-DD_HHMMSS>/     hub 를 켤 때마다, 또는 로그 화면의 "새 세션"
+    events.jsonl        사건 한 줄씩: 점검 끊김/복구, 프로세스 켜짐/오류, 로그의 오류 줄, USB 꽂음/뺌
+    runs.json           이 세션에 돈 프로세스 로그 위치
+    incidents/<HHMMSS>_<장치>_<내용>/     오류 하나마다
+        summary.md      무엇이, 언제, 어디서, 힌트, 그때 돌던 프로세스
+        checks.json     그 순간의 모든 점검 결과와 USB 목록
+        <pid>.log       오류 낸 프로세스: 직전 200줄 + 직후 30초
+        others/*.log    같이 돌던 프로세스: 직전 100줄 + 직후 30초
+        leap_check.txt  5분 안에 그 장치의 확인 도구를 돌렸으면 그 출력
+```
+
+- 같은 장치에서 30초 안에 난 오류는 한 폴더에 모인다 (횟수와 "같이 난 오류"가 늘어난다).
+- 세션은 30개까지 보관한다. 로그 화면에서 세션 또는 사고 하나를 zip 으로 받는다.
+- LEAP 모터가 빠지면: 홈의 LEAP 칸이 "모터 응답 없음: 7" 처럼 번호를 보여 준다. 텔레옵을 끄고 **LEAP 모터 확인**을 돌리면 모터 표에 응답, 온도, 전압, 오류 비트가 나오고 그 출력이 사고 폴더에 붙는다. 번호를 모르는 읽기 실패(`[leap] feedback read failed`)는 주의로 남는다.
 
 ### 끄기
 
@@ -92,7 +118,7 @@ hub 는 가짜 설정과 자동 시험으로만 확인했다. 실물에서 아�
 
 | 순서 | 볼 것 | 다르면 |
 |---|---|---|
-| 1 | **연결** 페이지에서 로봇 ping, 로봇 ssh 가 정상 | `hosts.*.ssh`, `checks.robot_ping` 의 주소 |
+| 1 | 오른쪽 띠에서 로봇 ping, 로봇 ssh 가 정상 | `hosts.*.ssh`, `checks.robot_ping` 의 주소 |
 | 2 | **전체 → 로봇 중복 실행 확인**이 `ros2 node list` 까지 출력 | 컨테이너 이름(`hosts.robot_container.container`), `envs.robot_ros` 의 source 줄. Robot PC 에서 `docker ps` 로 이름을 본다 |
 | 3 | zenoh 라우터를 켜면 "zenoh :7447" 이 정상, **끄기**로 실제로 꺼짐 | ssh 를 거친 Ctrl+C 가 안 닿으면 `tmux attach` 로 확인하고 알려 준다 |
 | 4 | 팔 bringup 이 leader 동기화 뒤 "준비됨"이 됨 | `processes.arm.ready.log` 를 leader 가 시작될 때 실제로 찍히는 문구로 바꾼다. 안 맞으면 계속 "켜는 중"이다 (동작에는 영향 없음) |
@@ -101,6 +127,10 @@ hub 는 가짜 설정과 자동 시험으로만 확인했다. 실물에서 아�
 | 7 | Manus 동글, 손목 카메라 USB 점검이 꽂았을 때만 정상 | `lsusb` 로 id 를 보고 `checks.manus_dongle`, `checks.realsense_usb` 의 id 를 고친다 |
 | 8 | `leap_manus` dry-run 이 `[teleop] live` 에서 "준비됨" | `ready.log` |
 | 9 | 녹화기를 켜면 "녹화기 UI" 가 정상이고 링크가 열림 | 포트(`checks.recorder_ui`) |
+| 10 | LEAP 모터가 빠졌을 때 홈의 LEAP 칸에 모터 번호가 뜨고 사고 폴더가 생김 | 실제로 찍힌 줄을 보고 `devices.leap.events` 의 정규식을 맞춘다 |
+| 11 | **장치 탐색**에 LEAP, Paxini 보드 두 개, 카메라 두 대, Manus 동글이 각각 구분되어 보임. 특히 Paxini 두 보드의 시리얼 번호가 서로 다른지 | 이름이 안 붙으면 `known_usb` 에 id 를 더한다. 구분이 되면 포트 자동 지정(추후)의 근거가 된다 |
+| 12 | LEAP 상세의 USB 속도, latency timer 가 맞게 나옴 (latency timer 1 이 정상) | 16 이면 경고가 뜬다. udev 규칙으로 1 로 맞춘다 |
+| 13 | 손목 카메라가 USB3 (5000 Mbps) 로 잡힘 | 480 이면 경고가 뜬다. USB3 포트·케이블로 바꾼다 |
 
 결과는 `docs/field-test/YYYY-MM-DD-results.md` 에 적는다.
 
@@ -123,8 +153,10 @@ hub 는 가짜 설정과 자동 시험으로만 확인했다. 실물에서 아�
 | 먼저 떠 있어야 하는 것 | `requires` (프로세스 id 또는 점검 id) |
 | "준비됨" 판정 | `ready: {log: 정규식}` 또는 `ready: {check: 점검 id}` |
 | 자주 보는 오류에 조치 붙이기 | `hints: [{match: 정규식, hint: 조치}]`. 무시할 줄은 `{match: ..., ignore: true}` |
-| 새 점검 | `checks` 에 `ping` / `tcp` / `file` / `http` / `ssh` / `usb` / `process` / `no_process` / `command` 중 하나 |
-| 끊긴 곳 표시의 순서 | `chains.*.items` |
+| 새 점검 | `checks` 에 `ping` / `tcp` / `file` / `http` / `ssh` / `usb` / `serial` / `process` / `no_process` / `command` 중 하나. `usb` 는 `warn_below_mbps` 로 느린 포트를 경고한다 |
+| 장치 칸에 묶을 것 | `devices.<id>` 의 `checks` / `processes` / `tools` / `recorder_stream` |
+| 로그 줄을 사건으로 | `devices.<id>.events: [{match: 정규식, level: bad/warn/info, text: "모터 응답 없음: {motors}"}]`. `(?P<motors>...)` 로 모터 번호를 뽑는다 |
+| 탐색 화면의 이름표 | `known_usb: {"vendor:product": 이름}` |
 
 `cmd` 와 `envs` 의 줄은 그대로 셸에 들어간다. `{repo}` 는 레포 루트로 바뀐다.
 
@@ -134,7 +166,8 @@ hub 는 가짜 설정과 자동 시험으로만 확인했다. 실물에서 아�
 |---|---|
 | `tmux 가 없습니다` | `sudo apt install tmux` |
 | 켜자마자 "오류", 로그에 `command not found` | 그 프로세스의 `env` 줄이 빠졌거나 순서가 틀렸다. 상세의 "실행하는 명령"을 터미널에 붙여 넣어 본다 |
-| Robot PC 프로세스가 켜자마자 끝남 | **연결** 페이지의 ping, ssh 를 본다. `ssh root@10.42.0.241` 이 비밀번호를 물으면 키를 등록한다 |
+| Robot PC 프로세스가 켜자마자 끝남 | 오른쪽 띠의 로봇 ping, ssh 를 본다. `ssh root@10.42.0.241` 이 비밀번호를 물으면 키를 등록한다 |
+| 시리얼 점검이 "권한 없음 (dialout 그룹)" | `sudo usermod -aG dialout $USER` 뒤 다시 로그인 |
 | 계속 "켜는 중" | 준비 조건(상세에 나온다)이 실제 로그와 안 맞는다. 프로세스는 돌고 있다. `ready` 를 고친다 |
 | 화면은 "꺼짐"인데 실제로는 돌고 있음 | hub 밖에서 띄운 것이다 (다른 터미널, 컨테이너 자동 실행). hub 는 자기가 띄운 것만 안다. 점검(포트 등)으로 확인한다 |
 | 환경 변수가 이상함 (RMW 등) | hub 를 ROS 를 source 한 셸에서 띄웠다. 전부 끄고 `tmux -L shapeup kill-server` 뒤 새 터미널에서 다시 |
@@ -155,6 +188,10 @@ ruff check src tests
 | `command.py` | 프로세스 → 창에서 실행할 한 줄 (로컬 / ssh / ssh + 컨테이너) |
 | `tmux.py` | tmux 를 부르는 유일한 파일 |
 | `supervisor.py` | 켜기, 끄기, 상태, 선행 조건, 충돌, 확인 |
-| `logscan.py` | 로그에서 준비 문구와 오류 찾기 |
-| `checks.py` | 점검 (ping, 포트, 장치) |
+| `logscan.py` | 로그에서 준비 문구, 오류, 장치 사건 찾기 |
+| `checks.py`, `sysfs.py` | 점검 (ping, 포트, 장치). USB 정보는 sysfs 를 읽기만 한다 |
+| `discovery.py` | 장치 탐색 표와 "다른 곳에 꽂힘" |
+| `watcher.py` | 1초마다 바뀐 것을 사건으로 적는 백그라운드 스레드 |
+| `session.py`, `incidents.py` | 세션 사건 기록과 사고 폴더 |
+| `devices.py`, `leapcheck.py` | 장치 상태 계산, `leap_check` 출력 → 모터 표 |
 | `server.py`, `static/` | API 와 화면. 브라우저는 id 만 보낸다. 명령 문자열은 받지 않는다 |
