@@ -76,3 +76,30 @@ def test_log_driver_logs_first_and_every_nth_command():
     assert len(command_lines) == 3  # commands 1, 4 and 7
     assert any("start" in line for line in lines)
     assert any("close" in line for line in lines)
+
+
+class FeedbackController(FakeController):
+    def __init__(self, error=None):
+        super().__init__()
+        self.error = error
+
+    def read_feedback(self):
+        if self.error:
+            raise self.error
+        return {"pos": [0.0]}
+
+
+def test_feedback_failure_is_logged_once_per_second():
+    lines, t = [], [0.0]
+    error = RuntimeError("feedback sync read failed for ID None: x")
+    driver = LeapHandDriver(FeedbackController(error), log=lines.append, clock=lambda: t[0])
+    assert driver.read_feedback() is None and driver.read_feedback() is None
+    t[0] = 1.01
+    driver.read_feedback()
+    assert lines == ["[leap] feedback read failed: feedback sync read failed for ID None: x"] * 2
+
+
+def test_feedback_success_logs_nothing():
+    lines = []
+    driver = LeapHandDriver(FeedbackController(), log=lines.append)
+    assert driver.read_feedback() == {"pos": [0.0]} and lines == []
