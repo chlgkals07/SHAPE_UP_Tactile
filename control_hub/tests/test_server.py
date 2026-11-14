@@ -23,7 +23,8 @@ def test_describe_shape(config_path, tmux):
     assert data["processes"]["client"]["confirm_start"][1] == {"text": "실물 확인",
                                                               "unless_flag": "dry"}
     assert data["profiles"][0]["steps"][:2] == [{"note": "전원을 켠다"}, {"process": "server"}]
-    assert data["chains"][0]["items"] == ["port", "server", "client"]
+    assert data["devices"]["hand"]["kind"] == "leap"
+    assert data["devices"]["hand"]["tools"] == ["once"]
     assert data["attach"].startswith("tmux -L ")
     assert "ready" in data["processes"]["server"]["ready"]
 

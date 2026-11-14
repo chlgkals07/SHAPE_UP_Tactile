@@ -91,7 +91,12 @@ def describe(cfg: HubConfig, tmux: Tmux) -> dict[str, Any]:
                        for s in p.steps]}
             for p in cfg.profiles
         ],
-        "chains": [{"id": c.id, "title": c.title, "items": list(c.items)} for c in cfg.chains],
+        "devices": {
+            d.id: {"id": d.id, "title": d.title, "kind": d.kind, "help": d.help,
+                   "recorder_stream": list(d.recorder_stream), "checks": list(d.checks),
+                   "processes": list(d.processes), "tools": list(d.tools)}
+            for d in cfg.devices.values()
+        },
     }
 
 

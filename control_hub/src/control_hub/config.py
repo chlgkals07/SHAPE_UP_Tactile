@@ -19,6 +19,8 @@ PROCESS_KINDS = ("service", "tool")
 CHECK_KINDS = (
     "ping", "tcp", "file", "http", "ssh", "usb", "process", "no_process", "command",
 )
+DEVICE_KINDS = ("generic", "leap")
+EVENT_LEVELS = ("info", "warn", "bad")
 
 
 class ConfigError(Exception):
@@ -106,10 +108,26 @@ class Profile:
 
 
 @dataclass(frozen=True)
-class Chain:
+class EventRule:
+    """A log line that means something happened to a device. Named groups fill ``text``."""
+
+    pattern: re.Pattern[str]
+    level: str
+    text: str
+
+
+@dataclass(frozen=True)
+class Device:
     id: str
     title: str
-    items: tuple[str, ...]  # check ids and process ids, in the order the signal flows
+    kind: str = "generic"
+    recorder_stream: tuple[str, ...] = ()  # where this device meets the recorder later
+    checks: tuple[str, ...] = ()
+    processes: tuple[str, ...] = ()
+    tools: tuple[str, ...] = ()
+    events: tuple[EventRule, ...] = ()
+    usb_id: str = ""  # "vvvv:pppp": lets discovery say "it seems to be on another port"
+    help: str = ""
 
 
 @dataclass(frozen=True)
@@ -121,14 +139,17 @@ class HubConfig:
     processes: dict[str, Process]
     checks: dict[str, Check]
     profiles: tuple[Profile, ...]
-    chains: tuple[Chain, ...]
+    devices: dict[str, Device]
     hints: tuple[Hint, ...]
+    known_usb: dict[str, str]  # "vvvv:pppp" -> label shown in discovery
     ui_host: str = "127.0.0.1"
     ui_port: int = 8700
     tmux_socket: str = "shapeup"
     tmux_session: str = "hub"
     log_dir: Path = Path("~/.local/state/control_hub/logs")
     check_interval_s: float = 3.0
+    session_dir: Path = Path("~/.local/state/control_hub/sessions")
+    keep_sessions: int = 30
 
 
 def _fail(where: str, message: str) -> ConfigError:
@@ -237,8 +258,8 @@ PROCESS_KEYS = {
     "confirm_start", "confirm_stop", "input", "stop_grace_s", "help", "hints",
 }
 TOP_KEYS = {
-    "repo", "hosts", "envs", "processes", "checks", "profiles", "chains", "hints", "ui", "tmux",
-    "log_dir", "check_interval_s",
+    "repo", "hosts", "envs", "processes", "checks", "profiles", "devices", "hints", "ui", "tmux",
+    "log_dir", "check_interval_s", "known_usb", "session_dir", "keep_sessions",
 }
 
 
@@ -324,6 +345,55 @@ def _check(cid: str, raw: Any, hosts: dict[str, Host]) -> Check:
                  str(raw.get("link", "")))
 
 
+def _events(value: Any, where: str) -> tuple[EventRule, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise _fail(where, "목록이어야 합니다")
+    out = []
+    for i, item in enumerate(value):
+        at = f"{where}[{i}]"
+        item = _mapping(item, at)
+        _known_keys(item, {"match", "level", "text"}, at)
+        if "match" not in item or "text" not in item:
+            raise _fail(at, "match 와 text 가 있어야 합니다")
+        level = item.get("level", "bad")
+        if level not in EVENT_LEVELS:
+            raise _fail(f"{at}.level", f"{', '.join(EVENT_LEVELS)} 중 하나여야 합니다")
+        out.append(EventRule(_regex(item["match"], f"{at}.match"), level, str(item["text"])))
+    return tuple(out)
+
+
+def _device(did: str, raw: Any, processes: dict[str, Process],
+            checks: dict[str, Check]) -> Device:
+    where = f"devices.{did}"
+    _check_id(did, where)
+    raw = _mapping(raw, where)
+    _known_keys(raw, {"title", "kind", "recorder_stream", "checks", "processes", "tools",
+                      "events", "usb_id", "help"}, where)
+    kind = raw.get("kind", "generic")
+    if kind not in DEVICE_KINDS:
+        raise _fail(f"{where}.kind", f"{', '.join(DEVICE_KINDS)} 중 하나여야 합니다")
+    refs = {key: _strings(raw.get(key), f"{where}.{key}")
+            for key in ("checks", "processes", "tools")}
+    for ref in refs["checks"]:
+        if ref not in checks:
+            raise _fail(f"{where}.checks", f"'{ref}' 는 checks 에 없습니다")
+    for ref in refs["processes"]:
+        if ref not in processes:
+            raise _fail(f"{where}.processes", f"'{ref}' 는 프로세스가 아닙니다")
+    for ref in refs["tools"]:
+        if ref not in processes or processes[ref].kind != "tool":
+            raise _fail(f"{where}.tools", f"'{ref}' 는 kind: tool 인 프로세스가 아닙니다")
+    return Device(
+        did, str(raw.get("title", did)), kind,
+        _strings(raw.get("recorder_stream"), f"{where}.recorder_stream"),
+        refs["checks"], refs["processes"], refs["tools"], _events(raw.get("events"),
+                                                                  f"{where}.events"),
+        str(raw.get("usb_id", "")), str(raw.get("help", "")).strip(),
+    )
+
+
 def load_config(path: Path | str) -> HubConfig:
     path = Path(path).expanduser()
     try:
@@ -333,6 +403,8 @@ def load_config(path: Path | str) -> HubConfig:
     except yaml.YAMLError as exc:
         raise ConfigError(f"{path}: YAML 문법 오류\n{exc}") from exc
     raw = _mapping(raw, str(path))
+    if "chains" in raw:
+        raise ConfigError("chains 는 v2 에서 없어졌습니다. devices 로 옮깁니다")
     _known_keys(raw, TOP_KEYS, "최상위")
 
     repo = Path(raw["repo"]).expanduser() if raw.get("repo") else _find_repo(path)
@@ -404,17 +476,11 @@ def load_config(path: Path | str) -> HubConfig:
         profiles.append(Profile(praw["id"], str(praw.get("title", praw["id"])), tuple(steps),
                                 str(praw.get("help", "")).strip()))
 
-    chains = []
-    for i, craw in enumerate(raw.get("chains") or []):
-        where = f"chains[{i}]"
-        craw = _mapping(craw, where)
-        _known_keys(craw, {"id", "title", "items"}, where)
-        _check_id(craw.get("id", ""), where)
-        items = _strings(craw.get("items"), f"{where}.items")
-        for ref in items:
-            if ref not in processes and ref not in checks:
-                raise _fail(f"{where}.items", f"'{ref}' 는 프로세스도 점검도 아닙니다")
-        chains.append(Chain(craw["id"], str(craw.get("title", craw["id"])), items))
+    devices = {
+        did: _device(did, draw, processes, checks)
+        for did, draw in _mapping(raw.get("devices"), "devices").items()
+    }
+    known_usb = {str(k): str(v) for k, v in _mapping(raw.get("known_usb"), "known_usb").items()}
 
     ui = _mapping(raw.get("ui"), "ui")
     _known_keys(ui, {"host", "port"}, "ui")
@@ -423,10 +489,14 @@ def load_config(path: Path | str) -> HubConfig:
 
     return HubConfig(
         path=path, repo=repo, hosts=hosts, envs=envs, processes=processes, checks=checks,
-        profiles=tuple(profiles), chains=tuple(chains), hints=_hints(raw.get("hints"), "hints"),
+        profiles=tuple(profiles), devices=devices, hints=_hints(raw.get("hints"), "hints"),
+        known_usb=known_usb,
         ui_host=str(ui.get("host", "127.0.0.1")), ui_port=int(ui.get("port", 8700)),
         tmux_socket=str(tmux.get("socket", "shapeup")),
         tmux_session=str(tmux.get("session", "hub")),
         log_dir=Path(raw.get("log_dir", "~/.local/state/control_hub/logs")).expanduser(),
         check_interval_s=float(raw.get("check_interval_s", 3.0)),
+        session_dir=Path(raw.get("session_dir", "~/.local/state/control_hub/sessions"))
+        .expanduser(),
+        keep_sessions=int(raw.get("keep_sessions", 30)),
     )

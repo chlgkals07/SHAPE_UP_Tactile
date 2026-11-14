@@ -25,7 +25,22 @@ def test_loads_and_links(cfg):
     assert cfg.checks["port"].kind == "file"
     assert cfg.profiles[0].steps[0].note == "전원을 켠다"
     assert cfg.profiles[0].steps[1].process == "server"
-    assert cfg.chains[0].items == ("port", "server", "client")
+
+
+def test_devices_parsed(cfg):
+    dev = cfg.devices["hand"]
+    assert dev.kind == "leap" and dev.processes == ("server",) and dev.tools == ("once",)
+    assert dev.checks == ("port",) and dev.recorder_stream == ("hand",)
+    assert dev.usb_id == "0403:6014"
+    rule = dev.events[0]
+    assert rule.level == "bad" and rule.text == "모터 없음: {motors}"
+    assert rule.pattern.search("IDs: [3, 7]").group("motors") == "3, 7"
+
+
+def test_recorder_stream_accepts_list(tmp_path):
+    cfg = load_config(write(tmp_path, "devices: {arm: {recorder_stream: [a, b]}}"))
+    assert cfg.devices["arm"].recorder_stream == ("a", "b")
+    assert cfg.devices["arm"].kind == "generic" and cfg.devices["arm"].title == "arm"
 
 
 @pytest.mark.parametrize(
@@ -46,7 +61,15 @@ def test_loads_and_links(cfg):
         ("checks: {c: {ping: a, file: b}}", "checks.c"),
         ("checks: {c: {tcp: nohostport}}", "checks.c.tcp"),
         ("processes: {a: {cmd: x}}\nprofiles: [{id: p, steps: [nope]}]", "profiles[0].steps[0]"),
-        ("processes: {a: {cmd: x}}\nchains: [{id: c, items: [nope]}]", "chains[0].items"),
+        ("chains: []", "chains 는 v2 에서 없어졌습니다"),
+        ("devices: {d: {processes: [nope]}}", "devices.d.processes"),
+        ("devices: {d: {checks: [nope]}}", "devices.d.checks"),
+        ("processes: {a: {cmd: x}}\ndevices: {d: {tools: [a]}}", "devices.d.tools"),
+        ("devices: {d: {kind: robotarm}}", "devices.d.kind"),
+        ("devices: {d: {colour: red}}", "devices.d"),
+        ("devices: {d: {events: [{match: '(', text: x}]}}", "devices.d.events[0]"),
+        ("devices: {d: {events: [{match: x, level: fatal, text: x}]}}",
+         "devices.d.events[0].level"),
         ("procesess: {}", "최상위"),
         ("hints: [{match: x}]", "hints[0]"),
         ("processes: [1, 2", "YAML"),
@@ -113,6 +136,6 @@ def test_quoting_survives_every_layer(tmp_path):
 def test_shipped_configs_load():
     for name in ("hub.example.yaml", "hub.fake.yaml"):
         cfg = load_config(EXAMPLES / name)
-        assert cfg.processes and cfg.profiles and cfg.chains
+        assert cfg.processes and cfg.profiles
         for proc in cfg.processes.values():
             assert build_command(cfg, proc, [f.id for f in proc.flags])

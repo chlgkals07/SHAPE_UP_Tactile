@@ -140,11 +140,6 @@ checks:
     link: 녹화기 열기
     help: 녹화기를 켠다.
 
-chains:
-  - {id: arm, title: 팔, items: [robot_power, zenoh_port, arm]}
-  - {id: hand, title: 손, items: [manus, leap_port, leap_manus]}
-  - {id: record, title: 녹화, items: [recorder, recorder_ui]}
-
 profiles:
   - id: collect
     title: 수집 (팔 + 손 + 녹화)

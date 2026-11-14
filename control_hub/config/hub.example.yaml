@@ -417,12 +417,6 @@ checks:
     link: 녹화기 열기
     help: 녹화기가 꺼져 있다. 실행 페이지에서 켠다.
 
-# 신호가 흐르는 순서. 처음으로 막힌 곳이 화면에 "여기서 끊김"으로 나온다
-chains:
-  - {id: arm, title: 팔, items: [robot_ping, robot_ssh, zenoh_port, arm]}
-  - {id: hand, title: 손, items: [manus_core_off, manus_dongle, manus, leap_port, leap_manus]}
-  - {id: record, title: 녹화, items: [realsense_usb, paxini_port, recorder, recorder_ui]}
-
 # 실행표. 가이드의 "켜는 순서": LEAP 5V(편 손) → Manus 노드 → zenohd → omy_ai_wrist_flip → leap_* → 녹화
 profiles:
   - id: collect

@@ -67,8 +67,17 @@ checks:
   port: {{title: 포트, file: {flag}}}
 profiles:
   - {{id: demo, title: 데모, steps: [{{note: 전원을 켠다}}, server, client]}}
-chains:
-  - {{id: main, title: 주, items: [port, server, client]}}
+devices:
+  hand:
+    title: 손
+    kind: leap
+    recorder_stream: hand
+    checks: [port]
+    processes: [server]
+    tools: [once]
+    usb_id: "0403:6014"
+    events:
+      - {{match: "IDs: \\\\[?(?P<motors>[\\\\d, ]+)", level: bad, text: "모터 없음: {{motors}}"}}
 """
 
 

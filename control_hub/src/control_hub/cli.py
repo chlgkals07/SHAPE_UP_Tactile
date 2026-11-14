@@ -36,7 +36,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "validate":
         print(f"정상: 프로세스 {len(cfg.processes)}개, 점검 {len(cfg.checks)}개, "
-              f"실행표 {len(cfg.profiles)}개, 사슬 {len(cfg.chains)}개")
+              f"실행표 {len(cfg.profiles)}개, 장치 {len(cfg.devices)}개")
         return 0
 
     if not Tmux.available():
