@@ -24,7 +24,8 @@ let profileId = localStorage.getItem("hub.profile");
 let selected = null;     // process id shown in the detail panel
 const flagChoice = {};   // pid -> [flag ids] chosen on this page
 const log = { pid: null, run: null, offset: 0, chosen: "", runsFor: null, busy: false };
-const logsView = { sid: null, dev: "", level: "", incident: null, file: null, detail: null,
+const INCIDENT_FILLING_S = 40;
+const logsView = { sid: null, dev: "", level: "", incident: null, file: null, detail: null, detailFor: null,
                    sessions: [], events: [], incidents: [], loadedAt: 0, busy: false };
 const devEvents = { id: null, list: [], at: 0, busy: false };
 
@@ -190,20 +191,20 @@ function rowButton(pid, proc, st) {
   if (!proc && !ALIVE.includes(st.state)) return "";
   if (st.state === "stopping") {
     return st.stop_overdue
-      ? `<button class="btn small stop" data-action="kill" data-id="${pid}">강제 종료</button>`
+      ? `<button class="btn small stop" data-action="kill" data-id="${esc(pid)}">강제 종료</button>`
       : `<button class="btn small" disabled>끄는 중</button>`;
   }
-  if (ALIVE.includes(st.state)) return `<button class="btn small danger" data-action="stop" data-id="${pid}">끄기</button>`;
+  if (ALIVE.includes(st.state)) return `<button class="btn small danger" data-action="stop" data-id="${esc(pid)}">끄기</button>`;
   const blocked = st.blockers && st.blockers.length;
   const verb = proc.kind === "tool" ? "실행" : "켜기";
-  return `<button class="btn small primary" data-action="start" data-id="${pid}" ${blocked ? "disabled" : ""}>${verb}</button>`;
+  return `<button class="btn small primary" data-action="start" data-id="${esc(pid)}" ${blocked ? "disabled" : ""}>${verb}</button>`;
 }
 function processRow(pid, num, extra) {
   const proc = D.processes[pid];
   const st = stateOf(pid);
   const [subClass, sub] = rowSub(pid, proc, st);
   const classes = ["row", pid === selected ? "selected" : "", st.state === "failed" ? "failed" : "", extra || ""].join(" ");
-  return `<li class="${classes}" data-action="select" data-id="${pid}" tabindex="0">
+  return `<li class="${classes}" data-action="select" data-id="${esc(pid)}" tabindex="0">
     <span class="num">${num ?? ""}</span>
     <span class="title"><span class="dot ${st.state}"></span><span class="name">${esc(proc ? proc.title : pid)}</span>
       ${proc && proc.remote ? '<span class="where">Robot PC</span>' : ""}
@@ -302,10 +303,10 @@ function renderDetail() {
   }
   const buttons = [];
   const verb = proc && proc.kind === "tool" ? "실행" : "켜기";
-  if (proc && !alive) buttons.push(`<button class="btn primary" data-action="start" data-id="${pid}" ${st.blockers.length ? "disabled" : ""}>${st.state === "off" ? verb : "다시 " + verb}</button>`);
-  if (alive) buttons.push(`<button class="btn danger" data-action="stop" data-id="${pid}">${st.state === "stopping" ? "Ctrl+C 다시 보내기" : "끄기 (Ctrl+C)"}</button>`);
-  if (st.state === "stopping") buttons.push(`<button class="btn stop" data-action="kill" data-id="${pid}">강제 종료</button>`);
-  if (["done", "failed"].includes(st.state)) buttons.push(`<button class="btn" data-action="clear" data-id="${pid}">닫기</button>`);
+  if (proc && !alive) buttons.push(`<button class="btn primary" data-action="start" data-id="${esc(pid)}" ${st.blockers.length ? "disabled" : ""}>${st.state === "off" ? verb : "다시 " + verb}</button>`);
+  if (alive) buttons.push(`<button class="btn danger" data-action="stop" data-id="${esc(pid)}">${st.state === "stopping" ? "Ctrl+C 다시 보내기" : "끄기 (Ctrl+C)"}</button>`);
+  if (st.state === "stopping") buttons.push(`<button class="btn stop" data-action="kill" data-id="${esc(pid)}">강제 종료</button>`);
+  if (["done", "failed"].includes(st.state)) buttons.push(`<button class="btn" data-action="clear" data-id="${esc(pid)}">닫기</button>`);
   html += `<div class="actions">${buttons.join("")}</div>`;
 
   if (st.issues && st.issues.length) {
@@ -339,7 +340,7 @@ function renderNav() {
   const banner = $("failed-banner");
   banner.hidden = !failed.length;
   setHTML(banner, failed.length ? "오류로 끝난 프로세스: " + failed.map((pid) =>
-    `<a href="#" data-action="select" data-id="${pid}">${esc(titleOf(pid))}</a>`).join(", ") + " (눌러서 로그 보기)" : "");
+    `<a href="#" data-action="select" data-id="${esc(pid)}">${esc(titleOf(pid))}</a>`).join(", ") + " (눌러서 로그 보기)" : "");
   document.title = failed.length ? `(${failed.length}) Control Hub` : "Control Hub";
   const error = $("config-error");
   error.hidden = !S.config_error;
@@ -381,7 +382,7 @@ function problemRow(e) {
   const tool = dev && dev.tools[0];
   let open = "";
   if (e.data.incident) open = `data-action="incident" data-id="${esc(e.data.incident)}"`;
-  else if (e.data.pid) open = `data-action="jump" data-id="${e.data.pid}" data-run="${esc(e.data.run || "")}"`;
+  else if (e.data.pid) open = `data-action="jump" data-id="${esc(e.data.pid)}" data-run="${esc(e.data.run || "")}"`;
   return `<li class="problem ${e.level}" ${open}><span class="time">${clock(e.t)}</span>
     <span class="dev">${esc(dev ? dev.title : "기타")}</span>
     <span class="text">${esc(e.text)}${e.data.count > 1 ? ` <b>×${e.data.count}</b>` : ""}${e.data.hint ? `<small>→ ${esc(e.data.hint)}</small>` : ""}</span>
@@ -395,7 +396,7 @@ function renderHome() {
       <small>${esc(deviceLine(d))}</small></a>`;
   }).join("");
   const shown = Object.keys(S.processes).filter((pid) => [...ALIVE, "failed"].includes(stateOf(pid).state));
-  const chips = shown.map((pid) => `<button class="chip" data-action="select" data-id="${pid}">
+  const chips = shown.map((pid) => `<button class="chip" data-action="select" data-id="${esc(pid)}">
     <span class="dot ${stateOf(pid).state}"></span>${esc(titleOf(pid))}</button>`).join("");
   const problems = (S.problems || []).map(problemRow).join("");
   setHTML($("page-home"), `<header class="bar"><h1>홈</h1><span class="muted right">세션 ${esc(S.session || "")}</span></header>
@@ -425,7 +426,7 @@ function toolResult(result) {
 }
 function motorCell(index, d, table, fromLog) {
   const m = table ? table.motors[index] : null;
-  const seen = fromLog[index] || fromLog[String(index)];
+  const seen = fromLog[index];
   let cls = "";
   if (m && m.responded) cls = m.hw_err ? "bad" : m.temp >= MOTOR_HOT_C ? "warn" : "ok";
   if ((m && m.responded === false) || seen) cls = "bad";
@@ -437,7 +438,7 @@ function motorCell(index, d, table, fromLog) {
   if (m && m.hw_err) lines.push(`오류 비트 ${m.hw_err}`);
   if (m && m.responded === false) lines.push("응답 없음");
   if (seen) lines.push(`${clock(seen.t)} ${seen.text}`);
-  return `<td class="motor ${cls}"><div class="mid">ID ${m ? m.id : index}</div>
+  return `<td class="motor ${cls}"><div class="mid">ID ${esc(m ? m.id : index)}</div>
     <div class="joint">${esc(d.joints[index] || "")}</div>${lines.map((l) => `<div>${esc(l)}</div>`).join("")}</td>`;
 }
 function motorTable(d, st) {
@@ -456,8 +457,8 @@ async function loadDevEvents(id) {
   if (devEvents.busy || !S.session) return;
   devEvents.busy = true;
   try {
-    const { events } = await api(`/api/sessions/${S.session}/events?dev=${encodeURIComponent(id)}`);
-    Object.assign(devEvents, { id, list: events.slice(-50).reverse(), at: Date.now() });
+    const { events } = await api(`/api/sessions/${S.session}/events?limit=50&dev=${encodeURIComponent(id)}`);
+    Object.assign(devEvents, { id, list: events.reverse(), at: Date.now() });
     render();
   } catch { /* shown as empty; the state poll reports a lost connection */ } finally { devEvents.busy = false; }
 }
@@ -511,10 +512,17 @@ async function loadLogs(force) {
     if (logsView.level) query.set("level", logsView.level);
     const [{ events }, { incidents }] = await Promise.all([
       api(`/api/sessions/${sid}/events?${query}`), api(`/api/sessions/${sid}/incidents`)]);
-    Object.assign(logsView, { sessions, events: events.reverse(), incidents, loadedAt: Date.now() });
-    logsView.detail = logsView.incident
-      ? await api(`/api/sessions/${sid}/incidents/${encodeURIComponent(logsView.incident)}`) : null;
-  } catch (error) { toast(error.message, true); } finally { logsView.busy = false; }
+    Object.assign(logsView, { sessions, events: events.reverse(), incidents });
+    // an incident's files only change while its logs are still being collected (30 s)
+    const open = incidents.find((i) => i.id === logsView.incident);
+    if (!open) Object.assign(logsView, { detail: null, detailFor: null });
+    else if (logsView.detailFor !== open.id || Date.now() / 1000 - open.t < INCIDENT_FILLING_S) {
+      logsView.detail = await api(`/api/sessions/${sid}/incidents/${encodeURIComponent(open.id)}`);
+      logsView.detailFor = open.id;
+    }
+  } catch (error) { toast(error.message, true); } finally {
+    Object.assign(logsView, { busy: false, loadedAt: Date.now() });
+  }
   render();
 }
 function incidentView() {
@@ -540,7 +548,7 @@ function renderLogs() {
   setHTML($("page-logs"), `<header class="bar"><h1>로그</h1>
       <select id="logs-sid" aria-label="세션">${sessions}</select>
       <button class="btn small" data-action="new-session">새 세션</button>
-      <a class="btn small" href="/api/sessions/${v.sid}/export">세션 zip</a>
+      ${v.sid ? `<a class="btn small" href="/api/sessions/${v.sid}/export">세션 zip</a>` : ""}
       <select id="logs-dev" class="right" aria-label="장치">${options(Object.values(D.devices).map((d) => [d.id, d.title]), v.dev, "모든 장치")}</select>
       <select id="logs-level" aria-label="수준">${options([["bad", "문제"], ["warn", "주의"], ["info", "정보"]], v.level, "모든 수준")}</select></header>
     <div class="logs-grid"><div>

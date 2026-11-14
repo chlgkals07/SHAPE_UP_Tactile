@@ -25,7 +25,7 @@ def test_rule_extracts_motors(tmp_path):
     scanner.poll()
     [event] = scanner.drain()
     assert event.motors == (3, 7) and event.text == "모터 응답 없음: 3, 7"
-    assert event.level == "bad" and not event.generic and event.count == 1
+    assert event.level == "bad" and event.count == 1
     assert scanner.drain() == []
 
 
@@ -39,7 +39,7 @@ def test_generic_error_becomes_warn_event(tmp_path):
     scanner = LogScanner(write(tmp_path, "$ cmd\nsomething failed\n"), None, [], [RULE])
     scanner.poll()
     [event] = scanner.drain()
-    assert event.generic and event.level == "warn" and event.text == "something failed"
+    assert event.level == "warn" and event.text == "something failed"
 
 
 def test_hint_line_becomes_bad_event_with_hint(tmp_path):
@@ -70,22 +70,28 @@ def test_event_rate_limit(tmp_path):
     assert [e.count for e in scanner.drain()] == [500]  # 499 held back + this one
 
 
-def test_event_offset_points_into_file(tmp_path):
-    log = write(tmp_path, "$ cmd\n" + "x\n" * 10)
-    scanner = LogScanner(log, None, [], [RULE])
-    scanner.poll()
-    size = log.stat().st_size
-    append(log, "IDs: [2]\n")
-    scanner.poll()
-    [event] = scanner.drain()
-    assert event.offset == size
-
 
 def test_skip_existing_keeps_ready_but_no_events(tmp_path):
     log = write(tmp_path, "$ cmd\n[srv] ready\nIDs: [1]\nit failed\n")
     scanner = LogScanner(log, re.compile(r"\[srv\] ready"), [], [RULE])
     scanner.skip_existing()
-    assert scanner.ready_seen and scanner.drain() == [] and list(scanner.issues) == []
+    assert scanner.ready_seen and scanner.drain() == []
+    assert [i["line"] for i in scanner.issues] == ["it failed"]  # the detail panel keeps them
     append(log, "IDs: [4]\n")
     scanner.poll()
     assert [e.motors for e in scanner.drain()] == [(4,)]
+
+
+def test_timestamped_flood_is_one_event(tmp_path):
+    lines = "".join(f"[ERROR] [1731650000.{i:06d}] [arm]: read failed\n" for i in range(300))
+    scanner = LogScanner(write(tmp_path, "$ cmd\n" + lines), None, [], [RULE], now=lambda: 5.0)
+    scanner.poll()
+    [event] = scanner.drain()
+    assert event.text.startswith("[ERROR] [1731650000.000000]")
+
+
+def test_different_motors_are_not_merged_by_the_rate_limit(tmp_path):
+    log = write(tmp_path, "$ cmd\nIDs: [3]\nIDs: [7]\n")
+    scanner = LogScanner(log, None, [], [RULE], now=lambda: 5.0)
+    scanner.poll()
+    assert [e.motors for e in scanner.drain()] == [(3,), (7,)]

@@ -142,3 +142,21 @@ def test_bad_motor_check_is_written_down(cfg, tmux, monkeypatch):
     wait_for(lambda: sup.status()["once"]["state"] == "done", what="tool done")
     watcher.step()
     assert ("hand", "warn", "모터 확인: ID 7 오류 비트 32") in texts(session)
+
+
+def test_unassigned_issue_shows_in_problems(cfg, tmux):
+    sup, _, watcher = make(cfg, tmux)
+    watcher.step()
+    sup.start("boom")  # not part of any device
+    wait_for(lambda: sup.status()["boom"]["state"] == "failed", what="boom fails")
+    watcher.step()
+    assert any(p["dev"] is None for p in watcher.snapshot()["problems"])
+    sup.clear("boom")
+
+
+def test_stop_flushes_open_incidents(cfg, tmux):
+    _, _, watcher = make(cfg, tmux)
+    flushed = []
+    watcher.incidents.flush = lambda: flushed.append(True)
+    watcher.stop()
+    assert flushed == [True]

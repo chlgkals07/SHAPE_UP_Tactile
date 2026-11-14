@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from control_hub.cli import main
 from control_hub.server import create_app
+from control_hub.session import Event
 
 
 def client_for(config_path, tmux) -> TestClient:
@@ -102,9 +103,19 @@ def test_sessions_api_flow(config_path, tmux):
         new = client.post("/api/sessions/new").json()["current"]
         listing = client.get("/api/sessions").json()
         assert new != first and listing["current"] == new
-        assert [s["id"] for s in listing["sessions"]][:2] == [new, first]
+        assert listing["sessions"][0]["id"] == new  # the empty first one is cleared away
         assert client.get(f"/api/sessions/{new}/events").json() == {"events": []}
         assert client.get(f"/api/sessions/{new}/incidents").json() == {"incidents": []}
+
+
+def test_events_limit_keeps_newest(config_path, tmux):
+    app = create_app(config_path, tmux, background=False)
+    session = app.state.watcher.session
+    for i in range(5):
+        session.add(Event(float(i), "hand", "log", "bad", str(i)))
+    with TestClient(app) as client:
+        rows = client.get(f"/api/sessions/{session.current}/events?limit=2").json()["events"]
+    assert [e["text"] for e in rows] == ["3", "4"]
 
 
 def test_session_paths_are_confined(config_path, tmux):

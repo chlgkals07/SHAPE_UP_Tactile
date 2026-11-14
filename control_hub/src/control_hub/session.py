@@ -25,7 +25,7 @@ RECENT = 500
 class Event:
     t: float
     dev: str | None  # device id; None = not tied to a device ("기타")
-    source: str  # check | process | log | tool
+    source: str  # check | process | log
     level: str  # info | warn | bad
     text: str
     data: dict = field(default_factory=dict)
@@ -60,6 +60,10 @@ class SessionLog:
             (self.root / sid).mkdir(parents=True)
             self.current = sid
             self._recent.clear()
+            older = [i for i in self._ids() if i != sid]
+            for old in older:  # a hub start where nothing happened leaves an empty folder
+                if not any((self.root / old).iterdir()):
+                    (self.root / old).rmdir()
             for old in self._ids()[self.keep:]:
                 shutil.rmtree(self.root / old, ignore_errors=True)
             return sid
@@ -70,15 +74,9 @@ class SessionLog:
             with (self.dir() / "events.jsonl").open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(event.to_json(), ensure_ascii=False) + "\n")
 
-    def recent(self, seconds: float | None = None, dev: str | None = None) -> list[Event]:
+    def recent(self) -> list[Event]:
         with self._lock:
-            events = list(self._recent)
-        if seconds is not None:
-            since = self._now() - seconds
-            events = [e for e in events if e.t >= since]
-        if dev is not None:
-            events = [e for e in events if e.dev == dev]
-        return events
+            return list(self._recent)
 
     def note_run(self, pid: str, run: str, log_path: Path) -> None:
         with self._lock:

@@ -29,8 +29,7 @@ def test_session_writes_jsonl_and_recent(tmp_path):
     log.add(ev(clock.t, None, "warn", text="기타"))
     lines = (log.dir() / "events.jsonl").read_text().splitlines()
     assert [json.loads(x)["text"] for x in lines] == ["옛날", "지금", "기타"]
-    assert [e.text for e in log.recent(60)] == ["지금", "기타"]
-    assert [e.text for e in log.recent(dev="hand")] == ["옛날", "지금"]
+    assert [e.text for e in log.recent()] == ["옛날", "지금", "기타"]
     assert log.read_events(log.current)[1]["dev"] == "hand"
 
 
@@ -38,16 +37,30 @@ def test_new_session_and_retention(tmp_path):
     clock = Clock()
     log = SessionLog(tmp_path, keep=2, now=clock)
     first = log.current
+    log.add(ev(clock.t, "hand"))
     clock.t += 1
     second = log.new_session()
+    log.add(ev(clock.t, "hand"))
     clock.t += 1
     third = log.new_session()
     assert [s["id"] for s in log.sessions()] == [third, second]
     assert not (tmp_path / first).exists() and log.recent() == []
 
 
+def test_empty_sessions_do_not_push_out_recorded_ones(tmp_path):
+    clock = Clock()
+    log = SessionLog(tmp_path, keep=2, now=clock)
+    kept = log.current
+    log.add(ev(clock.t, "hand"))
+    for _ in range(3):  # hub restarts with nothing happening
+        clock.t += 1
+        log.new_session()
+    assert kept in [s["id"] for s in log.sessions()]
+
+
 def test_same_second_sessions_get_distinct_ids(tmp_path):
     first = SessionLog(tmp_path, now=Clock())
+    first.add(ev(0.0, "hand"))
     second = SessionLog(tmp_path, now=Clock())
     assert first.current != second.current and len(second.sessions()) == 2
 
@@ -107,7 +120,7 @@ def test_leap_motors_from_events(cfg):
     assert set(motors) == {3, 7} and motors[7]["text"] == "모터 응답 없음: 3, 7"
 
 
-def test_unassigned_issue_goes_to_other(cfg):
-    events = [ev(NOW - 1, None, "warn", text="something failed")]
-    other = device_states(cfg, {}, {}, events, NOW)["_other"]
-    assert other["level"] == "warn" and other["events"][0]["text"] == "something failed"
+def test_motor_event_names_the_cause_over_the_exit(cfg):
+    events = [ev(NOW - 1, "hand", text="모터 응답 없음: 7", motors=[7])]
+    states = device_states(cfg, {"motor": {"state": "failed"}}, {}, events, NOW)
+    assert states["hand"]["summary"] == "모터 응답 없음: 7"

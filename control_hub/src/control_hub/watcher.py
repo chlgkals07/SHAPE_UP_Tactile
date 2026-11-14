@@ -144,7 +144,7 @@ class Watcher:
             dev = self._device_of(pid)
             for e in found:
                 out.append(Event(e.t, dev, "log", e.level, e.text, {
-                    "pid": pid, "run": procs.get(pid, {}).get("run"), "offset": e.offset,
+                    "pid": pid, "run": procs.get(pid, {}).get("run"),
                     "motors": list(e.motors), "count": e.count, "line": e.line,
                     "hint": e.hint}))
         return out
@@ -211,3 +211,4 @@ class Watcher:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=5)
+        self.incidents.flush()

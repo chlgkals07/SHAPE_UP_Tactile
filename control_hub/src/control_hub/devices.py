@@ -16,7 +16,9 @@ def device_states(cfg: HubConfig, procs: dict[str, dict], checks: dict[str, Chec
     fresh = [e for e in recent if now - e.t <= WINDOW_S and e.level in RANK]
     out: dict[str, dict] = {}
     for device in cfg.devices.values():
-        causes: list[tuple[int, str]] = []
+        # events first: on a tie the log line (the cause) wins over "process failed" (the exit)
+        mine = [e for e in fresh if e.dev == device.id]
+        causes: list[tuple[int, str]] = [(RANK[e.level], e.text) for e in reversed(mine)]
         for cid in device.checks:
             result = checks.get(cid)
             if result is None or result.ok is None:
@@ -29,8 +31,6 @@ def device_states(cfg: HubConfig, procs: dict[str, dict], checks: dict[str, Chec
         for pid in pids:
             if procs.get(pid, {}).get("state") == "failed":
                 causes.append((2, f"{cfg.processes[pid].title} 오류"))
-        mine = [e for e in fresh if e.dev == device.id]
-        causes += [(RANK[e.level], e.text) for e in reversed(mine)]  # newest first
         if causes:
             rank, summary = max(causes, key=lambda c: c[0])
             level = "bad" if rank == 2 else "warn"
@@ -38,15 +38,9 @@ def device_states(cfg: HubConfig, procs: dict[str, dict], checks: dict[str, Chec
             summary = ""
             running = any(procs.get(pid, {}).get("state", "off") != "off" for pid in pids)
             level = "ok" if device.checks or running else "idle"
-        state = {"level": level, "summary": summary,
-                 "last_event": mine[-1].to_json() if mine else None}
+        state = {"level": level, "summary": summary}
         if device.kind == "leap":
             state["motors"] = {m: {"t": e.t, "text": e.text}
                                for e in mine for m in e.data.get("motors", [])}
         out[device.id] = state
-    other = [e for e in fresh if e.dev is None]
-    out["_other"] = {
-        "level": max((e.level for e in other), key=RANK.get, default="ok"),
-        "events": [e.to_json() for e in other[-20:]],
-    }
     return out

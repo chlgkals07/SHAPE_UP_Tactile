@@ -27,6 +27,7 @@ from control_hub.session import Event, SessionLog
 
 INCIDENT_PATTERN = re.compile(r"^\d{6}_[\w-]+$")
 TAIL_BYTES = 256 * 1024
+MAX_ALSO = 10  # other error texts listed in one summary
 MAX_AFTER_BYTES = 1024 * 1024
 
 
@@ -91,7 +92,8 @@ class Incidents:
                     and ev.t - inc["last_t"] <= self.group_s):
                 inc["count"] += 1
                 inc["last_t"] = ev.t
-                if ev.text != inc["text"] and ev.text not in inc["also"]:
+                if (ev.text != inc["text"] and ev.text not in inc["also"]
+                        and len(inc["also"]) < MAX_ALSO):
                     inc["also"].append(ev.text)
                 self._write_summary(inc)
                 return inc["id"]
@@ -137,6 +139,13 @@ class Incidents:
                 inc["logs_done"] = True
         self._open = [i for i in self._open
                       if not i["logs_done"] or now - i["t"] <= self.tool_window_s]
+
+    def flush(self) -> None:
+        """Hub stopping: write the logs of open incidents with what there is so far."""
+        for inc in self._open:
+            if not inc["logs_done"]:
+                self._write_logs(inc)
+                inc["logs_done"] = True
 
     # ---- reading ----
     def _dir(self, sid: str, iid: str) -> Path:

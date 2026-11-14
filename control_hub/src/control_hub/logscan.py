@@ -25,7 +25,7 @@ GENERIC_ERROR = re.compile(
 MAX_ISSUES = 20
 MAX_CHUNK = 256 * 1024
 EVENT_GAP_S = 1.0  # the same event text is reported at most once a second
-MOTOR_NUMBER = re.compile(r"\d+")
+NUMBER = re.compile(r"\d+")
 
 
 def clean(text: str) -> str:
@@ -60,9 +60,7 @@ class LogEvent:
     text: str
     line: str
     motors: tuple[int, ...]
-    offset: int  # where the chunk holding this line starts: open the log here to see it
     hint: str | None
-    generic: bool  # caught by the generic error words or a hint, not by a device rule
     count: int = 1  # lines this event stands for (repeats held back by the rate limit)
 
 
@@ -80,9 +78,8 @@ class LogScanner:
         self.last_line = ""
         self._now = now
         self._offset = 0
-        self._chunk_start = 0
         self._partial = ""
-        self._quiet = False  # reading old lines: update ready, report nothing
+        self._quiet = False  # reading old lines: keep ready and issues, make no events
         self._events: list[LogEvent] = []
         self._last_sent: dict[str, float] = {}
         self._held: dict[str, int] = {}
@@ -92,11 +89,9 @@ class LogScanner:
 
     def poll(self) -> None:
         while True:
-            start = self._offset
             offset, text = read_chunk(self.path, self._offset)
             if offset == self._offset:
                 break
-            self._chunk_start = start
             self._offset = offset
             lines = (self._partial + text).split("\n")
             self._partial = lines.pop()
@@ -127,8 +122,6 @@ class LogScanner:
         self.last_line = line
         if self.ready is not None and not self.ready_seen and self.ready.search(line):
             self.ready_seen = True
-        if self._quiet:
-            return
         hint_text = None
         for hint in self.hints:
             if hint.pattern.search(line):
@@ -140,7 +133,9 @@ class LogScanner:
         if hint_text is None and not GENERIC_ERROR.search(line):
             return
         if not rule_hit:
-            self._emit("bad" if hint_text else "warn", line[:200], line, (), hint_text, True)
+            # raw lines often carry a timestamp: digits do not make a repeat a new event
+            self._emit("bad" if hint_text else "warn", line[:200], line, (), hint_text,
+                       key=NUMBER.sub("#", line[:200]))
         if self.issues and self.issues[-1]["line"] == line:
             self.issues[-1]["count"] += 1
             return
@@ -152,24 +147,26 @@ class LogScanner:
             if match is None:
                 continue
             groups = {k: (v or "").strip() for k, v in match.groupdict().items()}
-            motors = tuple(int(n) for n in MOTOR_NUMBER.findall(groups.get("motors", "")))
+            motors = tuple(int(n) for n in NUMBER.findall(groups.get("motors", "")))
             try:
                 text = rule.text.format(**groups)
             except (KeyError, IndexError, ValueError):
                 text = rule.text
-            self._emit(rule.level, text, line, motors, hint_text, False)
+            self._emit(rule.level, text, line, motors, hint_text)
             return True
         return False
 
     def _emit(self, level: str, text: str, line: str, motors: tuple[int, ...],
-              hint: str | None, generic: bool) -> None:
+              hint: str | None, key: str | None = None) -> None:
+        if self._quiet:
+            return
         now = self._now()
-        if now - self._last_sent.get(text, -EVENT_GAP_S) < EVENT_GAP_S:
-            self._held[text] = self._held.get(text, 0) + 1
+        key = key or text
+        if now - self._last_sent.get(key, -EVENT_GAP_S) < EVENT_GAP_S:
+            self._held[key] = self._held.get(key, 0) + 1
             return
         if len(self._last_sent) > 1000:  # many different lines: forget the old ones
             self._last_sent = {k: t for k, t in self._last_sent.items() if now - t < EVENT_GAP_S}
-        self._last_sent[text] = now
-        count = 1 + self._held.pop(text, 0)
-        self._events.append(LogEvent(now, level, text, line[:400], motors, self._chunk_start,
-                                     hint, generic, count))
+        self._last_sent[key] = now
+        count = 1 + self._held.pop(key, 0)
+        self._events.append(LogEvent(now, level, text, line[:400], motors, hint, count))

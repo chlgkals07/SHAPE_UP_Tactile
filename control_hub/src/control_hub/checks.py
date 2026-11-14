@@ -20,7 +20,7 @@ from pathlib import Path
 from control_hub.config import Check, Host, HubConfig
 from control_hub.sysfs import DEV, SYS, tty_info, usb_devices
 
-PING_TIME = re.compile(r"time[=<]([\d.]+) ?ms")
+PING_RTT = re.compile(r"= [\d.]+/([\d.]+)/")  # "rtt min/avg/max/mdev = 0.1/0.2/0.3/0.0 ms"
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,7 @@ def _ping(target: str) -> tuple[bool, str, dict]:
     code, out = _sh(["ping", "-c", "1", "-W", "1", target], 3)
     if code != 0:
         return False, out or "응답 없음", {}
-    match = PING_TIME.search(out)
+    match = PING_RTT.search(out)
     if match is None:
         return True, "응답 있음", {}
     ms = float(match.group(1))

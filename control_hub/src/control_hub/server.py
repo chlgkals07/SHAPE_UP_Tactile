@@ -242,10 +242,11 @@ def create_app(config_path: Path | str, tmux: Tmux | None = None,
         return {"current": session.new_session()}
 
     @app.get("/api/sessions/{sid}/events")
-    def api_events(sid: str, dev: str | None = None, level: str | None = None) -> dict[str, Any]:
-        events = confined(session.read_events, sid)
-        return {"events": [e for e in events if (dev is None or e["dev"] == dev)
-                           and (level is None or e["level"] == level)]}
+    def api_events(sid: str, dev: str | None = None, level: str | None = None,
+                   limit: int = 500) -> dict[str, Any]:
+        events = [e for e in confined(session.read_events, sid)
+                  if (dev is None or e["dev"] == dev) and (level is None or e["level"] == level)]
+        return {"events": events[-limit:] if limit > 0 else events}
 
     @app.get("/api/sessions/{sid}/incidents")
     def api_incidents(sid: str) -> dict[str, Any]:

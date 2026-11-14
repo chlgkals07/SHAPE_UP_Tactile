@@ -12,8 +12,9 @@ from control_hub.sysfs import usb_devices
 
 
 def test_ping_reports_ms(monkeypatch):
+    # _sh keeps the last line, and that is ping's summary
     monkeypatch.setattr(checks, "_sh", lambda *a, **k: (
-        0, "64 bytes from 10.42.0.241: icmp_seq=1 ttl=64 time=0.412 ms"))
+        0, "rtt min/avg/max/mdev = 0.412/0.412/0.412/0.000 ms"))
     result = run_check(Check("p", "p", "ping", "10.42.0.241"), {})
     assert result.ok and result.info["ms"] == pytest.approx(0.412)
 

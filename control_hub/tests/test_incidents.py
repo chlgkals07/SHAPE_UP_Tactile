@@ -117,3 +117,20 @@ def test_other_errors_of_the_same_device_join_the_open_incident(rig):
     assert second == first and other_dev != first
     summary = (session.dir() / "incidents" / first / "summary.md").read_text()
     assert "카메라 오류 (종료 코드 1)" in summary
+
+
+def test_flush_writes_logs_of_open_incidents(rig):
+    clock, session, incidents, log_path = rig
+    log_path("leap", "r1").write_text("$ cmd\nbefore\n")
+    iid = incidents.on_event(bad(clock), {"leap": "r1"}, {}, {})
+    incidents.flush()  # hub stopping before the 30 s are up
+    folder = session.dir() / "incidents" / iid
+    assert (folder / "leap.log").read_text().splitlines() == ["before"]
+
+
+def test_other_errors_list_is_capped(rig):
+    clock, session, incidents, _ = rig
+    for i in range(30):
+        iid = incidents.on_event(bad(clock, f"err {i}"), {}, {}, {})
+    summary = (session.dir() / "incidents" / iid / "summary.md").read_text()
+    assert "err 10" in summary and "err 11" not in summary
