@@ -46,7 +46,7 @@ envs:
 # 모든 프로세스의 로그에 적용되는 힌트 (가이드 "문제 해결" 표)
 hints:
   - {match: "zenohd: command not found", hint: "컨테이너 .bashrc 가 안 읽힌 셸이다. envs.robot_ros 의 source 줄을 확인한다"}
-  - {match: "Could not resolve hostname|No route to host|Connection timed out|Network is unreachable", hint: "Robot PC 에 닿지 않는다. 연결 페이지에서 ping 부터 본다 (이더넷, 공유 모드)"}
+  - {match: "Could not resolve hostname|No route to host|Connection timed out|Network is unreachable", hint: "Robot PC 에 닿지 않는다. 오른쪽 띠의 로봇 ping 부터 본다 (이더넷, 공유 모드)"}
   - {match: "Permission denied \\(publickey", hint: "ssh 키가 등록되지 않았다. 터미널에서 ssh root@10.42.0.241 이 비밀번호 없이 되는지 확인한다"}
   - {match: "banner exchange", hint: "ping 과 TCP 22 가 되어도 이 오류면 USB 랜 허브 문제다 (10/09: 허브 교체로 해결)"}
   - {match: "No such container|is not running", hint: "Robot PC 에서 cd /data/docker/open_manipulator && ./docker/container.sh start (인터넷 필요)"}
@@ -298,7 +298,7 @@ processes:
     conflicts: [camera_ros, recorder_fake, check_cam_wrist, check_tactile_a]
     ready: {check: recorder_ui}
     help: |
-      팔·손·촉각·카메라를 한 시간축으로 기록한다. 켜지면 연결 페이지의 "녹화기 열기"(:8800)로 간다.
+      팔·손·촉각·카메라를 한 시간축으로 기록한다. 켜지면 오른쪽 띠의 "녹화기 열기"(:8800)로 간다.
       녹화기가 카메라를 직접 연다. ROS 카메라 노드와 같이 켤 수 없다.
       태스크·수집자는 녹화기 화면의 설정 페이지에서 바꾼다.
     hints:

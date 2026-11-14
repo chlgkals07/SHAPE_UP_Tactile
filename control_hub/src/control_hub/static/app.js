@@ -355,8 +355,10 @@ function renderRail() {
   const checks = Object.values(D.checks).map((c) => {
     const r = S.checks[c.id] || { ok: null, detail: "" };
     const note = r.info && r.info.ms !== undefined ? `${r.info.ms} ms` : r.ok === false ? r.detail : "";
+    const link = c.link && r.ok ? `<a href="${esc(c.target)}" target="_blank" rel="noopener">${esc(c.link)} ▸</a>` : "";
     return `<li title="${esc(c.help)}"><span class="dot ${checkDot(r)}"></span><span class="name">${esc(c.title)}</span>
-      <small class="${r.ok === false ? "bad" : ""}">${esc(note)}</small>${r.warn ? `<div class="warnline">${esc(r.warn)}</div>` : ""}</li>`;
+      <small class="${r.ok === false ? "bad" : ""}">${esc(note)}</small>${link ? `<small>${link}</small>` : ""}
+      ${r.warn ? `<div class="warnline">${esc(r.warn)}</div>` : ""}</li>`;
   }).join("");
   const services = Object.values(D.processes).filter((p) => p.kind !== "tool");
   const running = services.filter((p) => ALIVE.includes(stateOf(p.id).state)).length;
