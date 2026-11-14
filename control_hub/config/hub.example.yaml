@@ -401,15 +401,21 @@ checks:
     help: 동글을 다시 꽂는다. udev 규칙(third_party/manus/70-manus-hid.rules)이 /etc/udev/rules.d/ 에 있는지 본다.
   leap_port:
     title: LEAP USB (/dev/ttyUSB0)
-    file: /dev/ttyUSB0
+    serial: /dev/ttyUSB0
     help: LEAP 의 FTDI USB 를 꽂는다. 번호가 다르면(ttyUSB1) 다른 USB-시리얼 장치를 뺀다.
   realsense_usb:
-    title: 손목 카메라 USB
-    command: "lsusb | grep -Ei '8086:(0b5b|0b3a)'"     # 현장 확인: D405 0b5b, D435i 0b3a
+    title: 손목 카메라 USB (D405)
+    usb: "8086:0b5b"
+    warn_below_mbps: 5000
     help: OMY 를 다시 켜면 카메라가 USB 에서 사라진다. 다시 꽂는다.
+  cam_ext_usb:
+    title: 외부 카메라 USB (D435i)
+    usb: "8086:0b3a"                                   # 현장 확인: 모델이 정해지면 id 를 맞춘다
+    warn_below_mbps: 5000
+    help: 외부 고정 카메라를 USB3 포트에 꽂는다.
   paxini_port:
     title: Paxini 보드 (/dev/ttyACM*)
-    file: /dev/ttyACM*
+    serial: /dev/ttyACM*
     help: Paxini 통신 보드 USB 를 꽂는다. 권한 오류면 dialout 그룹을 확인한다.
   recorder_ui:
     title: 녹화기 UI (:8800)
@@ -477,3 +483,60 @@ profiles:
       - check_arm_action
       - check_tactile_a
       - check_cam_wrist
+
+# 장치별 묶음. 홈 화면의 칸, 장치 페이지, 오류 위치가 이것으로 정해진다
+known_usb:
+  "0403:6014": "FTDI (LEAP?)"
+  "0403:6001": "FTDI"
+  "8086:0b5b": "RealSense D405"
+  "8086:0b3a": "RealSense D435i"
+  "1915:83fd": "Manus 동글"
+
+devices:
+  robot:
+    title: 로봇 PC
+    checks: [robot_ping, robot_ssh, zenoh_port]
+    processes: [zenohd]
+    tools: [robot_precheck]
+  arm:
+    title: 팔
+    recorder_stream: [arm_state, arm_action]
+    checks: [zenoh_port]
+    processes: [arm, arm_stock]
+    tools: [arm_controllers, leader_echo, check_arm_state, check_arm_action, pack, unpack]
+    events:
+      - {match: "Multi-turn|0xc", level: bad, text: "팔 모터 Multi-turn 오류"}
+  leap:
+    title: LEAP Hand
+    kind: leap
+    recorder_stream: hand
+    usb_id: "0403:6014"                # 현장 확인: LEAP 의 FTDI id
+    checks: [leap_port]
+    processes: [leap_manus, leap_leader]
+    tools: [leap_check, leap_zero, check_hand]
+    events:
+      - {match: "Missing or unresponsive DYNAMIXEL IDs: \\[?(?P<motors>[\\d, ]+)", level: bad, text: "모터 응답 없음: {motors}"}
+      - {match: "Torque-off was not acknowledged by (motor )?IDs:? [\\[(]?(?P<motors>[\\d, ]+)", level: bad, text: "토크 OFF 미확인: {motors}. 5V 차단"}
+      - {match: "Feedback unavailable for DYNAMIXEL ID (?P<motors>\\d+)", level: bad, text: "모터 {motors} 피드백 없음"}
+      - {match: "\\[leap\\] feedback read failed", level: warn, text: "LEAP 읽기 실패 (모터 번호 모름). leap_check 로 확인"}
+  glove:
+    title: 글러브
+    recorder_stream: glove
+    checks: [manus_core_off, manus_dongle]
+    processes: [manus]
+    tools: [leap_glovecal, manus_hz, check_glove]
+  tactile:
+    title: 촉각 (Paxini)
+    recorder_stream: tactile_a
+    checks: [paxini_port]
+    tools: [check_tactile_a]
+  cam_wrist:
+    title: 손목 카메라
+    recorder_stream: cam_wrist
+    checks: [realsense_usb]
+    processes: [camera_ros]
+    tools: [check_cam_wrist]
+  cam_ext:
+    title: 외부 카메라
+    recorder_stream: cam_ext
+    checks: [cam_ext_usb]
