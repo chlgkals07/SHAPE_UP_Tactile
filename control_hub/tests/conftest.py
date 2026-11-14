@@ -63,6 +63,9 @@ processes:
   arm_stock:
     title: 순정
     cmd: sleep 60
+  motor:
+    title: 모터
+    cmd: 'echo "Missing or unresponsive DYNAMIXEL IDs: [7]"; sleep 60'
 checks:
   port: {{title: 포트, file: {flag}}}
 profiles:
@@ -73,7 +76,7 @@ devices:
     kind: leap
     recorder_stream: hand
     checks: [port]
-    processes: [server]
+    processes: [server, motor]
     tools: [once]
     usb_id: "0403:6014"
     events:

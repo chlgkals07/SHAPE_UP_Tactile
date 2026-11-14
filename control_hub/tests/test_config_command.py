@@ -29,7 +29,7 @@ def test_loads_and_links(cfg):
 
 def test_devices_parsed(cfg):
     dev = cfg.devices["hand"]
-    assert dev.kind == "leap" and dev.processes == ("server",) and dev.tools == ("once",)
+    assert dev.kind == "leap" and dev.processes == ("server", "motor") and dev.tools == ("once",)
     assert dev.checks == ("port",) and dev.recorder_stream == ("hand",)
     assert dev.usb_id == "0403:6014"
     rule = dev.events[0]

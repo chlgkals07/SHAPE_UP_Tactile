@@ -21,7 +21,7 @@ from typing import Any
 from control_hub.checks import CheckResult
 from control_hub.command import build_command
 from control_hub.config import ID_PATTERN, HubConfig, Process
-from control_hub.logscan import LogScanner, read_chunk
+from control_hub.logscan import LogEvent, LogScanner, read_chunk
 from control_hub.tmux import Tmux, TmuxError, Window
 
 RUN_PATTERN = re.compile(r"^\d{8}-\d{6}(-\d+)?$")
@@ -65,7 +65,7 @@ class Supervisor:
     def _dir(self, pid: str) -> Path:
         return self.cfg.log_dir / pid
 
-    def _log_path(self, pid: str, run: str) -> Path:
+    def log_path(self, pid: str, run: str) -> Path:
         return self._dir(pid) / f"{run}.log"
 
     def _exit_path(self, pid: str, run: str) -> Path:
@@ -85,7 +85,9 @@ class Supervisor:
         proc = self.cfg.processes.get(pid)
         ready = proc.ready.log if proc is not None and proc.ready is not None else None
         hints = [*(proc.hints if proc is not None else ()), *self.cfg.hints]
-        return LogScanner(self._log_path(pid, run), ready, hints)
+        rules = [rule for dev in self.cfg.devices.values() if pid in (*dev.processes, *dev.tools)
+                 for rule in dev.events]
+        return LogScanner(self.log_path(pid, run), ready, hints, rules)
 
     def _load_run(self, pid: str) -> Run | None:
         try:
@@ -95,6 +97,7 @@ class Supervisor:
         except (OSError, ValueError, KeyError, TypeError):
             return None
         run.scanner = self._scanner(pid, run.run)
+        run.scanner.skip_existing()  # adopted: what it printed before is not news
         self._runs[pid] = run
         return run
 
@@ -118,6 +121,7 @@ class Supervisor:
             self.cfg = cfg
             for pid, run in self._runs.items():  # hints and ready patterns may have changed
                 run.scanner = self._scanner(pid, run.run)
+                run.scanner.skip_existing()
 
     # ---- status ----
     def _base_state(self, pid: str, window: Window | None,
@@ -251,7 +255,7 @@ class Supervisor:
             self._prune(pid)
             stamp = time.strftime("%Y%m%d-%H%M%S")
             run_id, n = stamp, 1
-            while self._log_path(pid, run_id).exists():
+            while self.log_path(pid, run_id).exists():
                 n += 1
                 run_id = f"{stamp}-{n}"
             command = build_command(self.cfg, proc, chosen)
@@ -270,7 +274,7 @@ class Supervisor:
             self._runs[pid] = run
             self._save_run(pid, run)
             try:
-                self.tmux.spawn(pid, script, self._log_path(pid, run_id))
+                self.tmux.spawn(pid, script, self.log_path(pid, run_id))
             except TmuxError as exc:
                 self._forget(pid)
                 raise HubError(f"{proc.title}: 창을 만들지 못했습니다 ({exc})") from exc
@@ -330,6 +334,16 @@ class Supervisor:
                 raise HubError(str(exc)) from exc
 
     # ---- logs ----
+    def drain_events(self) -> dict[str, list[LogEvent]]:
+        """Device events found in each running process's log since the last call."""
+        with self._lock:
+            out = {}
+            for pid, run in self._runs.items():
+                if run.scanner is not None:
+                    run.scanner.poll()
+                    out[pid] = run.scanner.drain()
+            return out
+
     def _known(self, pid: str) -> None:
         if pid in self.cfg.processes:
             return
@@ -353,5 +367,5 @@ class Supervisor:
                 run = past[0] if past else None
         if run is None or not RUN_PATTERN.match(run):
             return {"run": None, "offset": 0, "text": ""}
-        new_offset, text = read_chunk(self._log_path(pid, run), offset)
+        new_offset, text = read_chunk(self.log_path(pid, run), offset)
         return {"run": run, "offset": new_offset, "text": text}

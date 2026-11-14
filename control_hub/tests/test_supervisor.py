@@ -171,6 +171,27 @@ def test_restart_adopts_running_processes(cfg, tmux):
     until(second, "server", "off")
 
 
+def test_drain_events_by_process(cfg, tmux):
+    sup = Supervisor(cfg, tmux)
+    sup.start("motor")
+    events = wait_for(lambda: sup.drain_events().get("motor"), what="motor event")
+    assert [e.motors for e in events] == [(7,)]
+    assert sup.drain_events().get("motor") == []
+    assert sup.log_path("motor", sup.status()["motor"]["run"]).is_file()
+    sup.kill("motor")
+
+
+def test_restart_does_not_replay_old_log(cfg, tmux):
+    first = Supervisor(cfg, tmux)
+    first.start("motor")
+    wait_for(lambda: first.drain_events().get("motor"), what="motor event")
+    second = Supervisor(cfg, tmux)  # hub restart: the old line must not come back as new
+    assert second.drain_events().get("motor") == []
+    second.reload(cfg)
+    assert second.drain_events().get("motor") == []
+    second.kill("motor")
+
+
 def test_reload_marks_stale_and_keeps_orphans(cfg, tmux, config_path):
     sup = Supervisor(cfg, tmux)
     sup.start("arm_stock")
