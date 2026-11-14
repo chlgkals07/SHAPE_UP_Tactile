@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import glob
 import os
+import re
 import socket
 import subprocess
 import threading
@@ -13,9 +14,13 @@ import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 
 from control_hub.config import Check, Host, HubConfig
+from control_hub.sysfs import DEV, SYS, tty_info, usb_devices
+
+PING_TIME = re.compile(r"time[=<]([\d.]+) ?ms")
 
 
 @dataclass(frozen=True)
@@ -23,9 +28,12 @@ class CheckResult:
     ok: bool | None  # None: not looked at yet
     detail: str = ""
     checked_at: float = 0.0
+    info: dict = field(default_factory=dict)  # details shown on the device page
+    warn: str = ""  # works, but something will bite (slow USB, latency timer)
 
     def to_json(self) -> dict:
-        return {"ok": self.ok, "detail": self.detail, "checked_at": self.checked_at}
+        return {"ok": self.ok, "detail": self.detail, "checked_at": self.checked_at,
+                "info": self.info, "warn": self.warn}
 
 
 def _sh(args: list[str] | str, timeout: float, shell: bool = False) -> tuple[int, str]:
@@ -41,9 +49,15 @@ def _sh(args: list[str] | str, timeout: float, shell: bool = False) -> tuple[int
     return result.returncode, lines[-1].strip()[:200] if lines else ""
 
 
-def _ping(target: str) -> tuple[bool, str]:
+def _ping(target: str) -> tuple[bool, str, dict]:
     code, out = _sh(["ping", "-c", "1", "-W", "1", target], 3)
-    return code == 0, "응답 있음" if code == 0 else (out or "응답 없음")
+    if code != 0:
+        return False, out or "응답 없음", {}
+    match = PING_TIME.search(out)
+    if match is None:
+        return True, "응답 있음", {}
+    ms = float(match.group(1))
+    return True, f"{ms:g} ms", {"ms": ms}
 
 
 def _tcp(target: str) -> tuple[bool, str]:
@@ -77,9 +91,39 @@ def _ssh(host: Host) -> tuple[bool, str]:
     return code == 0, "접속됨" if code == 0 else (out or "접속 실패")
 
 
-def _usb(target: str) -> tuple[bool, str]:
-    code, out = _sh(["lsusb", "-d", target], 3)
-    return code == 0 and bool(out), out.split(" ", 6)[-1] if code == 0 and out else "꽂혀 있지 않음"
+def _serial(target: str, sys_root: Path, dev_root: Path) -> tuple[bool, str, dict, str]:
+    matches = sorted(glob.glob(os.path.expanduser(target)))
+    if not matches:
+        return False, "없음", {}, ""
+    path = matches[0]
+    tty = Path(path).name
+    found = tty_info(tty, sys_root, dev_root)
+    usb = found["usb"]
+    info = {"path": path, "tty": tty, "by_id": found["by_id"],
+            "latency_timer": found["latency_timer"],
+            "serial": usb.serial if usb else "", "usb_id": usb.usb_id if usb else "",
+            "rw": os.access(path, os.R_OK | os.W_OK)}
+    if not info["rw"]:
+        return False, f"{path}: 권한 없음 (dialout 그룹)", info, ""
+    warn = ""
+    latency = found["latency_timer"]
+    if latency is not None and latency != 1:
+        warn = (f"latency timer {latency} (1 이어야 빠름). "
+                "USB 를 다시 꽂으면 16 으로 돌아갑니다")
+    return True, path, info, warn
+
+
+def _usb(check: Check, sys_root: Path, dev_root: Path) -> tuple[bool, str, dict, str]:
+    usb = next((d for d in usb_devices(sys_root, dev_root) if d.usb_id == check.target), None)
+    if usb is None:
+        return False, "꽂혀 있지 않음", {}, ""
+    info = {"speed_mbps": usb.speed_mbps, "serial": usb.serial, "product": usb.product,
+            "bus_path": usb.bus_path}
+    warn = ""
+    if check.warn_below_mbps and usb.speed_mbps is not None \
+            and usb.speed_mbps < check.warn_below_mbps:
+        warn = f"USB {usb.speed_mbps} Mbps 로 잡힘 (USB3 포트에 꽂기)"
+    return True, usb.product or check.target, info, warn
 
 
 def _process(target: str) -> tuple[bool, str]:
@@ -87,10 +131,13 @@ def _process(target: str) -> tuple[bool, str]:
     return code == 0, out if code == 0 else "실행 중이 아님"
 
 
-def run_check(check: Check, hosts: dict[str, Host]) -> CheckResult:
+def run_check(check: Check, hosts: dict[str, Host], sys_root: Path = SYS,
+              dev_root: Path = DEV) -> CheckResult:
+    info: dict = {}
+    warn = ""
     try:
         if check.kind == "ping":
-            ok, detail = _ping(check.target)
+            ok, detail, info = _ping(check.target)
         elif check.kind == "tcp":
             ok, detail = _tcp(check.target)
         elif check.kind == "file":
@@ -100,7 +147,9 @@ def run_check(check: Check, hosts: dict[str, Host]) -> CheckResult:
         elif check.kind == "ssh":
             ok, detail = _ssh(hosts[check.target])
         elif check.kind == "usb":
-            ok, detail = _usb(check.target)
+            ok, detail, info, warn = _usb(check, sys_root, dev_root)
+        elif check.kind == "serial":
+            ok, detail, info, warn = _serial(check.target, sys_root, dev_root)
         elif check.kind == "process":
             ok, detail = _process(check.target)
         elif check.kind == "no_process":
@@ -111,7 +160,7 @@ def run_check(check: Check, hosts: dict[str, Host]) -> CheckResult:
             ok = code == 0
     except Exception as exc:  # noqa: BLE001 - a probe must never take the hub down
         ok, detail = False, f"{type(exc).__name__}: {exc}"
-    return CheckResult(ok, detail, time.time())
+    return CheckResult(ok, detail, time.time(), info, warn)
 
 
 class CheckRunner:
