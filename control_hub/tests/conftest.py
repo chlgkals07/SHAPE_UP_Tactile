@@ -12,6 +12,7 @@ from control_hub.tmux import Tmux
 
 BASE = """
 log_dir: {log_dir}
+session_dir: {session_dir}
 tmux: {{socket: {socket}, session: hub}}
 hosts:
   robot: {{ssh: root@robot.invalid}}
@@ -112,7 +113,8 @@ def tmux(socket_name):
 def config_path(tmp_path: Path, socket_name: str) -> Path:
     path = tmp_path / "hub.yaml"
     path.write_text(textwrap.dedent(BASE).format(
-        log_dir=tmp_path / "logs", socket=socket_name, flag=tmp_path / "port.flag"),
+        log_dir=tmp_path / "logs", session_dir=tmp_path / "sessions", socket=socket_name,
+        flag=tmp_path / "port.flag"),
         encoding="utf-8")
     return path
 

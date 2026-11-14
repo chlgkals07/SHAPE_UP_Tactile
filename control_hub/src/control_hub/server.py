@@ -12,18 +12,21 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from control_hub.checks import CheckRunner
 from control_hub.command import build_command
 from control_hub.config import LOCAL, ConfigError, HubConfig, Process, load_config
+from control_hub.incidents import Incidents
+from control_hub.session import SessionLog
 from control_hub.supervisor import HubError, Supervisor
 from control_hub.tmux import Tmux, TmuxError
+from control_hub.watcher import Watcher
 
 STATIC = Path(__file__).parent / "static"
 
@@ -101,26 +104,34 @@ def describe(cfg: HubConfig, tmux: Tmux) -> dict[str, Any]:
 
 
 def create_app(config_path: Path | str, tmux: Tmux | None = None,
-               start_checks: bool = True) -> FastAPI:
+               background: bool = True) -> FastAPI:
+    """``background=False`` (tests) starts neither the checks nor the watcher thread."""
     config_path = Path(config_path)
     cfg = load_config(config_path)
     tmux = tmux or Tmux(cfg.tmux_socket, cfg.tmux_session)
     runner = CheckRunner(cfg)
     supervisor = Supervisor(cfg, tmux, runner.results)
+    session = SessionLog(cfg.session_dir, cfg.keep_sessions)
+    incidents = Incidents(session, supervisor.log_path)
+    watcher = Watcher(cfg, supervisor, runner, session, incidents)
     hub: dict[str, Any] = {"cfg": cfg, "config_error": None, "loaded_at": time.time()}
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
-        if start_checks:
+        if background:
             runner.start()
+            watcher.start()
         try:
             yield
         finally:
+            watcher.stop()
             runner.stop()  # the processes themselves belong to tmux and keep running
 
     app = FastAPI(title="Control Hub", docs_url=None, redoc_url=None, lifespan=lifespan)
     app.state.supervisor = supervisor
     app.state.runner = runner
+    app.state.watcher = watcher
+    app.state.incidents = incidents
 
     @app.middleware("http")
     async def same_origin_only(request: Request, call_next):
@@ -162,6 +173,7 @@ def create_app(config_path: Path | str, tmux: Tmux | None = None,
             "config_error": hub["config_error"],
             "processes": supervisor.status(),
             "checks": {cid: result.to_json() for cid, result in runner.results().items()},
+            **watcher.snapshot(),  # devices, scan, session: at most one watcher step old
         }
 
     @app.post("/api/process/{pid}/start")
@@ -209,7 +221,45 @@ def create_app(config_path: Path | str, tmux: Tmux | None = None,
         hub.update(cfg=new, config_error=None, loaded_at=time.time())
         supervisor.reload(new)
         runner.reload(new)
+        watcher.reload(new)
         return {"ok": True}
+
+    def confined(read, *args):
+        """Session and incident ids come from the URL: anything not shaped like one is 404."""
+        try:
+            return read(*args)
+        except KeyError:
+            raise HTTPException(404, "그런 세션이나 사고가 없습니다") from None
+
+    @app.get("/api/sessions")
+    def api_sessions() -> dict[str, Any]:
+        return {"current": session.current, "sessions": session.sessions()}
+
+    @app.post("/api/sessions/new")
+    def api_new_session() -> dict[str, Any]:
+        return {"current": session.new_session()}
+
+    @app.get("/api/sessions/{sid}/events")
+    def api_events(sid: str, dev: str | None = None, level: str | None = None) -> dict[str, Any]:
+        events = confined(session.read_events, sid)
+        return {"events": [e for e in events if (dev is None or e["dev"] == dev)
+                           and (level is None or e["level"] == level)]}
+
+    @app.get("/api/sessions/{sid}/incidents")
+    def api_incidents(sid: str) -> dict[str, Any]:
+        return {"incidents": confined(incidents.list, sid)}
+
+    @app.get("/api/sessions/{sid}/incidents/{iid}")
+    def api_incident(sid: str, iid: str) -> dict[str, Any]:
+        return confined(incidents.read, sid, iid)
+
+    @app.get("/api/sessions/{sid}/export")
+    def api_export(sid: str, incident: str | None = None) -> Response:
+        data = confined(incidents.zip, sid, incident)
+        name = f"{sid}_{incident}.zip" if incident else f"{sid}.zip"
+        disposition = f"attachment; filename*=UTF-8''{quote(name)}"
+        return Response(data, media_type="application/zip",
+                        headers={"Content-Disposition": disposition})
 
     @app.get("/")
     def index() -> FileResponse:

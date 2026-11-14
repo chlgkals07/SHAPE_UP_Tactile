@@ -8,7 +8,7 @@ from control_hub.server import create_app
 
 
 def client_for(config_path, tmux) -> TestClient:
-    return TestClient(create_app(config_path, tmux, start_checks=False))
+    return TestClient(create_app(config_path, tmux, background=False))
 
 
 def state(client: TestClient, pid: str) -> str:
@@ -85,3 +85,50 @@ def test_index_and_cli_validate(config_path, tmux, tmp_path, capsys):
     broken.write_text("processes: {a: {cmd: x, requires: [nope]}}")
     assert main(["validate", "--config", str(broken)]) == 2
     assert "processes.a.requires" in capsys.readouterr().err
+
+
+def test_state_has_devices_and_scan(config_path, tmux):
+    with client_for(config_path, tmux) as client:
+        client.app.state.watcher.step()
+        data = client.get("/api/state").json()
+        assert data["devices"]["hand"]["level"] in ("ok", "bad", "warn", "idle")
+        assert "devices" in data["scan"] and data["session"]
+
+
+def test_sessions_api_flow(config_path, tmux):
+    with client_for(config_path, tmux) as client:
+        first = client.get("/api/sessions").json()["current"]
+        new = client.post("/api/sessions/new").json()["current"]
+        listing = client.get("/api/sessions").json()
+        assert new != first and listing["current"] == new
+        assert [s["id"] for s in listing["sessions"]][:2] == [new, first]
+        assert client.get(f"/api/sessions/{new}/events").json() == {"events": []}
+        assert client.get(f"/api/sessions/{new}/incidents").json() == {"incidents": []}
+
+
+def test_session_paths_are_confined(config_path, tmux):
+    with client_for(config_path, tmux) as client:
+        sid = client.get("/api/sessions").json()["current"]
+        assert client.get("/api/sessions/..%2F..%2Fetc/events").status_code == 404
+        assert client.get("/api/sessions/nope/incidents").status_code == 404
+        assert client.get(f"/api/sessions/{sid}/incidents/..%2Fx").status_code == 404
+        assert client.get(f"/api/sessions/{sid}/export?incident=..").status_code == 404
+
+
+def test_export_zip_and_incident(config_path, tmux):
+    import io
+    import zipfile
+
+    from control_hub.session import Event
+
+    with client_for(config_path, tmux) as client:
+        app = client.app
+        sid = client.get("/api/sessions").json()["current"]
+        iid = app.state.incidents.on_event(Event(1.0, "hand", "log", "bad", "모터 7", {}),
+                                           {}, {}, {})
+        assert client.get(f"/api/sessions/{sid}/incidents").json()["incidents"][0]["id"] == iid
+        detail = client.get(f"/api/sessions/{sid}/incidents/{iid}").json()
+        assert detail["summary"].startswith("# 모터 7")
+        response = client.get(f"/api/sessions/{sid}/export?incident={iid}")
+        assert response.headers["content-type"] == "application/zip"
+        assert f"{iid}/summary.md" in zipfile.ZipFile(io.BytesIO(response.content)).namelist()
