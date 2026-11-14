@@ -222,7 +222,8 @@ Stream:  latest()            최신값 (UI, 정책)
 <ul>
 <li><b>격자</b>: 녹화 시작 이후, 모든 스트림이 값을 낸 시점부터 1/30초 간격.</li>
 <li><b>값 고르기</b>: 각 격자 시점에서 그 이전의 가장 최근 값. 미래 값을 쓰지 않고 보간하지 않는다.</li>
-<li><b>스트림별 시각 선택</b> (<code>dataset.time</code>): <code>recv</code> 수신 시각, <code>src</code> 장치 시각, <code>respread</code> 일정 주기 가정으로 USB 뭉침 제거. 기본은 손 <code>src</code>, 촉각 <code>respread</code>, 나머지 <code>recv</code>.</li>
+<li><b>스트림별 시각 선택</b> (<code>dataset.time</code>): <code>recv</code> 수신 시각, <code>src</code> 장치 시각, <code>respread</code> USB 뭉침 제거. 기본은 손 <code>src</code>, 촉각 <code>respread</code>, 나머지 <code>recv</code>.</li>
+<li><b><code>respread</code>의 규칙</b>: 한꺼번에 도착한 샘플을 뒤에서부터 한 주기씩 앞으로 편다. 샘플을 수신 시각보다 늦게도, 실제로 만들어진 시각보다 이르게도 놓지 않는다. 프레임이 유실돼도 마찬가지라서 데이터셋에 미래 값이 섞이지 않는다.</li>
 <li><b>지연 보정</b> (<code>dataset.latency_ms</code>): 스트림별로 빼 줄 지연. 현장 실측 뒤에 채운다. 원본은 그대로라서 값을 바꿔 다시 변환할 수 있다.</li>
 <li><b>품질 보고</b>: 에피소드마다 스트림별로 "값이 최대 몇 ms 오래됐는지"를 낸다. 150 ms를 넘거나 끊김 표시가 있으면 기본으로 제외한다.</li>
 </ul>
@@ -243,11 +244,12 @@ Stream:  latest()            최신값 (UI, 정책)
 </ul>
 
 <h2 id="s7">7. UI <span class="tag done">구현</span></h2>
-<figure><img src="../images/recorder_ui_record.png" alt="녹화 화면: 카메라 미리보기, 손가락별 촉각 분포, 손 관절, 상태와 버튼, 스트림 표"><figcaption>녹화 화면 (가짜 장치). 흰 배경에 색은 상태에만 쓴다.</figcaption></figure>
+<figure><img src="../images/recorder_ui_record.png" alt="녹화 화면: 카메라 미리보기, 손가락별 촉각 분포, 손 관절, 상태와 버튼, 스트림 표"><figcaption>녹화 화면 (가짜 장치). 흰 배경에 색은 상태와 촉각 값에만 쓴다.</figcaption></figure>
 <div class="scroll"><table>
 <thead><tr><th>페이지</th><th>내용</th></tr></thead>
 <tbody>
-<tr><td>녹화</td><td>카메라 미리보기(회전 적용), 손가락 4개의 끝·마디 촉각 분포와 합력, 손 관절의 명령 대 측정, 상태·타이머·큰 버튼, 시작 전 점검 결과, 스트림 표</td></tr>
+<tr><td>녹화</td><td>카메라 미리보기(회전 적용, 영상 비율 그대로), 손가락 4개의 끝·마디 촉각, 손 관절의 명령 대 측정, 상태·타이머·큰 버튼, 시작 전 점검 결과, 스트림 표</td></tr>
+<tr><td>촉각 표시</td><td>Paxini SDK 뷰어(<code>paxini_sdk/tools/to_rerun.py</code>)와 같은 규칙: 제조사 좌표의 3D 측정점, 힘이 없으면 밝은 회색, 수직력이 클수록 진한 파랑과 큰 점(기본 3 N에서 최대), 센서마다 합력 Fx / Fy / Fz 추이. 끌어서 회전한다</td></tr>
 <tr><td>에피소드</td><td>이 태스크의 저장 목록, 길이·최대 공백·표시, 성공 / 실패 변경, 삭제, 변환 명령</td></tr>
 <tr><td>센서</td><td>스트림별 Hz 추이, 받은 수, 빠진 수, 항목, 펌웨어와 모듈 배치, 촉각 영점 보정</td></tr>
 <tr><td>설정</td><td>태스크 이름·문장, 수집자, 시간 제한 (대기 중에만). 장치 구성은 읽기 전용</td></tr>
@@ -256,7 +258,7 @@ Stream:  latest()            최신값 (UI, 정책)
 <li><b>조작</b>: 버튼과 단일 키(Space, S, F, D, M, Z). 발판 스위치를 키로 매핑하면 그대로 쓴다.</li>
 <li><b>소리</b>: 시작, 정지, 저장, 끊김이 서로 다른 소리다.</li>
 <li><b>확장</b>: 왼쪽 메뉴에 항목을 추가하는 구조라서, 나중의 bring-up 화면이 여기에 붙는다.</li>
-<li><b>주의</b>: 로그인이 없다. 연구실 네트워크가 아니면 <code>ui.host: 127.0.0.1</code>로 둔다.</li>
+<li><b>접속 범위</b>: 기본은 이 PC에서만 열린다(<code>127.0.0.1</code>). 태블릿에서 쓰려면 <code>--host 0.0.0.0</code>으로 띄운다. 로그인이 없으므로 믿을 수 있는 네트워크에서만 쓴다. 다른 웹 페이지가 보낸 요청은 거부한다.</li>
 </ul>
 
 <h2 id="impl">폴더와 기술 스택</h2>
@@ -301,11 +303,12 @@ user_pc/src/leap_teleop/record_sink.py   손·글러브 값을 허브로 보내�
 <div class="scroll"><table>
 <thead><tr><th>확인</th><th>결과</th></tr></thead>
 <tbody>
-<tr><td>녹화기 시험</td><td>78개 통과 (<code>recorder/tests</code>)</td></tr>
+<tr><td>녹화기 시험</td><td>89개 통과 (<code>recorder/tests</code>)</td></tr>
 <tr><td>기존 텔레옵 시험</td><td>155개 통과 (<code>user_pc/tests</code>, 싱크 시험 4개 포함). 기존 동작 변화 없음</td></tr>
 <tr><td>코드 검사</td><td>ruff 통과</td></tr>
-<tr><td>가짜 장치 실제 실행</td><td>9초 에피소드 2개. 팔 100 Hz, 손 50 Hz, 촉각 90 Hz, 카메라 30 Hz 그대로 기록, 빠짐 0</td></tr>
-<tr><td>LeRobot v2.1</td><td>openpi가 고정한 lerobot으로 쓰고 <code>LeRobotDataset</code>으로 다시 읽음. 프레임 542개, 위 표의 키와 차원 그대로</td></tr>
+<tr><td>가짜 장치 실제 실행</td><td>에피소드 2개. 팔 100 Hz, 손 50 Hz, 촉각 90 Hz, 카메라 30 Hz 그대로 기록, 빠짐 0</td></tr>
+<tr><td>LeRobot v2.1</td><td>openpi가 고정한 lerobot으로 쓰고 <code>LeRobotDataset</code>으로 다시 읽음. 위 표의 키와 차원 그대로</td></tr>
+<tr><td>코드 리뷰 (11/14)</td><td>10건 반영: 디스크 쓰기 실패 시 멈춤, 프레임 유실 때 촉각 시각이 앞당겨지는 문제, UI 갱신 작업이 예외 하나로 죽는 문제, <code>--overwrite</code>가 검증 전에 지우는 문제, 잘못된 글러브 패킷이 손 값까지 버리는 문제, 다른 PC의 시각을 그대로 믿는 문제, 건너뛸 에피소드가 변환 전체를 막는 문제, 서버 지연, 외부 접속 기본값, 중복 코드</td></tr>
 <tr><td>실측 도구</td><td>가짜 신호에서 스트림 간 차이 13 ms 이내 (각 스트림의 한 주기 안)</td></tr>
 <tr><td>웹 UI</td><td>헤드리스 Chrome으로 네 페이지 렌더 확인, API로 시작 → 정지 → 저장 확인</td></tr>
 </tbody></table></div>

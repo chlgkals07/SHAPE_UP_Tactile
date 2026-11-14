@@ -92,11 +92,14 @@ def test_session_change_through_the_api(client):
 def test_describe_lists_cameras_and_tactile_places_with_taxel_positions(client):
     info = client.get("/api/describe").json()
     assert info["cameras"] == [
-        {"name": "cam_wrist", "rotation_deg": 90}, {"name": "cam_ext", "rotation_deg": 0}
+        {"name": "cam_wrist", "rotation_deg": 90, "width": 48, "height": 64},
+        {"name": "cam_ext", "rotation_deg": 0, "width": 64, "height": 48},
     ]
     assert set(info["tactile"]) == set(info["tactile_order"])
     tip, pad = info["tactile"]["index_tip"], info["tactile"]["index_pad"]
-    assert (tip["points"], len(tip["xy"])) == (52, 52) and len(pad["xy"]) == 25
+    assert (tip["points"], len(tip["xyz"])) == (52, 52) and len(pad["xyz"]) == 25
+    assert len(tip["xyz"][0]) == 3
+    assert info["cameras"][0]["width"] < info["cameras"][0]["height"]  # wrist camera is upright
     assert tip["board"] == "tactile_a" and tip["module"] == "Index-Tip"
 
 
@@ -242,3 +245,41 @@ def test_check_command_passes_on_a_healthy_fake_stream(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "PASS" in out and "payload" in out
     assert main(["check", "nope", "--config", str(config_path)]) == 2
+
+
+# ---- review fixes ------------------------------------------------------------------------------
+
+
+def test_requests_from_another_site_cannot_drive_the_recorder(client):
+    evil = {"Origin": "http://evil.example"}
+    assert client.post("/api/record/discard", headers=evil).status_code == 403
+    assert client.post("/api/record/start", json={}, headers=evil).status_code == 403
+    assert client.get("/api/state").json()["recorder"]["state"] == "idle"
+    own = {"Origin": "http://testserver"}
+    assert client.post("/api/record/start", json={}, headers=own).status_code == 200
+    assert client.post("/api/record/discard", headers=own).status_code == 200
+
+
+def test_preview_is_encoded_once_per_frame(rig):
+    rig.run(0.2)
+    first = live.preview_jpeg(rig.hub, "cam_ext", width=32)
+    assert live.preview_jpeg(rig.hub, "cam_ext", width=32) is first  # same frame: cached
+    rig.run(0.1)
+    assert live.preview_jpeg(rig.hub, "cam_ext", width=32) is not first
+
+
+def test_overwrite_keeps_the_old_output_when_the_request_is_invalid(rig, tmp_path, capsys):
+    import yaml
+    from conftest import fake_config_dict
+
+    config_path = tmp_path / "rig.yaml"
+    config_path.write_text(yaml.safe_dump(fake_config_dict(tmp_path)))
+    out_dir = tmp_path / "dataset"
+    out_dir.mkdir()
+    (out_dir / "precious.txt").write_text("previous dataset")
+    base = ["convert", "--config", str(config_path), "--out", str(out_dir), "--overwrite"]
+    empty = tmp_path / "no_episodes"
+    empty.mkdir()
+    assert main([*base, "--in", str(empty), "--format", "npz"]) == 2  # nothing to convert
+    assert main([*base, "--in", str(empty)]) == 2  # lerobot format without --repo-id
+    assert (out_dir / "precious.txt").read_text() == "previous dataset"

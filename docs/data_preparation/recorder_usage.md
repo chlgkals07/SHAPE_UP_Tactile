@@ -104,7 +104,7 @@ cd ../user_pc && env -u PYTHONPATH python -m pytest -q   # 텔레옵 시험 (싱
    tactile-rec record --config config/rig.yaml --task pick_cup --text "Pick up the cup" --operator hamin
    ```
 
-6. 브라우저에서 `http://localhost:8800`. 같은 네트워크의 태블릿에서는 `http://<User PC 주소>:8800`.
+6. 브라우저에서 `http://localhost:8800`. 기본은 이 PC에서만 열린다. 태블릿에서 쓰려면 `--host 0.0.0.0` 을 붙여 띄우고 `http://<User PC 주소>:8800` 으로 연다. 로그인이 없으므로 믿을 수 있는 네트워크에서만 한다.
 
 ### 화면에서 하는 일
 
@@ -158,7 +158,7 @@ cd ../user_pc && env -u PYTHONPATH python -m pytest -q   # 텔레옵 시험 (싱
 
 1. `tactile-rec record --config config/rig.yaml` 로 띄우고 센서 페이지에서 모든 스트림이 "정상"인지 본다.
 2. 녹화 페이지에서 손목 카메라가 바로 서 있는지 본다. 누워 있으면 `rotation_deg` 를 바꾼다 (다시 찍을 필요 없이 설정만).
-3. 촉각 패널: 손가락을 하나씩 눌러서 화면의 같은 손가락·같은 마디가 반응하는지 본다. 다르면 `places` 가 틀린 것이다.
+3. 촉각 패널: 손가락을 하나씩 눌러서 화면의 같은 손가락·같은 마디가 반응하는지 본다. 다르면 `places` 가 틀린 것이다. 표시는 Paxini SDK 뷰어와 같은 방식이다 (힘이 클수록 진한 파랑과 큰 점, 아래는 합력 Fx / Fy / Fz). 센서를 끌면 회전하고 두 번 누르면 원래대로 돌아온다.
 4. 10초짜리 에피소드를 하나 찍고 `tactile-rec inspect <에피소드>` 로 스트림별 Hz 와 최대 공백을 본다.
 
 ### 5.3 시간 차이 실측

@@ -80,14 +80,15 @@ def test_packets_from_the_real_teleop_sink_arrive_as_hand_and_glove_samples():
     stream.start()
     time.sleep(0.2)
     driver = SimpleNamespace(last_sent_degrees=lambda: np.full(16, 11.0))
-    sink = UdpRecordSink("127.0.0.1", port, driver, clock_ns=lambda: 123_000)
+    sink = UdpRecordSink("127.0.0.1", port, driver)  # stamps with the real monotonic clock
     feedback = SimpleNamespace(
         positions_degrees=np.full(16, 10.0),
         velocities_degrees_per_second=np.full(16, 3.0),
         currents_milliamps=np.full(16, 80.0),
     )
     nodes = (("Hand/Invalid", (0, 0, 0, 0, 0, 0, 1)), ("Index/TIP", (0.1, 0.2, 0.3, 0, 0, 0, 1)))
-    reading = Reading(timestamp=2.5, human=HumanHand(np.arange(20.0), None, nodes))
+    glove_time = time.monotonic()
+    reading = Reading(timestamp=glove_time, human=HumanHand(np.arange(20.0), None, nodes))
     sink.publish(np.full(16, 12.0), feedback, "live", reading)
     sink.publish(np.full(16, 13.0), None, "hold", reading)  # same glove sample, no feedback
     deadline = time.monotonic() + 2.0
@@ -99,13 +100,15 @@ def test_packets_from_the_real_teleop_sink_arrive_as_hand_and_glove_samples():
     samples = stream.recent(0)
     assert len(samples) == 2
     first, second = samples
-    assert first.t_src_ns == 123_000 and (first.src_seq, second.src_seq) == (0, 1)
+    # The sender is on this PC, so its stamp is kept and is a little before the receive time.
+    assert 0 <= first.t_recv_ns - first.t_src_ns < 500_000_000
+    assert (first.src_seq, second.src_seq) == (0, 1)
     assert first.data["cmd"][0] == 12 and first.data["sent"][0] == 11 and first.data["cur"][0] == 80
     assert int(first.data["mode"]) == 0 and int(second.data["mode"]) == 1
     assert np.isnan(second.data["pos"]).all()  # feedback read failed on that tick
     glove = stream.glove.recent(0)
     assert len(glove) == 1  # the unchanged glove sample is not repeated
-    assert glove[0].t_src_ns == 2_500_000_000
+    assert glove[0].t_src_ns == int(round(glove_time * 1e9))
     assert glove[0].data["ergo"].tolist() == list(range(20))
     assert int(glove[0].data["n_nodes"]) == 2
     assert glove[0].data["nodes"][1, :3].tolist() == pytest.approx([0.1, 0.2, 0.3])
@@ -121,9 +124,30 @@ def test_malformed_packets_are_rejected():
         json.dumps({**good, "cmd": [0.0] * 15}).encode(),
         json.dumps({k: v for k, v in good.items() if k != "mode"}).encode(),
         json.dumps({**good, "cmd": None}).encode(),
+        json.dumps({**good, "seq": None}).encode(),  # wrong type, not a missing key
+        json.dumps({**good, "cmd": "abc"}).encode(),
     ):
         with pytest.raises(ValueError):
             parse_packet(bad)
+
+
+def test_a_bad_glove_block_does_not_cost_the_hand_sample():
+    good = {"v": 1, "seq": 3, "t_ns": 1, "mode": "live", "cmd": [0.0] * 16}
+    for glove in ({"ergo": [0.0] * 20}, {"t_ns": 5}, "nonsense", {"t_ns": 5, "ergo": [0.0] * 3}):
+        packet = parse_packet(json.dumps({**good, "glove": glove}).encode())
+        assert packet.seq == 3 and packet.glove is None and "bad glove" in packet.glove_error
+
+
+def test_a_stamp_from_another_clock_is_dropped_not_trusted():
+    from tactile_rec.clock import FakeClock
+
+    cfg = {"hz": 50, "host": "127.0.0.1", "port": 0, "glove": False, "required": True}
+    stream = HandUdpStream("hand", cfg, FakeClock())
+    now = 10_000_000_000
+    assert stream._sender_time(now - 2_000_000, now) == now - 2_000_000  # 2 ms old: same PC
+    assert stream._sender_time(now + 5_000_000_000, now) == NO_TIME  # from the future
+    assert stream._sender_time(now - 90_000_000_000, now) == NO_TIME  # another machine's uptime
+    assert stream.clock_mismatch == 2 and stream.spec.meta["clock_mismatch"] == 2
 
 
 def test_bad_packets_are_counted_and_do_not_stop_the_stream():

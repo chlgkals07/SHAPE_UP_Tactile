@@ -41,17 +41,20 @@
       <div class="record-grid">
         <div class="col-main">
           <div class="panel">
-            <div class="panel-head"><h2>카메라</h2><span class="muted">미리보기 (녹화는 원본 해상도)</span></div>
+            <div class="panel-head"><h2>카메라</h2><span class="muted">미리보기입니다. 녹화는 원본 해상도로 저장됩니다.</span></div>
             <div class="cams" id="cams"></div>
           </div>
           <div class="panel">
             <div class="panel-head">
               <h2>촉각</h2>
-              <span class="muted">점 = 측정점의 수직력, 숫자 = 합력 Fz (N)</span>
-              <label class="scale">최대 <select id="tactile-scale">
-                <option value="10">1 N</option><option value="30" selected>3 N</option>
-                <option value="100">10 N</option><option value="255">25.5 N</option>
-              </select></label>
+              <span class="muted">Paxini SDK 뷰어와 같은 표시: 점 색·크기 = 측정점의 수직력. 끌면 회전, 두 번 누르면 원래대로.</span>
+              <span class="right">
+                <span class="series-key"><i style="background:#8a909b"></i>Fx<i style="background:#c9861a"></i>Fy<i style="background:rgb(24,95,165)"></i>Fz</span>
+                <span>0<i class="ramp"></i><select id="tactile-scale" aria-label="색이 가장 진해지는 힘">
+                  <option value="10">1 N</option><option value="30" selected>3 N</option>
+                  <option value="100">10 N</option><option value="255">25.5 N</option>
+                </select></span>
+              </span>
             </div>
             <div class="fingers" id="fingers"></div>
           </div>
@@ -81,7 +84,7 @@
           <div class="panel">
             <div class="panel-head"><h2>스트림</h2></div>
             <table class="streams">
-              <thead><tr><th>이름</th><th class="num">Hz</th><th class="num">수신</th><th class="num">빠짐</th><th>상태</th></tr></thead>
+              <thead><tr><th>이름</th><th class="num">Hz / 기대</th><th class="num">수신</th><th class="num">빠짐</th><th>상태</th></tr></thead>
               <tbody id="stream-rows"></tbody>
             </table>
           </div>

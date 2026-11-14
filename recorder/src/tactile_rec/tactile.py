@@ -12,7 +12,9 @@ Only the low byte is used: Fx, Fy are int8, Fz is uint8, 0.1 N per count.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -129,3 +131,46 @@ def encode_payload(
             taxels = np.asarray(distributed, dtype=np.int16).reshape(module.points, 3)
             parts.append(taxels.astype(np.uint8).reshape(-1))
     return np.concatenate(parts) if parts else np.zeros(0, dtype=np.uint8)
+
+
+# ---- taxel positions for drawing -------------------------------------------------------------
+
+_DATA_DIRS = (
+    # the repo checkout: recorder/src/tactile_rec/tactile.py -> third_party/paxini/paxini_sdk/data
+    Path(__file__).resolve().parents[3] / "third_party" / "paxini" / "paxini_sdk" / "data",
+)
+
+
+def _vendor_points(points: int) -> list[list[float]] | None:
+    folders = list(_DATA_DIRS)
+    try:
+        import paxini_sdk
+
+        folders.insert(0, Path(paxini_sdk.__file__).parent / "data")
+    except ImportError:
+        pass
+    for folder in folders:
+        registry = folder / "registry.json"
+        if not registry.is_file():
+            continue
+        for sensor in json.loads(registry.read_text(encoding="utf-8"))["sensors"]:
+            if sensor["n_points"] == points:
+                data = json.loads((folder / sensor["json_file"]).read_text(encoding="utf-8"))
+                return [[p["x_mm"], p["y_mm"], p["z_mm"]] for p in data["points"]]
+    return None
+
+
+def taxel_xyz(points: int) -> list[list[float]]:
+    """3D positions (mm) of a sensor's taxels, identified by its point count: the vendor
+    coordinates that paxini_sdk's own viewer draws. Falls back to a flat grid when the
+    coordinate files are not available."""
+    xyz = _vendor_points(points)
+    if xyz is not None:
+        return xyz
+    columns = max(1, int(np.ceil(np.sqrt(points * 0.6))))
+    return [[float(i % columns), float(i // columns), 0.0] for i in range(points)]
+
+
+def taxel_xy(points: int) -> list[list[float]]:
+    """The same positions seen from above (x, y)."""
+    return [point[:2] for point in taxel_xyz(points)]

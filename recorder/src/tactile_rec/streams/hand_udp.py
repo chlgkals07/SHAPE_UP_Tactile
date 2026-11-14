@@ -25,9 +25,11 @@ import numpy as np
 from tactile_rec.clock import Clock
 from tactile_rec.stream import Stream, ThreadedStream
 from tactile_rec.streams import specs
+from tactile_rec.types import NO_TIME
 
 PACKET_VERSION = 1
 MAX_DATAGRAM = 65535
+MAX_SENDER_AGE_S = 1.0
 
 
 @dataclass(frozen=True)
@@ -38,6 +40,7 @@ class HandPacket:
     glove: dict[str, np.ndarray] | None
     glove_t_ns: int
     node_names: list[str]
+    glove_error: str = ""
 
 
 def _joint_array(values: Any, name: str) -> np.ndarray:
@@ -49,8 +52,22 @@ def _joint_array(values: Any, name: str) -> np.ndarray:
     return array
 
 
+def _parse_glove(glove_raw: Any) -> tuple[dict[str, np.ndarray], int, list[str]]:
+    ergo = np.asarray(glove_raw["ergo"], dtype=np.float32)
+    if ergo.shape != (specs.GLOVE_ANGLES,):
+        raise ValueError(f"glove ergo must have {specs.GLOVE_ANGLES} values")
+    nodes_in = np.asarray(glove_raw.get("nodes") or [], dtype=np.float32).reshape(-1, 7)
+    count = min(len(nodes_in), specs.GLOVE_MAX_NODES)
+    nodes = np.full((specs.GLOVE_MAX_NODES, 7), np.nan, dtype=np.float32)
+    nodes[:count] = nodes_in[:count]
+    names = [str(n) for n in (glove_raw.get("node_names") or [])][:count]
+    return {"ergo": ergo, "nodes": nodes, "n_nodes": np.int16(count)}, int(glove_raw["t_ns"]), names
+
+
 def parse_packet(raw: bytes) -> HandPacket:
-    """Decode one datagram. Raises ValueError on anything malformed."""
+    """Decode one datagram. Raises ValueError (and nothing else) when the hand part is
+    malformed. A malformed glove block is dropped on its own: the hand sample in the same
+    packet is still good, and `glove_error` says what was wrong."""
     try:
         packet = json.loads(raw)
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -59,6 +76,8 @@ def parse_packet(raw: bytes) -> HandPacket:
         version = packet.get("v") if isinstance(packet, dict) else None
         raise ValueError(f"unsupported packet version {version}")
     try:
+        if packet["cmd"] is None:
+            raise ValueError("cmd is required")
         hand = {
             "cmd": _joint_array(packet["cmd"], "cmd"),
             "sent": _joint_array(packet.get("sent"), "sent"),
@@ -70,21 +89,16 @@ def parse_packet(raw: bytes) -> HandPacket:
         seq, t_ns = int(packet["seq"]), int(packet["t_ns"])
     except KeyError as error:
         raise ValueError(f"missing field {error}") from error
-    if packet["cmd"] is None:
-        raise ValueError("cmd is required")
+    except TypeError as error:  # a field of the wrong kind, e.g. seq: null or cmd: "x"
+        raise ValueError(f"wrong field type: {error}") from error
     glove_raw = packet.get("glove")
     if glove_raw is None:
         return HandPacket(seq, t_ns, hand, None, 0, [])
-    ergo = np.asarray(glove_raw["ergo"], dtype=np.float32)
-    if ergo.shape != (specs.GLOVE_ANGLES,):
-        raise ValueError(f"glove ergo must have {specs.GLOVE_ANGLES} values")
-    nodes_in = np.asarray(glove_raw.get("nodes") or [], dtype=np.float32).reshape(-1, 7)
-    count = min(len(nodes_in), specs.GLOVE_MAX_NODES)
-    nodes = np.full((specs.GLOVE_MAX_NODES, 7), np.nan, dtype=np.float32)
-    nodes[:count] = nodes_in[:count]
-    glove = {"ergo": ergo, "nodes": nodes, "n_nodes": np.int16(count)}
-    names = [str(n) for n in (glove_raw.get("node_names") or [])][:count]
-    return HandPacket(seq, t_ns, hand, glove, int(glove_raw["t_ns"]), names)
+    try:
+        glove, glove_t_ns, names = _parse_glove(glove_raw)
+    except (KeyError, TypeError, ValueError, AttributeError) as error:
+        return HandPacket(seq, t_ns, hand, None, 0, [], glove_error=f"bad glove block: {error}")
+    return HandPacket(seq, t_ns, hand, glove, glove_t_ns, names)
 
 
 class HandUdpStream(ThreadedStream):
@@ -97,6 +111,8 @@ class HandUdpStream(ThreadedStream):
         if cfg["glove"]:
             self.glove = Stream(specs.glove_spec("glove", float(cfg["hz"])), self.clock)
         self.bad_packets = 0
+        self.bad_glove = 0
+        self.clock_mismatch = 0
         self._socket: socket.socket | None = None
 
     def _open(self) -> None:
@@ -123,8 +139,29 @@ class HandUdpStream(ThreadedStream):
         except ValueError:
             self.bad_packets += 1
             return
-        self.push(packet.hand, t_src_ns=packet.t_ns, src_seq=packet.seq, t_recv_ns=t_recv_ns)
+        if packet.glove_error:
+            self.bad_glove += 1
+        self.push(
+            packet.hand, t_src_ns=self._sender_time(packet.t_ns, t_recv_ns),
+            src_seq=packet.seq, t_recv_ns=t_recv_ns,
+        )
         if packet.glove is not None and self.glove is not None:
             if packet.node_names and packet.node_names != self.glove.spec.meta["node_names"]:
                 self.glove.spec.meta["node_names"] = packet.node_names
-            self.glove.push(packet.glove, t_src_ns=packet.glove_t_ns, t_recv_ns=t_recv_ns)
+            self.glove.push(
+                packet.glove, t_src_ns=self._sender_time(packet.glove_t_ns, t_recv_ns),
+                t_recv_ns=t_recv_ns,
+            )
+
+    def _sender_time(self, t_ns: int, t_recv_ns: int) -> int:
+        """The sender's stamp, if it can be on this PC's monotonic clock.
+
+        The stamp is only meaningful when leap_teleop runs on this PC. A stamp from the future
+        or more than MAX_SENDER_AGE_S old means another machine (or another boot) sent it;
+        then it is dropped and the converter falls back to the receive time.
+        """
+        if 0 <= t_recv_ns - t_ns <= int(MAX_SENDER_AGE_S * 1e9):
+            return t_ns
+        self.clock_mismatch += 1
+        self.spec.meta["clock_mismatch"] = self.clock_mismatch
+        return NO_TIME

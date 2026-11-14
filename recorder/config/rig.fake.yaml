@@ -31,4 +31,4 @@ dataset:
   cameras: [cam_wrist, cam_ext]
   time: {hand: src, tactile_a: respread, tactile_b: respread}
 
-ui: {host: 127.0.0.1, port: 8800, preview_hz: 10, preview_width: 480}
+ui: {host: 127.0.0.1, port: 8800, preview_hz: 15, preview_width: 800}

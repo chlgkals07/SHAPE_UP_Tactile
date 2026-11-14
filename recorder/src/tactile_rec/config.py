@@ -78,10 +78,10 @@ class DatasetConfig:
 
 @dataclass(frozen=True)
 class UiConfig:
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"  # 0.0.0.0 opens the UI to the network; there is no login
     port: int = 8800
-    preview_hz: float = 10.0
-    preview_width: int = 480
+    preview_hz: float = 15.0
+    preview_width: int = 800
 
 
 @dataclass(frozen=True)
@@ -161,7 +161,7 @@ def _check_stream(name: str, raw: Any) -> dict[str, Any]:
     return out
 
 
-def _check_label(value: str, what: str) -> None:
+def check_label(value: str, what: str) -> None:
     if not LABEL_PATTERN.match(value):
         raise ConfigError(
             f"{what} {value!r}: use letters, digits, '_' and '-' only (it becomes a folder name)"
@@ -178,14 +178,14 @@ def parse_config(raw: dict[str, Any], source: str = "") -> Config:
     rig = raw.get("rig") or {}
     if "name" not in rig or "mount" not in rig:
         raise ConfigError("rig: needs 'name' and 'mount'")
-    _check_label(str(rig["mount"]), "rig.mount")
+    check_label(str(rig["mount"]), "rig.mount")
     streams_raw = raw.get("streams") or {}
     if not streams_raw:
         raise ConfigError("streams: at least one stream is required")
     streams = {name: _check_stream(name, value) for name, value in streams_raw.items()}
     session = _section(raw, "session", SessionConfig)
-    _check_label(session.task, "session.task")
-    _check_label(session.operator, "session.operator")
+    check_label(session.task, "session.task")
+    check_label(session.operator, "session.operator")
     record = _section(raw, "record", RecordConfig)
     if not 1 <= record.jpeg_quality <= 100:
         raise ConfigError("record.jpeg_quality must be 1..100")

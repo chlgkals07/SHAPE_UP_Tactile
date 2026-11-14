@@ -16,7 +16,7 @@ import numpy as np
 from tactile_rec.clock import Clock
 from tactile_rec.stream import ThreadedStream
 from tactile_rec.streams import specs
-from tactile_rec.tactile import Module, TactileLayout, encode_payload
+from tactile_rec.tactile import Module, TactileLayout, encode_payload, taxel_xy
 from tactile_rec.types import NO_TIME, SRC_NONE, StreamSpec
 
 TAP_WIDTH_S = 0.08
@@ -71,6 +71,11 @@ class FakeStream(ThreadedStream):
         self._zero_requested = False
         if self.like == "tactile":
             self.layout = fake_layout(cfg["places"])
+            self._xy = {}
+            for module in self.layout.modules:  # taxel positions scaled into the unit square
+                xy = np.asarray(taxel_xy(module.points), dtype=np.float64)
+                span = np.ptp(xy, axis=0).max() or 1.0
+                self._xy[module.place] = (xy - xy.min(axis=0)) / span
 
     def zero(self) -> None:
         self._zero_requested = True
@@ -131,16 +136,23 @@ class FakeStream(ThreadedStream):
         if self.like == "tactile":
             forces = {}
             for index, module in enumerate(self.layout.modules):
-                # A slow press that moves across the taxels, plus the shared tap pulse.
+                # A fingertip-sized contact patch that wanders over the sensor surface while
+                # the press strength rises and falls, plus the shared tap pulse.
+                xy = self._xy[module.place]
                 press = max(0.0, math.sin(0.6 * t_s + index * 0.9))
-                centre = (0.5 + 0.4 * math.sin(0.9 * t_s + index)) * (module.points - 1)
-                bump = np.exp(-0.5 * ((np.arange(module.points) - centre) / 3.0) ** 2)
-                fz = np.clip(np.round(press * 12 * bump + tap * 25), 0, 255)
+                centre = np.array([
+                    0.5 + 0.3 * math.sin(0.9 * t_s + index), 0.5 + 0.3 * math.cos(0.7 * t_s + index)
+                ])
+                distance2 = ((xy - centre) ** 2).sum(axis=1)
+                bump = np.exp(-distance2 / (2 * 0.18**2))
+                fz = np.clip(np.round(press * 28 * bump + tap * 25), 0, 255)
                 taxels = np.zeros((module.points, 3), dtype=np.int16)
                 taxels[:, 2] = fz
-                taxels[:, 0] = np.round(2 * press * bump * math.cos(t_s))
+                taxels[:, 0] = np.round(4 * press * bump * math.cos(t_s))
+                taxels[:, 1] = np.round(4 * press * bump * math.sin(t_s))
                 resultant = np.array(
-                    [taxels[:, 0].sum() // 4, 0, min(255, int(fz.sum() // 6))], dtype=np.int16
+                    [taxels[:, 0].sum() // 4, taxels[:, 1].sum() // 4,
+                     min(255, int(fz.sum() // 6))], dtype=np.int16,
                 )
                 forces[module.place] = (resultant, taxels)
             return {

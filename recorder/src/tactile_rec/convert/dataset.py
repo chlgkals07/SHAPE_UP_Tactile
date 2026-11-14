@@ -129,6 +129,33 @@ class LeRobotV21Writer:
         pass
 
 
+def check_inputs(inputs: list[Path], include_failed: bool = False) -> list[Path]:
+    """Episode folders under `inputs`, after checking they can share one dataset.
+
+    Only episodes that would be converted count: an episode labelled failure that is skipped
+    anyway cannot block the others. Raises ConvertError when there is nothing to convert or
+    when the remaining episodes were recorded with different mounts.
+    """
+    paths = [p for root in inputs for p in find_episodes(root)]
+    if not paths:
+        raise ConvertError(f"no episodes found under {[str(p) for p in inputs]}")
+    mounts: dict[str, str] = {}
+    for path in paths:
+        try:
+            meta = json.loads((path / "episode.json").read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue  # reported as skipped when it is converted
+        if meta.get("result") != "success" and not include_failed:
+            continue
+        mounts.setdefault(str(meta.get("mount", "")), f"{path.parent.name}/{path.name}")
+    if len(mounts) > 1:
+        raise ConvertError(
+            "episodes with different mounts cannot be mixed in one dataset: "
+            + ", ".join(f"{m!r} (e.g. {e})" for m, e in mounts.items())
+        )
+    return paths
+
+
 def convert_many(
     inputs: list[Path],
     cfg: DatasetConfig,
@@ -138,23 +165,24 @@ def convert_many(
     include_flagged: bool = False,
     log: Log = print,
 ) -> dict[str, Any]:
-    """Convert every episode under `inputs`. Returns the conversion report."""
-    paths = [p for root in inputs for p in find_episodes(root)]
-    if not paths:
-        raise ConvertError(f"no episodes found under {[str(p) for p in inputs]}")
+    """Convert every episode under `inputs`. Returns the conversion report.
+
+    A problem with one episode (failure label, stale values, unreadable files) skips that
+    episode and is listed in the report; it never stops the rest.
+    """
+    paths = check_inputs(inputs, include_failed)
     reports: list[dict[str, Any]] = []
-    mounts: dict[str, str] = {}
+    mount = ""
     written = 0
     for path in paths:
-        episode = Episode(path)
+        name = f"{path.parent.name}/{path.name}"
         try:
-            mount = str(episode.meta.get("mount", ""))
-            mounts.setdefault(mount, episode.name)
-            if len(mounts) > 1:
-                raise ConvertError(
-                    "episodes with different mounts cannot be mixed in one dataset: "
-                    + ", ".join(f"{m!r} (e.g. {e})" for m, e in mounts.items())
-                )
+            episode = Episode(path)
+        except (OSError, ValueError) as error:
+            reports.append({"episode": name, "result": None, "skipped": f"unreadable: {error}"})
+            log(f"skip  {name}: unreadable: {error}")
+            continue
+        try:
             result = episode.meta.get("result")
             if result != "success" and not include_failed:
                 reports.append(
@@ -176,6 +204,7 @@ def convert_many(
                 continue
             writer.add(converted, episode, str(episode.meta.get("text") or episode.meta["task"]))
             written += 1
+            mount = str(episode.meta.get("mount", ""))
             reports.append(report)
             log(
                 f"ok    {episode.name}: {report['steps']} steps, "
@@ -188,7 +217,7 @@ def convert_many(
         "found": len(paths),
         "written": written,
         "skipped": len(paths) - written,
-        "mount": next(iter(mounts), ""),
+        "mount": mount,
         "fps": cfg.fps,
         "episodes": reports,
     }

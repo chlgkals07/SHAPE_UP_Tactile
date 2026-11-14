@@ -191,3 +191,56 @@ def test_marker_and_zero_are_written_to_the_event_log(rig):
     events = [json.loads(line) for line in (path / "events.jsonl").read_text().splitlines()]
     assert [e for e in events if e["type"] == "mark"][0]["label"] == "contact"
     assert any(e["type"] == "tactile_zero" for e in events)
+
+
+def test_a_failed_write_returns_to_idle_instead_of_hanging(rig, monkeypatch):
+    recorder = Recorder(rig.hub)
+    rig.run(1.5)
+    recorder.start()
+    rig.run(0.5)
+    tmp_dir = recorder._tmp_dir
+
+    def disk_full(*_args, **_kwargs):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(np, "savez", disk_full)
+    with pytest.raises(RecorderError, match="could not be written"):
+        recorder.stop()
+    monkeypatch.undo()
+    assert recorder.state == IDLE and not tmp_dir.exists()
+    assert recorder.start() == 1  # recording works again, same number
+    rig.run(0.3)
+    recorder.stop()
+    assert recorder.save(True).name == "ep_0001"
+
+
+def test_video_thread_survives_a_failing_file_and_stop_reports_it(rig):
+    recorder = Recorder(rig.hub)
+    rig.run(1.5)
+    recorder.start()
+    sink = recorder._writer._sinks["cam_ext"]
+    sink._file.close()  # every later write raises, as on an unplugged drive
+    rig.run(1.0)  # more frames than the queue would hold if the thread had died
+    with pytest.raises(RecorderError, match="cam_ext"):
+        recorder.stop()
+    assert recorder.state == IDLE
+
+
+def test_time_limit_and_manual_stop_in_the_same_instant_do_not_raise(rig):
+    recorder = Recorder(rig.hub)
+    recorder.set_time_limit(0.5)
+    rig.run(1.5)
+    recorder.start()
+    rig.run(0.6)
+    recorder.stop()  # the operator stops first
+    recorder.state = "recording"  # tick() saw "recording" just before that stop
+    recorder._writer = None
+    original_stop = recorder.stop
+
+    def stop_after_the_operator():
+        recorder.state = REVIEW
+        return original_stop()
+
+    recorder.stop = stop_after_the_operator
+    recorder.tick()  # must swallow "cannot stop while review"
+    assert recorder.state == REVIEW

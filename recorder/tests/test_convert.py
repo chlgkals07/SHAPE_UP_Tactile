@@ -220,3 +220,32 @@ def test_lerobot_writer_calls_create_add_frame_save_episode(rig, tmp_path):
     assert dataset.saved == 1 and len(dataset.rows) == report["episodes"][0]["steps"]
     assert dataset.rows[0]["task"] == "Pick up the cup"
     assert dataset.rows[0][features.KEY_ACTION].shape == (22,)
+
+
+def test_a_skipped_failure_with_another_mount_does_not_block_the_batch(tmp_path):
+    good = ManualRig(tmp_path)
+    record(good, seconds=0.5)
+    other = ManualRig(tmp_path, rig={"name": "test_rig", "mount": "stock"})
+    record(other, seconds=0.5, success=False)  # labelled failure: skipped anyway
+    report = convert_many(
+        [good.config.data_root], good.config.dataset, NpzWriter(tmp_path / "o"),
+        log=lambda _line: None,
+    )
+    assert (report["written"], report["skipped"], report["mount"]) == (1, 1, "wrist_flip")
+
+
+def test_a_damaged_episode_is_skipped_and_reported(rig, tmp_path):
+    first = record(rig, seconds=0.5)
+    recorder = Recorder(rig.hub)
+    recorder._session_dir = first.parent
+    recorder.start()
+    rig.run(0.5)
+    recorder.stop()
+    second = recorder.save(True)
+    (second / "hand.npz").unlink()  # lost in a copy
+    report = convert_many(
+        [rig.config.data_root], rig.config.dataset, NpzWriter(tmp_path / "o"),
+        log=lambda _line: None,
+    )
+    assert (report["written"], report["skipped"]) == (1, 1)
+    assert "hand.npz" in report["episodes"][1]["skipped"]

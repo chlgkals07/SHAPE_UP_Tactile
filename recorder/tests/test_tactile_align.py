@@ -98,11 +98,27 @@ def test_respread_recovers_a_constant_rate_from_bunched_arrivals():
     assert (times <= recv).all()  # never moved later than received
 
 
-def test_respread_refuses_when_the_stream_stalled():
+def test_respread_leaves_a_stall_alone():
     recv = np.concatenate([np.arange(50) * 11 * MS, 2_000 * MS + np.arange(50) * 11 * MS])
-    times, ok = align.respread(recv)
-    assert not ok
-    np.testing.assert_array_equal(times, recv)
+    times, ok = align.respread(recv, period_ns=11 * MS)
+    assert ok
+    np.testing.assert_array_equal(times, recv)  # evenly received samples are not moved
+
+
+def test_respread_never_places_a_sample_before_it_was_produced_when_frames_are_lost():
+    """Lost frames must not pull later samples into the past: a dataset step would then see a
+    tactile value from its own future."""
+    period = 11 * MS
+    produced = 1_000 * MS + np.arange(120) * period
+    kept = np.ones(120, dtype=bool)
+    kept[[40, 41, 42, 43, 80]] = False  # four frames lost in a row, later one more
+    produced = produced[kept]
+    recv = produced.reshape(-1, 5)[:, -1].repeat(5)  # arrives in bursts of five
+    times, _ = align.respread(recv)  # period estimated from the data, as the converter does
+    assert abs(align.estimate_period(recv) - period) < 0.02 * period  # lost frames ignored
+    assert (times - produced).min() >= -MS // 10  # never earlier than produced (0.1 ms slack)
+    assert (times <= recv).all()
+    assert np.abs(times - produced).max() <= 4 * period + MS  # still bounded by the burst length
 
 
 def test_src_time_by_clock_kind():

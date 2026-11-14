@@ -10,7 +10,7 @@ import time
 from collections.abc import Sequence
 from pathlib import Path
 
-from tactile_rec.config import Config, ConfigError, load_config
+from tactile_rec.config import Config, ConfigError, check_label, load_config
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -79,10 +79,8 @@ def _apply_record_overrides(config: Config, args: argparse.Namespace) -> Config:
     ui = dataclasses.replace(
         config.ui, **{k: v for k, v in (("host", args.host), ("port", args.port)) if v is not None}
     )
-    from tactile_rec.config import _check_label
-
-    _check_label(session.task, "task")
-    _check_label(session.operator, "operator")
+    check_label(session.task, "task")
+    check_label(session.operator, "operator")
     return dataclasses.replace(
         config, session=session, ui=ui,
         data_root=args.root.expanduser() if args.root is not None else config.data_root,
@@ -122,7 +120,10 @@ def _record(args: argparse.Namespace) -> int:
                 while time.monotonic() < end:
                     time.sleep(0.1)
                     recorder.tick()
-                summary = recorder.stop()
+                # A time limit shorter than --auto has already stopped the episode.
+                summary = recorder.stop() if recorder.state == "recording" else (
+                    recorder.status()["summary"]
+                )
                 path = recorder.save(True)
                 print(f"[tactile-rec] episode {number}: {summary['duration_s']} s -> {path}")
     except KeyboardInterrupt:
@@ -138,6 +139,7 @@ def _convert(args: argparse.Namespace) -> int:
     from tactile_rec.convert.dataset import (
         LeRobotV21Writer,
         NpzWriter,
+        check_inputs,
         convert_many,
         prepare_output,
     )
@@ -148,15 +150,17 @@ def _convert(args: argparse.Namespace) -> int:
     if args.fps is not None:
         cfg = dataclasses.replace(cfg, fps=args.fps)
     try:
-        prepare_output(args.out, args.overwrite)
-        if args.format == "npz":
-            writer = NpzWriter(args.out)
-        else:
+        # Everything that can be wrong is checked before the old output is removed.
+        lerobot_writer = None
+        if args.format == "lerobot":
             if not args.repo_id:
                 raise ConvertError("--repo-id is required for --format lerobot")
-            writer = LeRobotV21Writer(
+            lerobot_writer = LeRobotV21Writer(
                 args.repo_id, args.out, cfg.fps, cfg.robot_type, args.image_mode
             )
+        check_inputs(args.inputs, args.include_failed)
+        prepare_output(args.out, args.overwrite)
+        writer = lerobot_writer if lerobot_writer is not None else NpzWriter(args.out)
         report = convert_many(
             args.inputs, cfg, writer,
             include_failed=args.include_failed, include_flagged=args.include_flagged,

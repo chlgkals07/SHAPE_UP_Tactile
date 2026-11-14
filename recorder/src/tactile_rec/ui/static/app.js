@@ -16,7 +16,10 @@ let state = null;        // last "state" message
 let info = null;         // /api/describe
 let page = "record";
 const hzHistory = {};    // stream -> recent Hz values, for the sparklines
-const canvases = {};     // place -> {canvas, xy, fz element, box}
+const canvases = {};     // place -> {canvas, graph, range, fz, geometry, history, last}
+let unknownPlaces = [];  // tactile places that are not one of the four fingers
+let lastInfoLoad = 0;
+let lastSensorRender = 0;
 
 function el(tag, props = {}, children = []) {
   const node = document.createElement(tag);
@@ -133,11 +136,17 @@ function onNotice(message) {
 function buildCameras() {
   const box = $("cams");
   box.replaceChildren();
+  // Tiles take the upright picture's own shape (nothing is letterboxed) and share one height.
+  const ratios = info.cameras.map((camera) => camera.width / camera.height);
+  box.style.setProperty("--sum-aspect", ratios.reduce((sum, ratio) => sum + ratio, 0) || 1);
+  box.style.setProperty("--count", info.cameras.length || 1);
   for (const camera of info.cameras) {
-    box.append(el("div", { class: "cam" }, [
-      el("div", { class: "cam-frame" }, el("img", { src: `/api/stream/${camera.name}`, alt: `${camera.name} 미리보기` })),
+    const frame = el("div", { class: "cam-frame", style: `--aspect: ${camera.width} / ${camera.height}` },
+      el("img", { src: `/api/stream/${camera.name}`, alt: `${camera.name} 미리보기` }));
+    box.append(el("div", { class: "cam", style: `--ratio: ${camera.width / camera.height}` }, [
+      frame,
       el("div", { class: "cam-cap" }, [
-        el("span", { text: camera.name + (camera.rotation_deg ? ` · ${camera.rotation_deg}° 회전` : "") }),
+        el("span", { text: camera.name }),
         el("span", { class: "muted", id: `cam-hz-${camera.name}` }),
       ]),
     ]));
@@ -154,50 +163,157 @@ function buildFingers() {
     for (const [segment, segmentLabel] of SEGMENTS) {
       const place = `${finger}_${segment}`;
       const sensor = info.tactile[place];
-      const canvas = el("canvas", { width: 220, height: 184 });
-      const fz = el("div", { class: "fz", text: sensor ? "0.0" : "-" });
-      const pad = el("div", { class: sensor ? "pad" : "pad off" }, [
+      const canvas = el("canvas", { class: "points", role: "img", "aria-label": `${fingerLabel} ${segmentLabel} 측정점별 수직력` });
+      const graph = el("canvas", { class: "series", role: "img", "aria-label": `${fingerLabel} ${segmentLabel} 합력 Fx Fy Fz 추이` });
+      const range = el("span", { class: "range" });
+      const fz = el("span", { text: sensor ? "0.0" : "-" });
+      const pad = el("div", { class: `pad ${segment === "tip" ? "tip" : "seg-pad"}${sensor ? "" : " off"}` }, [
+        el("div", { class: "pad-head" }, [
+          el("span", { class: "seg", text: sensor ? `${segmentLabel} · ${sensor.points}점` : `${segmentLabel} · 센서 없음` }),
+          el("span", { class: "fz" }, [fz, el("small", { text: "N" })]),
+        ]),
         canvas,
-        el("div", { class: "seg", text: sensor ? `${segmentLabel} · ${sensor.points}점` : `${segmentLabel} · 없음` }),
-        fz,
+        el("div", { class: "series-wrap" }, [graph, range]),
       ]);
       column.append(pad);
-      if (sensor) canvases[place] = { canvas, fz, xy: normalise(sensor.xy), pad };
+      if (sensor) {
+        canvases[place] = { canvas, graph, range, fz, geometry: geometry(sensor.xyz), history: [], last: null };
+        enableRotate(canvas);
+      }
     }
     box.append(column);
   }
+  // Sensors on places other than the four fingers still record; they are listed, not drawn.
+  unknownPlaces = Object.keys(info.tactile).filter((place) => !canvases[place]);
   buildHand();
 }
 
-function normalise(xy) {
-  // Fit the taxel coordinates (mm) into the canvas, keeping the aspect ratio. y grows toward
-  // the fingertip, so it is flipped to point up.
-  const xs = xy.map((p) => p[0]), ys = xy.map((p) => p[1]);
-  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-  const span = Math.max(maxX - minX, maxY - minY) || 1;
-  return xy.map(([x, y]) => [
-    0.5 + (x - (minX + maxX) / 2) / span * 0.82,
-    0.5 - (y - (minY + maxY) / 2) / span * 0.82,
-  ]);
+// ---- tactile view: the same picture as paxini_sdk/tools/to_rerun.py ----------------------------
+// 3D taxel points at the vendor coordinates. Unloaded points are light grey; loaded points
+// follow a blue ramp that is darkest at the chosen full-scale force (3 N by default, as in the
+// SDK viewer) and grow with Fz. Under each sensor: resultant Fx / Fy / Fz over the last seconds.
+
+const REST = [210, 215, 220], RAMP_LOW = [230, 241, 251], RAMP_HIGH = [24, 95, 165];
+const SERIES = [["Fx", "#8a909b"], ["Fy", "#c9861a"], ["Fz", "rgb(24,95,165)"]];
+const HISTORY = 150;                       // resultant samples kept per sensor (about 15 s)
+const DEFAULT_VIEW = { yaw: -0.35, pitch: 0.6 };
+let view = { ...DEFAULT_VIEW };            // one camera for all sensors; drag to rotate
+
+function fzColour(counts, full) {
+  if (counts <= 0) return `rgb(${REST})`;
+  const t = Math.min(1, counts / Math.max(1, full));
+  return `rgb(${RAMP_LOW.map((low, k) => Math.round(low + (RAMP_HIGH[k] - low) * t))})`;
+}
+
+function geometry(xyz) {
+  // Centre the points and remember the radius of the sphere that holds them, so the sensor
+  // stays the same size on screen while it is rotated.
+  const centre = [0, 1, 2].map((k) => (Math.min(...xyz.map((p) => p[k])) + Math.max(...xyz.map((p) => p[k]))) / 2);
+  const points = xyz.map((p) => p.map((value, k) => value - centre[k]));
+  const reach = Math.max(...points.map((p) => Math.hypot(...p))) || 1;
+  return { points, reach };
+}
+
+function project([x, y, z]) {
+  // Turn about the vertical axis (yaw), then tip the sensor back (pitch). Returns screen x, y
+  // (y up) and depth toward the viewer.
+  const cy = Math.cos(view.yaw), sy = Math.sin(view.yaw), cp = Math.cos(view.pitch), sp = Math.sin(view.pitch);
+  const x1 = x * cy - y * sy, y1 = x * sy + y * cy;
+  return [x1, y1 * cp + z * sp, -y1 * sp + z * cp];
+}
+
+function fitCanvas(canvas) {
+  const ratio = window.devicePixelRatio || 1, width = canvas.clientWidth, height = canvas.clientHeight;
+  if (!width || !height) return null;
+  if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) {
+    canvas.width = Math.round(width * ratio);   // match the screen pixels: sharp, never stretched
+    canvas.height = Math.round(height * ratio);
+  }
+  const context = canvas.getContext("2d");
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  context.clearRect(0, 0, width, height);
+  return { context, width, height };
 }
 
 function drawTactile(place, values) {
   const item = canvases[place];
   if (!item) return;
-  const context = item.canvas.getContext("2d");
-  const { width, height } = item.canvas;
+  item.last = values;
+  const fitted = fitCanvas(item.canvas);
+  if (!fitted) return;
+  const { context, width, height } = fitted;
+  const { points, reach } = item.geometry;
   const full = Number($("tactile-scale").value);
-  const radius = Math.max(4, Math.min(11, 150 / Math.sqrt(item.xy.length) / 1.6));
-  context.clearRect(0, 0, width, height);
-  item.xy.forEach(([x, y], index) => {
-    const level = Math.min(1, (values.fz[index] || 0) / full);
-    const shade = Math.round(222 - level * 205);       // light grey -> near black
+  const drawn = points.map((point, index) => [...project(point), values.fz[index] || 0]);
+  // Fill the canvas at the current viewing angle, leaving room for the largest dot
+  // (1.9 mm radius in sensor units) at every edge.
+  const xs = drawn.map((p) => p[0]), ys = drawn.map((p) => p[1]);
+  const midX = (Math.min(...xs) + Math.max(...xs)) / 2, midY = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const scale = Math.min(
+    (width - 8) / (Math.max(...xs) - Math.min(...xs) + 3.8),
+    (height - 8) / (Math.max(...ys) - Math.min(...ys) + 3.8),
+    (Math.min(width, height) - 8) / reach,           // a flat-on view must not grow without limit
+  );
+  drawn.sort((p, q) => p[2] - q[2]);                    // far points first
+  for (const [x, y, , counts] of drawn) {
+    const radius = (0.4 + Math.min(1.5, Math.max(0, counts * 0.05))) * scale;   // SDK rule, in mm
     context.beginPath();
-    context.arc(x * width, y * height, radius * (0.75 + 0.5 * level), 0, Math.PI * 2);
-    context.fillStyle = level >= 1 ? "#c62828" : `rgb(${shade},${shade},${shade + 2})`;
+    context.arc(width / 2 + (x - midX) * scale, height / 2 - (y - midY) * scale, Math.max(3, radius), 0, Math.PI * 2);
+    context.fillStyle = fzColour(counts, full);
     context.fill();
-  });
+    context.lineWidth = 0.75;
+    context.strokeStyle = counts > 0 ? "rgba(24,95,165,0.55)" : "#aeb4bd";
+    context.stroke();
+  }
   item.fz.textContent = values.r[2].toFixed(1);
+  item.history.push(values.r);
+  if (item.history.length > HISTORY) item.history.shift();
+  drawSeries(item);
+}
+
+function drawSeries(item) {
+  const fitted = fitCanvas(item.graph);
+  if (!fitted) return;
+  const { context, width, height } = fitted;
+  const history = item.history;
+  // Symmetric range that always shows at least +-1 N, so noise near zero does not fill the plot.
+  const peak = Math.max(1, ...history.map((r) => Math.max(Math.abs(r[0]), Math.abs(r[1]), Math.abs(r[2]))));
+  const y = (value) => height / 2 - value / peak * (height / 2 - 3);
+  context.strokeStyle = "#d9dce1"; context.lineWidth = 1;
+  context.beginPath(); context.moveTo(0, y(0)); context.lineTo(width, y(0)); context.stroke();
+  SERIES.forEach(([, colour], axis) => {
+    context.strokeStyle = colour; context.lineWidth = axis === 2 ? 2 : 1.25;
+    context.beginPath();
+    history.forEach((r, index) => {
+      const x = width - (history.length - 1 - index) / (HISTORY - 1) * width;   // newest at the right
+      if (index) context.lineTo(x, y(r[axis])); else context.moveTo(x, y(r[axis]));
+    });
+    context.stroke();
+  });
+  item.range.textContent = `±${peak.toFixed(0)} N`;
+}
+
+function redrawTactile() {
+  for (const [place, item] of Object.entries(canvases)) if (item.last) drawTactile(place, item.last);
+}
+
+function enableRotate(canvas) {
+  // Drag any sensor to turn all of them together; double-click returns to the default view.
+  let start = null;
+  canvas.addEventListener("pointerdown", (event) => {
+    start = { x: event.clientX, y: event.clientY, ...view };
+    canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    if (!start) return;
+    view.yaw = start.yaw + (event.clientX - start.x) * 0.01;
+    view.pitch = Math.max(0, Math.min(Math.PI / 2, start.pitch + (event.clientY - start.y) * 0.01));
+    redrawTactile();
+  });
+  const end = () => { start = null; };
+  canvas.addEventListener("pointerup", end);
+  canvas.addEventListener("pointercancel", end);
+  canvas.addEventListener("dblclick", () => { view = { ...DEFAULT_VIEW }; redrawTactile(); });
 }
 
 function buildHand() {
@@ -220,8 +336,9 @@ function buildHand() {
 function onLive(message) {
   if (page !== "record" || !info) return;
   for (const [place, values] of Object.entries(message.tactile)) drawTactile(place, values);
-  // A board that connected after the page loaded: fetch its layout once.
-  if (Object.keys(message.tactile).some((place) => !canvases[place])) loadInfo();
+  // A board that connected after the page loaded: fetch its layout, at most every 3 s.
+  const fresh = Object.keys(message.tactile).some((place) => !canvases[place] && !unknownPlaces.includes(place));
+  if (fresh && Date.now() - lastInfoLoad > 3000) { lastInfoLoad = Date.now(); loadInfo(); }
   if (message.hand) {
     const range = 120;  // degrees shown full-width; LEAP joints stay within about -60..120
     for (const row of document.querySelectorAll(".joint")) {
@@ -310,7 +427,7 @@ function onState(message) {
     const fault = stream.required && !["ok", "slow"].includes(stream.status);
     rows.push(el("tr", { class: fault ? "fault" : "" }, [
       el("td", { text: name }),
-      el("td", { class: "num", text: `${stream.hz.toFixed(0)} / ${stream.nominal_hz.toFixed(0)}` }),
+      el("td", { class: "num", text: `${stream.hz.toFixed(0)} / ${stream.nominal_hz.toFixed(0)}`, title: "측정 Hz / 기대 Hz" }),
       el("td", { class: "num", text: stream.age_s === null ? "-" : stream.age_s < 1 ? `${(stream.age_s * 1000).toFixed(0)} ms` : `${stream.age_s.toFixed(1)} s` }),
       el("td", { class: "num", text: String(stream.missed) }),
       el("td", {}, [
@@ -322,7 +439,8 @@ function onState(message) {
     if (camHz) camHz.textContent = `${stream.hz.toFixed(0)} Hz`;
   }
   $("stream-rows").replaceChildren(...rows);
-  if (page === "sensors") renderSensors();
+  // Rebuilding the cards on every update makes text impossible to select; once a second is enough.
+  if (page === "sensors" && Date.now() - lastSensorRender > 1000) renderSensors();
 }
 
 const actStart = (force) => command("/api/record/start", { force: force === true });
@@ -411,16 +529,18 @@ function sparkline(canvas, values, nominal) {
 
 function renderSensors() {
   if (!state || !info) return;
+  lastSensorRender = Date.now();
   const box = $("sensor-cards");
   const cards = [];
   for (const [name, stream] of Object.entries(state.streams)) {
     const spec = info.specs[name] || { fields: {}, meta: {} };
-    const canvas = el("canvas", { class: "spark", width: 300, height: 36, role: "img", "aria-label": `${name} 최근 Hz` });
+    const canvas = el("canvas", { class: "spark", width: 360, height: 44, role: "img", "aria-label": `${name} 최근 Hz` });
     const pairs = [
       ["Hz (기대)", `${stream.hz.toFixed(1)} (${stream.nominal_hz})`],
       ["받은 수", String(stream.count)], ["빠짐", String(stream.missed)],
       ["필수", stream.required ? "예" : "아니오 (없어도 녹화 가능)"],
       ["원천 시각", spec.src_clock || "-"],
+      ...(stream.kind === "video" ? [["회전", `${(spec.meta || {}).rotation_deg || 0}° (미리보기와 변환에 적용)`]] : []),
       ["항목", Object.entries(spec.fields).map(([key, field]) => `${key}[${field.shape.join("x")}] ${field.unit}`).join(", ") || "-"],
     ];
     const meta = spec.meta || {};

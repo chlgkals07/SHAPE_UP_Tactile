@@ -95,8 +95,11 @@ class _Timed:
 def convert_episode(episode: Episode, cfg: DatasetConfig) -> Converted:
     try:
         return _convert(episode, cfg)
-    except (EpisodeError, KeyError) as error:
-        raise ConvertError(f"{episode.name}: {error}") from error
+    except ConvertError:
+        raise
+    except (EpisodeError, KeyError, OSError, ValueError, IndexError) as error:
+        # A missing or damaged file, or arrays that do not match episode.json.
+        raise ConvertError(f"{episode.name}: {type(error).__name__}: {error}") from error
 
 
 def _convert(episode: Episode, cfg: DatasetConfig) -> Converted:

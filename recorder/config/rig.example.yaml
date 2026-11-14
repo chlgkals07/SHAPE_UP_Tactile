@@ -78,4 +78,5 @@ dataset:
   time: {hand: src, tactile_a: respread, tactile_b: respread}
   latency_ms: {}             # 톡 치기 실측 뒤에 채운다. 예: {cam_wrist: 35}
 
-ui: {host: 0.0.0.0, port: 8800, preview_hz: 10, preview_width: 480}
+# host 를 0.0.0.0 으로 바꾸면 같은 네트워크의 태블릿에서도 열린다. 로그인이 없으므로 믿을 수 있는 망에서만.
+ui: {host: 127.0.0.1, port: 8800, preview_hz: 15, preview_width: 800}

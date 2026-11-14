@@ -103,6 +103,7 @@ class _VideoSink:
         self.sizes: list[int] = []
         self.dropped = 0
         self.failed = 0
+        self.error = ""
         self._params = [int(cv2.IMWRITE_JPEG_QUALITY), int(jpeg_quality)]
         self._queue: queue.Queue = queue.Queue(maxsize=VIDEO_QUEUE_FRAMES)
         self._file = self.video_path.open("wb")
@@ -123,12 +124,19 @@ class _VideoSink:
             sample = self._queue.get()
             if sample is _STOP:
                 return
-            ok, encoded = cv2.imencode(".jpg", sample.data[IMAGE_FIELD], self._params)
-            if not ok:
+            # A failed encode or write (disk full, drive unplugged) must not end this thread:
+            # close() waits for it, and a dead thread with a full queue would block stop().
+            try:
+                ok, encoded = cv2.imencode(".jpg", sample.data[IMAGE_FIELD], self._params)
+                if not ok:
+                    self.failed += 1
+                    continue
+                data = encoded.tobytes()
+                self._file.write(data)
+            except Exception as error:  # noqa: BLE001 - reported through the stream statistics
                 self.failed += 1
+                self.error = str(error)
                 continue
-            data = encoded.tobytes()
-            self._file.write(data)
             self.columns.add(sample)
             for name, values in self.extra.items():
                 values.append(sample.data[name])
@@ -139,7 +147,11 @@ class _VideoSink:
     def _finish_thread(self) -> None:
         self._queue.put(_STOP)
         self._thread.join()
-        self._file.close()
+        try:
+            self._file.close()
+        except OSError as error:  # the final flush can fail on a full disk
+            self.failed += 1
+            self.error = str(error)
 
     def close(self) -> dict[str, Any]:
         self._finish_thread()
@@ -156,7 +168,9 @@ class _VideoSink:
         np.savez(self.index_path, **arrays)
         stats = stream_stats(arrays["t_recv_ns"], arrays["src_seq"])
         stats["dropped_write"] = self.dropped
-        stats["failed_encode"] = self.failed
+        stats["failed_write"] = self.failed
+        if self.error:
+            stats["write_error"] = self.error
         return stats
 
     def abort(self) -> None:

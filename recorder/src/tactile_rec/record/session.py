@@ -22,16 +22,17 @@ from pathlib import Path
 from typing import Any
 
 from tactile_rec import __version__
-from tactile_rec.config import LABEL_PATTERN, SessionConfig
+from tactile_rec.config import ConfigError, SessionConfig, check_label
 from tactile_rec.hub import Hub
 from tactile_rec.record.writer import EpisodeWriter
-from tactile_rec.types import STATUS_OK
+from tactile_rec.streams.specs import mode_code
+from tactile_rec.types import STATUS_OK, STATUS_SLOW
 
 IDLE, RECORDING, REVIEW = "idle", "recording", "review"
 FORMAT_VERSION = 1
 EPISODE_PREFIX = "ep_"
 TMP_SUFFIX = ".tmp"
-LIVE_MODE = 0  # specs.HAND_MODES index of "live"
+LIVE_MODE = mode_code("live")
 
 
 class RecorderError(RuntimeError):
@@ -112,10 +113,10 @@ class Recorder:
             if self.state != IDLE:
                 raise RecorderError("the session can only be changed while idle")
             for value, what in ((task, "task"), (operator, "operator")):
-                if not LABEL_PATTERN.match(value):
-                    raise RecorderError(
-                        f"{what} {value!r}: use letters, digits, '_' and '-' only"
-                    )
+                try:
+                    check_label(value, what)
+                except ConfigError as error:
+                    raise RecorderError(str(error)) from error
             self.session = SessionConfig(task=task, text=text, operator=operator)
             self._session_dir = None
             self._counts = {"success": 0, "failure": 0}
@@ -232,37 +233,66 @@ class Recorder:
             self._unsubscribe = []
             self.hub.add_event("record_stop", episode=self._episode)
             assert self._writer is not None and self._tmp_dir is not None
-            stats = self._writer.close()
-            self._writer = None
-            events = self.hub.events_since(
-                self._start["mono_ns"] - int(self.config.record.preroll_s * 1e9)
-            )
-            with (self._tmp_dir / "events.jsonl").open("w", encoding="utf-8") as file:
-                for event in events:
-                    file.write(json.dumps(event, ensure_ascii=False) + "\n")
-            streams = {}
-            for name, stream in self.hub.streams.items():
-                streams[name] = {**stream.spec.to_json(), "stats": stats[name]}
-            self._summary = {
-                "format": FORMAT_VERSION,
-                "episode": self._episode,
-                "task": self.session.task,
-                "text": self.session.text,
-                "operator": self.session.operator,
-                "rig": self.config.rig_name,
-                "mount": self.config.mount,
-                "start": self._start,
-                "end_ns": self._end_ns,
-                "duration_s": round((self._end_ns - self._start["mono_ns"]) / 1e9, 3),
-                "preroll_s": self.config.record.preroll_s,
-                "result": None,
-                "flags": {"forced_start": self._forced, "dropouts": dict(self._dropouts)},
-                "streams": streams,
-            }
-            _write_json(self._tmp_dir / "episode.json", self._summary)
+            try:
+                self._summary = self._finish_episode()
+            except Exception as error:  # noqa: BLE001 - disk full, drive gone, shape mismatch
+                # The episode cannot be saved. Clean up and return to idle so the operator can
+                # fix the cause and record again, instead of being stuck in "recording".
+                try:
+                    self._writer.abort()
+                except Exception:  # noqa: BLE001 - best effort
+                    pass
+                self._writer = None
+                shutil.rmtree(self._tmp_dir, ignore_errors=True)
+                self._tmp_dir = None
+                self.state = IDLE
+                self.hub.add_event("record_failed", episode=self._episode, error=str(error))
+                failure = RecorderError(f"the episode could not be written and was lost: {error}")
+            else:
+                failure = None
+                self._writer = None
+        if failure is not None:
+            self._notify("discarded", episode=self._episode)
+            raise failure
+        with self._lock:
             self.state = REVIEW
             summary = self._summary
         self._notify("stop", episode=self._episode)
+        return summary
+
+    def _finish_episode(self) -> dict[str, Any]:
+        """Flush the writer and write events.jsonl and episode.json into the temporary folder."""
+        assert self._writer is not None and self._tmp_dir is not None
+        stats = self._writer.close()
+        errors = [f"{n}: {v['write_error']}" for n, v in stats.items() if v.get("write_error")]
+        if errors:
+            raise OSError("; ".join(errors))
+        events = self.hub.events_since(
+            self._start["mono_ns"] - int(self.config.record.preroll_s * 1e9)
+        )
+        with (self._tmp_dir / "events.jsonl").open("w", encoding="utf-8") as file:
+            for event in events:
+                file.write(json.dumps(event, ensure_ascii=False) + "\n")
+        streams = {}
+        for name, stream in self.hub.streams.items():
+            streams[name] = {**stream.spec.to_json(), "stats": stats[name]}
+        summary = {
+            "format": FORMAT_VERSION,
+            "episode": self._episode,
+            "task": self.session.task,
+            "text": self.session.text,
+            "operator": self.session.operator,
+            "rig": self.config.rig_name,
+            "mount": self.config.mount,
+            "start": self._start,
+            "end_ns": self._end_ns,
+            "duration_s": round((self._end_ns - self._start["mono_ns"]) / 1e9, 3),
+            "preroll_s": self.config.record.preroll_s,
+            "result": None,
+            "flags": {"forced_start": self._forced, "dropouts": dict(self._dropouts)},
+            "streams": streams,
+        }
+        _write_json(self._tmp_dir / "episode.json", summary)
         return summary
 
     def save(self, success: bool) -> Path:
@@ -326,7 +356,7 @@ class Recorder:
             for name, health in self.hub.health().items():
                 if not self.hub.streams[name].spec.required:
                     continue
-                if health.status != STATUS_OK and health.status != "slow":
+                if health.status not in (STATUS_OK, STATUS_SLOW):
                     if name not in self._down:
                         self._down.add(name)
                         self._dropouts[name] = self._dropouts.get(name, 0) + 1
@@ -341,7 +371,12 @@ class Recorder:
         for kind, name in notices:
             self._notify(kind, stream=name)
         if stop_now:
-            self.stop()
+            try:
+                self.stop()
+            except RecorderError:
+                # The operator stopped (or discarded) in the same instant, or the write failed
+                # and stop() already returned the recorder to idle. Either way nothing to do.
+                pass
 
     # ---- status -----------------------------------------------------------------------------
 

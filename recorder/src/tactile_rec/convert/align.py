@@ -12,11 +12,8 @@ from tactile_rec.types import NO_TIME, SRC_HOST_WALL, SRC_MONO, SRC_NONE
 
 TIME_RECV = "recv"  # when the sample reached the recorder
 TIME_SRC = "src"  # the device's own stamp, mapped onto the recorder clock
-TIME_RESPREAD = "respread"  # recv, with USB bunching removed assuming a constant rate
+TIME_RESPREAD = "respread"  # recv, with USB bunching removed (samples one period apart)
 TIME_MODES = (TIME_RECV, TIME_SRC, TIME_RESPREAD)
-
-RESPREAD_MAX_PERIODS = 5.0
-RESPREAD_MIN_TOLERANCE_NS = 50_000_000
 
 
 def make_grid(start_ns: int, end_ns: int, fps: float) -> np.ndarray:
@@ -51,31 +48,60 @@ def monotone(times_ns: np.ndarray) -> np.ndarray:
     return np.maximum.accumulate(np.asarray(times_ns, dtype=np.int64))
 
 
-def respread(recv_ns: np.ndarray) -> tuple[np.ndarray, bool]:
+def estimate_period(recv_ns: np.ndarray) -> float:
+    """Sample period of a constant-rate device, from receive times that may be bunched and may
+    have lost frames.
+
+    Samples that arrive together form a burst. A burst of n samples that ends at time e, after
+    a burst that ended at e_prev, covers n periods: (e - e_prev) / n. A burst that follows lost
+    frames gives a value that is too long, so a value just below the median over all bursts is
+    used. The plain mean interval would be too long whenever frames were lost, and a period
+    that is too long makes respread() move samples earlier than they were produced; erring
+    slightly short is the safe side.
+    """
+    recv_ns = np.asarray(recv_ns, dtype=np.int64)
+    count = recv_ns.size
+    mean = float(recv_ns[-1] - recv_ns[0]) / max(1, count - 1)
+    if count < 4 or mean <= 0:
+        return mean
+    last_of_burst = np.flatnonzero(np.diff(recv_ns) > 0.25 * mean)  # index of each burst's end
+    ends = np.append(last_of_burst, count - 1)
+    if ends.size < 3:
+        return mean
+    sizes = np.diff(ends)  # samples in each burst after the first
+    spans = np.diff(recv_ns[ends])
+    return float(np.percentile(spans / sizes, 40))
+
+
+def respread(recv_ns: np.ndarray, period_ns: float | None = None) -> tuple[np.ndarray, bool]:
     """Undo USB bunching for a constant-rate device.
 
     A serial device that emits at a steady rate can arrive in bursts, so several samples share
-    nearly the same receive time. Assuming a constant period, the least-delayed sample fixes
-    the phase and every sample is placed on that line. A sample is never moved later than it
-    was received.
+    nearly the same receive time. Sample i was produced at least one period before sample i+1,
+    so working backwards from the end:   t[i] = min(recv[i], t[i+1] - period).
+    Inside a burst this spaces the samples one period apart, ending at the burst's receive
+    time. Outside a burst nothing changes.
 
-    Returns (times, ok). ok is False when the constant-rate assumption does not hold (a stall or
-    lost samples: some sample would move by more than max(5 periods, 50 ms)); then recv is
-    returned unchanged.
+    This can only move a sample EARLIER than it was received, and never earlier than it was
+    produced: if frames were lost between i and i+1 the true spacing is larger than one period,
+    so the bound is merely looser. A dataset step therefore never sees a tactile value from its
+    own future, with or without lost frames.
+
+    period_ns defaults to estimate_period(). Returns (times, True); the flag is kept for
+    callers that report whether a fallback was used.
     """
     recv_ns = np.asarray(recv_ns, dtype=np.int64)
     count = recv_ns.size
     if count < 3 or recv_ns[-1] <= recv_ns[0]:
         return recv_ns.copy(), True
-    period = (recv_ns[-1] - recv_ns[0]) / (count - 1)
-    ideal = np.arange(count, dtype=np.float64) * period
-    phase = np.min(recv_ns - ideal)
-    times = (phase + ideal).astype(np.int64)
-    moved = recv_ns - times
-    tolerance = max(RESPREAD_MAX_PERIODS * period, RESPREAD_MIN_TOLERANCE_NS)
-    if moved.max() > tolerance:
-        return recv_ns.copy(), False
-    return np.minimum(times, recv_ns), True
+    if period_ns is None:
+        period_ns = estimate_period(recv_ns)
+    # t[i] = min over j >= i of (recv[j] - (j - i) * period), computed as a running minimum of
+    # (recv[j] - j * period) from the right.
+    index = np.arange(count, dtype=np.float64)
+    slack = recv_ns - index * period_ns
+    times = np.minimum.accumulate(slack[::-1])[::-1] + index * period_ns
+    return np.minimum(times.astype(np.int64), recv_ns), True
 
 
 def src_on_recorder_clock(
@@ -128,9 +154,7 @@ def stream_times(
         else:
             times = src_on_recorder_clock(recv_ns, src_ns, src_clock, anchor)
     elif mode == TIME_RESPREAD:
-        times, ok = respread(recv_ns)
-        if not ok:
-            note = "rate not constant; used recv"
+        times, _ = respread(recv_ns)
     else:
         times = np.asarray(recv_ns, dtype=np.int64).copy()
     return monotone(times - int(latency_ns)), note

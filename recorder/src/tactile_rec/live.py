@@ -7,18 +7,15 @@ now, a policy later. It never touches the recording path.
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
 
 import cv2
 import numpy as np
 
 from tactile_rec import features
+from tactile_rec import tactile as _tactile
 from tactile_rec.hub import Hub
 from tactile_rec.tactile import TactileLayout, decode_payload
-
-_ROTATE = {90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180, 270: cv2.ROTATE_90_COUNTERCLOCKWISE}
 
 
 def tactile_now(hub: Hub) -> dict[str, dict[str, np.ndarray]]:
@@ -36,21 +33,31 @@ def tactile_now(hub: Hub) -> dict[str, dict[str, np.ndarray]]:
     return out
 
 
+_preview_cache: dict[tuple[int, str, int], tuple[int, bytes]] = {}
+
+
 def preview_jpeg(hub: Hub, camera: str, width: int, quality: int = 70) -> tuple[int, bytes] | None:
-    """(sample seq, JPEG bytes) of the camera's latest frame, upright and scaled to `width`."""
+    """(sample seq, JPEG bytes) of the camera's latest frame, upright and scaled to `width`.
+
+    The result is cached per frame, so several open browser tabs cost one encode, not one each.
+    """
     stream = hub.streams.get(camera)
     sample = stream.latest() if stream is not None else None
     if sample is None or "image" not in sample.data:
         return None
-    image = sample.data["image"]
-    rotation = int(stream.spec.meta.get("rotation_deg", 0))
-    if rotation in _ROTATE:
-        image = cv2.rotate(image, _ROTATE[rotation])
+    key = (id(stream), camera, width)
+    cached = _preview_cache.get(key)
+    if cached is not None and cached[0] == sample.seq:
+        return cached
+    image = features.rotate_bgr(sample.data["image"], int(stream.spec.meta.get("rotation_deg", 0)))
     if width and image.shape[1] > width:
         height = max(1, round(image.shape[0] * width / image.shape[1]))
         image = cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
     ok, encoded = cv2.imencode(".jpg", image, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
-    return (sample.seq, encoded.tobytes()) if ok else None
+    if not ok:
+        return None
+    _preview_cache[key] = (sample.seq, encoded.tobytes())
+    return _preview_cache[key]
 
 
 def observe(hub: Hub) -> dict[str, Any] | None:
@@ -87,38 +94,4 @@ def observe(hub: Hub) -> dict[str, Any] | None:
     return out
 
 
-# ---- taxel positions for drawing -------------------------------------------------------------
-
-_DATA_DIRS = (
-    # the repo checkout: recorder/src/tactile_rec/live.py -> third_party/paxini/paxini_sdk/data
-    Path(__file__).resolve().parents[3] / "third_party" / "paxini" / "paxini_sdk" / "data",
-)
-
-
-def _vendor_points(points: int) -> list[list[float]] | None:
-    folders = list(_DATA_DIRS)
-    try:
-        import paxini_sdk
-
-        folders.insert(0, Path(paxini_sdk.__file__).parent / "data")
-    except ImportError:
-        pass
-    for folder in folders:
-        registry = folder / "registry.json"
-        if not registry.is_file():
-            continue
-        for sensor in json.loads(registry.read_text(encoding="utf-8"))["sensors"]:
-            if sensor["n_points"] == points:
-                data = json.loads((folder / sensor["json_file"]).read_text(encoding="utf-8"))
-                return [[p["x_mm"], p["y_mm"]] for p in data["points"]]
-    return None
-
-
-def taxel_xy(points: int) -> list[list[float]]:
-    """2D positions (mm) of a sensor's taxels, identified by its point count. Falls back to a
-    plain grid when the vendor coordinate files are not available."""
-    xy = _vendor_points(points)
-    if xy is not None:
-        return xy
-    columns = max(1, int(np.ceil(np.sqrt(points * 0.6))))
-    return [[float(i % columns), float(i // columns)] for i in range(points)]
+taxel_xy = _tactile.taxel_xy  # kept here for callers of the live module

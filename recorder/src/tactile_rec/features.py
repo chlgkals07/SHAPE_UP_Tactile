@@ -72,16 +72,22 @@ def tactile_names(order: tuple[str, ...], points: dict[str, int]) -> tuple[list[
     return resultant, distributed
 
 
-def orient_image(image_bgr: np.ndarray, rotation_deg: int) -> np.ndarray:
-    """Stored camera frame (BGR, as captured) -> upright RGB.
+def rotate_bgr(image_bgr: np.ndarray, rotation_deg: int) -> np.ndarray:
+    """Stored camera frame (BGR, as captured) -> upright BGR. The only place rotation happens:
+    the dataset, the live observation and the UI preview all go through here.
 
     rotation_deg is the clockwise rotation that makes the stored frame upright.
     """
     if rotation_deg in _ROTATIONS:
-        image_bgr = cv2.rotate(image_bgr, _ROTATIONS[rotation_deg])
-    elif rotation_deg != 0:
+        return cv2.rotate(image_bgr, _ROTATIONS[rotation_deg])
+    if rotation_deg != 0:
         raise ValueError(f"rotation_deg must be 0, 90, 180 or 270, got {rotation_deg}")
-    return cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+    return image_bgr
+
+
+def orient_image(image_bgr: np.ndarray, rotation_deg: int) -> np.ndarray:
+    """Stored camera frame (BGR, as captured) -> upright RGB."""
+    return cv2.cvtColor(rotate_bgr(image_bgr, rotation_deg), cv2.COLOR_BGR2RGB)
 
 
 def oriented_shape(height: int, width: int, rotation_deg: int) -> tuple[int, int, int]:

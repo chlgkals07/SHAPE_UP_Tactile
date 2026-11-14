@@ -8,27 +8,28 @@ from __future__ import annotations
 
 import asyncio
 import json
-import re
 import shutil
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import numpy as np
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from tactile_rec import live
+from tactile_rec.config import LABEL_PATTERN
 from tactile_rec.hub import Hub
 from tactile_rec.record.session import Recorder, RecorderError, list_episodes
+from tactile_rec.tactile import taxel_xyz
 from tactile_rec.types import KIND_VIDEO
 
 STATIC = Path(__file__).parent / "static"
 STATE_HZ = 5.0
 TICK_HZ = 10.0
-FOLDER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_\-]*$")
 
 
 class StartBody(BaseModel):
@@ -85,7 +86,7 @@ def build_live(hub: Hub) -> dict[str, Any]:
     out: dict[str, Any] = {"type": "live", "tactile": {}, "hand": None, "arm": None}
     for place, values in live.tactile_now(hub).items():
         out["tactile"][place] = {
-            "r": [round(float(v) * 0.1, 1) for v in values["resultant"]],  # newtons
+            "r": [round(float(v) * 0.1, 1) for v in values["resultant"]],  # fx, fy, fz in newtons
             "fz": values["distributed"][:, 2].astype(int).tolist(),  # counts, 0.1 N each
         }
     hand = hub.streams.get(cfg.hand)
@@ -111,12 +112,19 @@ def describe(hub: Hub) -> dict[str, Any]:
     cameras, tactile = [], {}
     for name, stream in hub.streams.items():
         if stream.spec.kind == KIND_VIDEO:
-            cameras.append({"name": name, "rotation_deg": stream.spec.meta.get("rotation_deg", 0)})
+            meta = stream.spec.meta
+            rotation = int(meta.get("rotation_deg", 0))
+            width, height = int(meta.get("width", 4)), int(meta.get("height", 3))
+            if rotation in (90, 270):
+                width, height = height, width
+            # width / height of the upright picture, so the page can size the tile to fit it
+            cameras.append({"name": name, "rotation_deg": rotation, "width": width,
+                            "height": height})
     for stream in hub.tactile_streams().values():
         for module in (stream.spec.meta.get("layout") or {}).get("modules", []):
             tactile[module["place"]] = {
                 "board": stream.name, "module": module["name"], "points": module["points"],
-                "model": module.get("model", ""), "xy": live.taxel_xy(module["points"]),
+                "model": module.get("model", ""), "xyz": taxel_xyz(module["points"]),
             }
     return {
         "config": hub.config.to_json(),
@@ -190,15 +198,39 @@ def create_app(hub: Hub, recorder: Recorder) -> FastAPI:
         while True:
             await asyncio.sleep(1.0 / TICK_HZ)
             tick += 1
-            await asyncio.to_thread(recorder.tick)
-            while not notices.empty():
-                await broadcast(notices.get_nowait())
-            if not clients:
-                continue
-            if tick % state_every == 0:
-                await broadcast(build_state(hub, recorder))
-            if tick % live_every == 0:
-                await broadcast(build_live(hub))
+            try:
+                await step(tick, state_every, live_every)
+            except asyncio.CancelledError:
+                raise
+            except Exception as error:  # noqa: BLE001 - one bad tick must not end the pump
+                print(f"[tactile-rec] ui pump error: {error!r}")
+
+    async def step(tick: int, state_every: int, live_every: int) -> None:
+        await asyncio.to_thread(recorder.tick)
+        while not notices.empty():
+            await broadcast(notices.get_nowait())
+        if not clients:
+            return
+        # Built in a worker thread: status() waits while stop() writes an episode, and
+        # that wait must not freeze the event loop (camera previews, other requests).
+        if tick % state_every == 0:
+            await broadcast(await asyncio.to_thread(build_state, hub, recorder))
+        if tick % live_every == 0:
+            await broadcast(await asyncio.to_thread(build_live, hub))
+
+    @app.middleware("http")
+    async def same_origin_only(request: Request, call_next):
+        """Refuse state-changing requests that another web page made the browser send.
+
+        A browser attaches an Origin header to cross-site POST / DELETE requests. If it names a
+        different host than the one this page was loaded from, the request did not come from
+        our own page.
+        """
+        if request.method not in ("GET", "HEAD", "OPTIONS"):
+            origin = request.headers.get("origin")
+            if origin and urlsplit(origin).netloc != request.headers.get("host"):
+                return JSONResponse({"detail": "cross-site request refused"}, status_code=403)
+        return await call_next(request)
 
     def run(command, *args):
         try:
@@ -229,7 +261,8 @@ def create_app(hub: Hub, recorder: Recorder) -> FastAPI:
         await websocket.accept()
         clients.add(websocket)
         try:
-            await websocket.send_text(json.dumps(build_state(hub, recorder)))
+            first = await asyncio.to_thread(build_state, hub, recorder)
+            await websocket.send_text(json.dumps(first))
             while True:
                 await websocket.receive_text()  # the browser only listens; this detects close
         except WebSocketDisconnect:
@@ -292,7 +325,7 @@ def create_app(hub: Hub, recorder: Recorder) -> FastAPI:
     # ---- saved episodes ---------------------------------------------------------------------
 
     def episode_path(session: str, episode: str) -> Path:
-        if not FOLDER.match(session) or not FOLDER.match(episode):
+        if not LABEL_PATTERN.match(session) or not LABEL_PATTERN.match(episode):
             raise HTTPException(400, "bad session or episode name")
         path = recorder.task_dir / session / episode
         if not (path / "episode.json").is_file():
@@ -326,4 +359,6 @@ def serve(hub: Hub, recorder: Recorder) -> None:
 
     ui = hub.config.ui
     print(f"[tactile-rec] open http://{'localhost' if ui.host == '0.0.0.0' else ui.host}:{ui.port}")
+    if ui.host not in ("127.0.0.1", "localhost"):
+        print("[tactile-rec] the UI is reachable from the network and has no login")
     uvicorn.run(create_app(hub, recorder), host=ui.host, port=ui.port, log_level="warning")
