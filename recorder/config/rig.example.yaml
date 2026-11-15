@@ -68,7 +68,7 @@ dataset:
   fps: 30
   robot_type: omy_f3m_leap
   arm_dof: 6
-  hand_action: cmd           # cmd = 리타게팅 결과, sent = 범위·속도 제한 후 모터에 쓴 값
+  hand_action: sent          # sent = 관절 범위·속도 제한 후 모터에 쓴 값, cmd = 그 전 값 (리타게팅 + stale guard)
   tactile: [tactile_a, tactile_b]
   tactile_order: [thumb_tip, thumb_pad, index_tip, index_pad, middle_tip, middle_pad, ring_tip, ring_pad]
   tactile_hr: 3              # 데이터셋 한 스텝에 묶어 넣는 고주파 촉각 샘플 수 (90 Hz / 30 fps)

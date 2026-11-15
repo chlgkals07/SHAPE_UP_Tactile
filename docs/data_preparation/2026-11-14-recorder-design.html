@@ -211,7 +211,7 @@ Stream:  latest()            최신값 (UI, 정책)
 <thead><tr><th>키</th><th>차원</th><th>내용</th></tr></thead>
 <tbody>
 <tr><td><code>observation.state</code></td><td>22</td><td>팔 6 + 손 16 측정 위치 (rad)</td></tr>
-<tr><td><code>action</code></td><td>22</td><td>팔 leader 명령 6 + 손 명령 16 (rad). 손은 <code>cmd</code>(기본) 또는 <code>sent</code></td></tr>
+<tr><td><code>action</code></td><td>22</td><td>팔 leader 명령 6 + 손 명령 16 (rad). 손은 <code>sent</code>(기본, 모터에 실제로 쓴 값) 또는 <code>cmd</code>(clip·slew 전)</td></tr>
 <tr><td><code>observation.hand_current</code></td><td>16</td><td>모터 전류 (mA)</td></tr>
 <tr><td><code>observation.tactile.resultant</code></td><td>8 x 3 = 24</td><td>센서별 합력 (N). 순서: 엄지 끝·마디, 검지, 중지, 약지</td></tr>
 <tr><td><code>observation.tactile.distributed</code></td><td>(4x52 + 4x25) x 3 = 924</td><td>측정점별 힘 (N)</td></tr>

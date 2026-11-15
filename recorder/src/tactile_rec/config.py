@@ -65,7 +65,7 @@ class DatasetConfig:
     arm_action: str = "arm_action"
     hand: str = "hand"
     arm_dof: int = 6  # leading joints of the arm streams that go into state / action
-    hand_action: str = "cmd"  # "cmd" (after the stale guard) or "sent" (after clip + slew)
+    hand_action: str = "sent"  # "sent" (after clip + slew, written to the motors) or "cmd" (after the stale guard)
     tactile: tuple[str, ...] = ()
     tactile_order: tuple[str, ...] = DEFAULT_ORDER
     tactile_hr: int = 3  # high-rate tactile samples packed into each dataset step
