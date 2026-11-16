@@ -128,7 +128,9 @@ function onNotice(message) {
     beep([[220, 0.15], [220, 0.15], [220, 0.15]]);
     toast(`${message.stream} 끊김`, true);
   } else if (message.kind === "recovered") toast(`${message.stream} 복구`);
-  if (["saved", "discarded"].includes(message.kind) && page === "episodes") loadEpisodes();
+  else if (message.kind === "disk_low") toast("디스크 여유가 부족해 녹화를 멈췄습니다", true);
+  else if (message.kind === "failed") toast("에피소드를 마무리하지 못했습니다. 기록된 데까지는 에피소드 목록에 미저장으로 남습니다", true);
+  if (["saved", "discarded", "failed"].includes(message.kind) && page === "episodes") loadEpisodes();
 }
 
 // ---- record page ----------------------------------------------------------------------------
@@ -394,6 +396,8 @@ function renderReview(summary) {
   const flags = [];
   for (const [name, count] of Object.entries(summary.flags.dropouts)) flags.push(`${name} 끊김 ${count}회`);
   if (summary.flags.forced_start) flags.push("점검 실패 상태에서 강제 시작");
+  for (const [name, error] of Object.entries(summary.flags.write_errors || {})) flags.push(`${name} 쓰기 실패 (${error})`);
+  if (summary.flags.disk_low) flags.push("디스크 여유가 부족해 자동으로 멈춤");
   box.replaceChildren(table, flags.length ? el("p", { class: "flag", text: `주의: ${flags.join(", ")}` }) : null);
 }
 
@@ -479,21 +483,30 @@ async function loadEpisodes() {
     const notes = [];
     for (const [name, count] of Object.entries(row.dropouts)) notes.push(`${name} 끊김 ${count}`);
     if (row.forced) notes.push("강제 시작");
+    for (const name of Object.keys(row.write_errors)) notes.push(`${name} 쓰기 실패`);
+    if (row.recovered) notes.push("비정상 종료 후 복구");
+    if (row.cut_off) notes.push("녹화 중 프로그램이 죽음 (저장하면 디스크에 남은 데까지 복구)");
+    const setLabel = (result) => async () => {
+      try {
+        await api("POST", "/api/episodes/label", { session: row.session, episode: row.episode, result });
+        loadEpisodes();
+      } catch (error) { toast(error.message, true); }
+    };
     const other = row.result === "success" ? "failure" : "success";
+    // An unsaved episode (left in its temporary folder) is kept by giving it a label.
+    const labelButtons = row.pending
+      ? [button("성공으로 저장", "small", setLabel("success")), button("실패로 저장", "small", setLabel("failure"))]
+      : [button(other === "success" ? "성공으로 변경" : "실패로 변경", "small", setLabel(other))];
+    const tag = row.pending ? ["pending", "미저장"] : [row.result, row.result === "success" ? "성공" : "실패"];
     return el("tr", {}, [
       el("td", { text: row.session }),
       el("td", { text: row.episode }),
-      el("td", {}, el("span", { class: `tag ${row.result}`, text: row.result === "success" ? "성공" : "실패" })),
-      el("td", { class: "num", text: `${Number(row.duration_s).toFixed(1)} s` }),
+      el("td", {}, el("span", { class: `tag ${tag[0]}`, text: tag[1] })),
+      el("td", { class: "num", text: row.duration_s == null ? "-" : `${Number(row.duration_s).toFixed(1)} s` }),
       el("td", { class: "num", text: `${Number(row.max_gap_ms).toFixed(0)} ms` }),
       el("td", { class: notes.length ? "" : "muted", text: notes.join(", ") || "-" }),
       el("td", {}, [
-        button(other === "success" ? "성공으로 변경" : "실패로 변경", "small", async () => {
-          try {
-            await api("POST", "/api/episodes/label", { session: row.session, episode: row.episode, result: other });
-            loadEpisodes();
-          } catch (error) { toast(error.message, true); }
-        }),
+        ...labelButtons,
         button("삭제", "small danger", async () => {
           if (!confirm(`${row.session}/${row.episode} 를 삭제합니다. 되돌릴 수 없습니다.`)) return;
           try {

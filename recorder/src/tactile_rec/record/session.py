@@ -7,12 +7,15 @@ On disk:
   <data_root>/<task>/<YYYY-MM-DD_HHMM>_<operator>/session.json
                                                  /ep_0001/...
 An episode is written to `ep_0001.tmp/` and renamed to `ep_0001/` when it is saved, so a folder
-without `.tmp` is always complete. Discarding deletes the temporary folder.
+without `.tmp` is always complete. Only an explicit discard deletes the temporary folder: an
+episode that was not saved (the program was closed, a write failed, the PC lost power) stays
+there and can be kept later (see record/recover.py).
 """
 
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import threading
@@ -32,6 +35,9 @@ IDLE, RECORDING, REVIEW = "idle", "recording", "review"
 FORMAT_VERSION = 1
 EPISODE_PREFIX = "ep_"
 TMP_SUFFIX = ".tmp"
+EPISODE_FILE = "episode.json"
+PROGRESS_FILE = "recording.json"  # what is known while recording; replaced by episode.json
+EVENTS_FILE = "events.jsonl"
 LIVE_MODE = mode_code("live")
 
 
@@ -54,8 +60,11 @@ def _git_commit() -> str:
         return ""
 
 
-def _write_json(path: Path, data: Any) -> None:
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+def write_json(path: Path, data: Any) -> None:
+    """Written under a temporary name and renamed, so the file is never half-written."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def list_episodes(session_dir: Path) -> list[Path]:
@@ -86,6 +95,8 @@ class Recorder:
         self._start: dict[str, int] = {}
         self._end_ns = 0
         self._forced = False
+        self._disk_guard = False  # stop when the disk runs low (off if it already was at start)
+        self._disk_low = False
         self._dropouts: dict[str, int] = {}  # stream -> number of dropouts in this episode
         self._down: set[str] = set()
         self._summary: dict[str, Any] = {}
@@ -95,7 +106,8 @@ class Recorder:
     # ---- observers --------------------------------------------------------------------------
 
     def add_listener(self, fn: Callable[[str, dict[str, Any]], None]) -> None:
-        """fn(kind, detail) on: start, stop, saved, discarded, dropout, recovered, mark."""
+        """fn(kind, detail) on: start, stop, saved, discarded, failed, dropout, recovered,
+        disk_low, mark."""
         self._listeners.append(fn)
 
     def _notify(self, kind: str, **detail: Any) -> None:
@@ -135,7 +147,7 @@ class Recorder:
             stamp = time.strftime("%Y-%m-%d_%H%M", time.localtime(self.clock.wall_ns() / 1e9))
             directory = self.task_dir / f"{stamp}_{self.session.operator}"
             directory.mkdir(parents=True, exist_ok=True)
-            _write_json(directory / "session.json", {
+            write_json(directory / "session.json", {
                 "format": FORMAT_VERSION,
                 "recorder_version": __version__,
                 "git_commit": _git_commit(),
@@ -205,12 +217,16 @@ class Recorder:
             self._episode = self._next_episode(session_dir)
             self._tmp_dir = session_dir / f"{EPISODE_PREFIX}{self._episode:04d}{TMP_SUFFIX}"
             specs = {name: stream.spec for name, stream in self.hub.streams.items()}
-            self._writer = writer = EpisodeWriter(
-                self._tmp_dir, specs, self.config.record.jpeg_quality
-            )
             self._start = self.clock.anchor()
             self._forced = bool(problems)
             self._dropouts, self._down = {}, set()
+            free_gb = self._free_gb()
+            self._disk_low = False
+            self._disk_guard = free_gb is None or free_gb >= self.config.record.min_free_gb
+            self._writer = writer = EpisodeWriter(
+                self._tmp_dir, specs, self.config.record.jpeg_quality,
+                self.config.record.flush_s, self._write_progress,
+            )
             since_ns = self._start["mono_ns"] - int(self.config.record.preroll_s * 1e9)
             # Each stream hands over its buffered pre-roll and then every new sample, in order.
             self._unsubscribe = [
@@ -219,6 +235,7 @@ class Recorder:
             ]
             self.state = RECORDING
             self.hub.add_event("record_start", episode=self._episode)
+            self._write_progress()
         self._notify("start", episode=self._episode)
         return self._episode
 
@@ -235,24 +252,27 @@ class Recorder:
             assert self._writer is not None and self._tmp_dir is not None
             try:
                 self._summary = self._finish_episode()
-            except Exception as error:  # noqa: BLE001 - disk full, drive gone, shape mismatch
-                # The episode cannot be saved. Clean up and return to idle so the operator can
-                # fix the cause and record again, instead of being stuck in "recording".
+            except Exception as error:  # noqa: BLE001 - episode.json itself cannot be written
+                # The episode cannot be finished now. Return to idle so the operator can fix
+                # the cause and record again; what reached the disk stays in the temporary
+                # folder and can be kept later.
                 try:
                     self._writer.abort()
                 except Exception:  # noqa: BLE001 - best effort
                     pass
                 self._writer = None
-                shutil.rmtree(self._tmp_dir, ignore_errors=True)
-                self._tmp_dir = None
+                kept, self._tmp_dir = self._tmp_dir, None
                 self.state = IDLE
                 self.hub.add_event("record_failed", episode=self._episode, error=str(error))
-                failure = RecorderError(f"the episode could not be written and was lost: {error}")
+                failure = RecorderError(
+                    f"the episode could not be finished ({error}); what was written is kept "
+                    f"in {kept}"
+                )
             else:
                 failure = None
                 self._writer = None
         if failure is not None:
-            self._notify("discarded", episode=self._episode)
+            self._notify("failed", episode=self._episode)
             raise failure
         with self._lock:
             self.state = REVIEW
@@ -260,23 +280,9 @@ class Recorder:
         self._notify("stop", episode=self._episode)
         return summary
 
-    def _finish_episode(self) -> dict[str, Any]:
-        """Flush the writer and write events.jsonl and episode.json into the temporary folder."""
-        assert self._writer is not None and self._tmp_dir is not None
-        stats = self._writer.close()
-        errors = [f"{n}: {v['write_error']}" for n, v in stats.items() if v.get("write_error")]
-        if errors:
-            raise OSError("; ".join(errors))
-        events = self.hub.events_since(
-            self._start["mono_ns"] - int(self.config.record.preroll_s * 1e9)
-        )
-        with (self._tmp_dir / "events.jsonl").open("w", encoding="utf-8") as file:
-            for event in events:
-                file.write(json.dumps(event, ensure_ascii=False) + "\n")
-        streams = {}
-        for name, stream in self.hub.streams.items():
-            streams[name] = {**stream.spec.to_json(), "stats": stats[name]}
-        summary = {
+    def _header(self) -> dict[str, Any]:
+        """Everything about the episode that is known before it ends."""
+        return {
             "format": FORMAT_VERSION,
             "episode": self._episode,
             "task": self.session.task,
@@ -285,14 +291,54 @@ class Recorder:
             "rig": self.config.rig_name,
             "mount": self.config.mount,
             "start": self._start,
-            "end_ns": self._end_ns,
-            "duration_s": round((self._end_ns - self._start["mono_ns"]) / 1e9, 3),
             "preroll_s": self.config.record.preroll_s,
             "result": None,
-            "flags": {"forced_start": self._forced, "dropouts": dict(self._dropouts)},
-            "streams": streams,
+            "flags": {
+                "forced_start": self._forced,
+                "dropouts": dict(self._dropouts),
+                "disk_low": self._disk_low,
+                "write_errors": {},
+                "recovered": False,
+            },
+            "streams": {n: s.spec.to_json() for n, s in self.hub.streams.items()},
         }
-        _write_json(self._tmp_dir / "episode.json", summary)
+
+    def _write_events(self, directory: Path) -> None:
+        events = self.hub.events_since(
+            self._start["mono_ns"] - int(self.config.record.preroll_s * 1e9)
+        )
+        tmp = directory / (EVENTS_FILE + ".tmp")
+        with tmp.open("w", encoding="utf-8") as file:
+            for event in events:
+                file.write(json.dumps(event, ensure_ascii=False) + "\n")
+        os.replace(tmp, directory / EVENTS_FILE)
+
+    def _write_progress(self) -> None:
+        """Called with every chunk the writer puts on disk: the header and the events so far,
+        so that an episode whose recorder died can still be described. Takes no recorder
+        lock (it runs on the writer's thread while stop() may be waiting for that thread)."""
+        directory = self._tmp_dir
+        if directory is None:
+            return
+        self._write_events(directory)
+        write_json(directory / PROGRESS_FILE, self._header())
+
+    def _finish_episode(self) -> dict[str, Any]:
+        """Flush the writer and write events.jsonl and episode.json into the temporary folder.
+        A stream that could not be written is flagged in the summary, not thrown away."""
+        assert self._writer is not None and self._tmp_dir is not None
+        stats = self._writer.close()
+        self._write_events(self._tmp_dir)
+        summary = self._header()
+        summary["end_ns"] = self._end_ns
+        summary["duration_s"] = round((self._end_ns - self._start["mono_ns"]) / 1e9, 3)
+        summary["flags"]["write_errors"] = {
+            name: value["write_error"] for name, value in stats.items() if value.get("write_error")
+        }
+        for name, spec in summary["streams"].items():
+            spec["stats"] = stats[name]
+        write_json(self._tmp_dir / EPISODE_FILE, summary)
+        (self._tmp_dir / PROGRESS_FILE).unlink(missing_ok=True)
         return summary
 
     def save(self, success: bool) -> Path:
@@ -303,7 +349,7 @@ class Recorder:
             assert self._tmp_dir is not None
             result = "success" if success else "failure"
             self._summary["result"] = result
-            _write_json(self._tmp_dir / "episode.json", self._summary)
+            write_json(self._tmp_dir / EPISODE_FILE, self._summary)
             final = self._tmp_dir.with_name(self._tmp_dir.name.removesuffix(TMP_SUFFIX))
             self._tmp_dir.rename(final)
             self._tmp_dir = None
@@ -332,6 +378,22 @@ class Recorder:
             self.hub.add_event("record_discard", episode=self._episode)
         self._notify("discarded", episode=self._episode)
 
+    def close(self) -> Path | None:
+        """The program is ending. An episode in progress is stopped and, like one waiting in
+        review, left in its temporary folder (returned) to be kept or deleted later."""
+        with self._lock:
+            if self.state == RECORDING:
+                try:
+                    self.stop()
+                except RecorderError:
+                    return None  # stop() already said where the data is
+            return self._tmp_dir if self.state == REVIEW else None
+
+    @property
+    def active_tmp_dir(self) -> Path | None:
+        """The temporary folder the recorder itself is using now (recording or review)."""
+        return self._tmp_dir
+
     def mark(self, label: str = "") -> None:
         """Drop a marker into the event log (e.g. first contact)."""
         with self._lock:
@@ -347,7 +409,8 @@ class Recorder:
             return self.hub.zero_tactile()
 
     def tick(self) -> None:
-        """Call about 10 times a second: enforces the time limit and watches for dropouts."""
+        """Call about 10 times a second: enforces the time limit, watches for dropouts and
+        stops the episode before the disk is full."""
         stop_now = False
         notices: list[tuple[str, str]] = []
         with self._lock:
@@ -368,6 +431,12 @@ class Recorder:
                     notices.append(("recovered", name))
             elapsed_s = (self.clock.now_ns() - self._start["mono_ns"]) / 1e9
             stop_now = 0 < self.time_limit_s <= elapsed_s
+            free_gb = self._free_gb()
+            if (self._disk_guard and free_gb is not None
+                    and free_gb < self.config.record.min_free_gb):
+                self._disk_low = stop_now = True
+                self.hub.add_event("disk_low", free_gb=round(free_gb, 2))
+                notices.append(("disk_low", ""))
         for kind, name in notices:
             self._notify(kind, stream=name)
         if stop_now:

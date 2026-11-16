@@ -47,7 +47,8 @@ class RecordConfig:
     preroll_s: float = 1.0
     time_limit_s: float = 0.0  # 0 = no limit
     jpeg_quality: int = 95
-    min_free_gb: float = 5.0
+    min_free_gb: float = 5.0  # refuse to start below this; stop a running episode below it
+    flush_s: float = 5.0  # how often rows are written to disk while recording
 
 
 @dataclass(frozen=True)
@@ -191,6 +192,8 @@ def parse_config(raw: dict[str, Any], source: str = "") -> Config:
         raise ConfigError("record.jpeg_quality must be 1..100")
     if record.preroll_s < 0 or record.preroll_s > 1.5:
         raise ConfigError("record.preroll_s must be 0..1.5 (streams keep 2 s of history)")
+    if record.flush_s <= 0:
+        raise ConfigError("record.flush_s must be positive")
     dataset = _section(raw, "dataset", DatasetConfig)
     if dataset.hand_action not in ("cmd", "sent"):
         raise ConfigError("dataset.hand_action must be 'cmd' or 'sent'")

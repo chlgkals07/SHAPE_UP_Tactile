@@ -129,8 +129,10 @@ def _record(args: argparse.Namespace) -> int:
     except KeyboardInterrupt:
         print("\ninterrupted")
     finally:
-        if recorder.state == "recording":
-            recorder.discard()
+        kept = recorder.close()
+        if kept is not None:
+            print(f"[tactile-rec] unsaved episode kept in {kept} (save or delete it on the "
+                  "episodes page)")
         hub.stop()
     return 0
 

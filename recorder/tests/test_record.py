@@ -193,7 +193,7 @@ def test_marker_and_zero_are_written_to_the_event_log(rig):
     assert any(e["type"] == "tactile_zero" for e in events)
 
 
-def test_a_failed_write_returns_to_idle_instead_of_hanging(rig, monkeypatch):
+def test_a_stream_that_cannot_be_written_is_flagged_and_nothing_is_deleted(rig, monkeypatch):
     recorder = Recorder(rig.hub)
     rig.run(1.5)
     recorder.start()
@@ -204,26 +204,26 @@ def test_a_failed_write_returns_to_idle_instead_of_hanging(rig, monkeypatch):
         raise OSError(28, "No space left on device")
 
     monkeypatch.setattr(np, "savez", disk_full)
-    with pytest.raises(RecorderError, match="could not be written"):
-        recorder.stop()
+    summary = recorder.stop()  # does not raise, does not hang
     monkeypatch.undo()
-    assert recorder.state == IDLE and not tmp_dir.exists()
-    assert recorder.start() == 1  # recording works again, same number
-    rig.run(0.3)
-    recorder.stop()
-    assert recorder.save(True).name == "ep_0001"
+    assert recorder.state == REVIEW and tmp_dir.exists()
+    assert set(summary["flags"]["write_errors"]) == set(rig.streams)
+    assert "No space left" in summary["flags"]["write_errors"]["hand"]
+    assert (tmp_dir / "cam_wrist.mjpeg").stat().st_size > 0  # what was written is still there
 
 
-def test_video_thread_survives_a_failing_file_and_stop_reports_it(rig):
+def test_video_thread_survives_a_failing_file_and_only_that_stream_is_flagged(rig):
     recorder = Recorder(rig.hub)
     rig.run(1.5)
     recorder.start()
     sink = recorder._writer._sinks["cam_ext"]
     sink._file.close()  # every later write raises, as on an unplugged drive
     rig.run(1.0)  # more frames than the queue would hold if the thread had died
-    with pytest.raises(RecorderError, match="cam_ext"):
-        recorder.stop()
-    assert recorder.state == IDLE
+    summary = recorder.stop()
+    assert list(summary["flags"]["write_errors"]) == ["cam_ext"]
+    path = recorder.save(False)
+    hand = np.load(path / "hand.npz")
+    assert 95 <= len(hand["seq"]) <= 105  # the other streams are complete (1 s pre-roll + 1 s)
 
 
 def test_time_limit_and_manual_stop_in_the_same_instant_do_not_raise(rig):

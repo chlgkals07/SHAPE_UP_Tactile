@@ -223,6 +223,10 @@ def _convert(episode: Episode, cfg: DatasetConfig) -> Converted:
         problems.append(f"{name}: dropped out {count} time(s) while recording")
     if flags.get("forced_start"):
         problems.append("recording was started although the pre-check failed")
+    for name, error in flags.get("write_errors", {}).items():
+        problems.append(f"{name}: could not be written completely ({error})")
+    if flags.get("recovered"):
+        problems.append("recovered after the recorder died: the episode ends where it was cut off")
     report = {
         "episode": episode.name,
         "result": meta.get("result"),

@@ -23,7 +23,8 @@ from pydantic import BaseModel
 from tactile_rec import live
 from tactile_rec.config import LABEL_PATTERN
 from tactile_rec.hub import Hub
-from tactile_rec.record.session import Recorder, RecorderError, list_episodes
+from tactile_rec.record import recover
+from tactile_rec.record.session import TMP_SUFFIX, Recorder, RecorderError, list_episodes
 from tactile_rec.tactile import taxel_xyz
 from tactile_rec.types import KIND_VIDEO
 
@@ -135,26 +136,43 @@ def describe(hub: Hub) -> dict[str, Any]:
     }
 
 
-def episode_rows(task_dir: Path) -> list[dict[str, Any]]:
+def _episode_row(session: str, path: Path, meta: dict[str, Any], pending: bool) -> dict[str, Any]:
+    flags = meta.get("flags", {})
+    return {
+        "session": session, "episode": path.name, "result": meta.get("result"),
+        "pending": pending,  # not saved yet: kept in its temporary folder
+        "cut_off": "end_ns" not in meta,  # the recorder died while recording
+        "duration_s": meta.get("duration_s"), "text": meta.get("text", ""),
+        "dropouts": flags.get("dropouts", {}), "forced": bool(flags.get("forced_start")),
+        "write_errors": flags.get("write_errors", {}),
+        "recovered": bool(flags.get("recovered")),
+        "max_gap_ms": max(
+            (s.get("stats", {}).get("max_gap_ms", 0) for s in meta["streams"].values()),
+            default=0,
+        ),
+    }
+
+
+def episode_rows(task_dir: Path, active: Path | None = None) -> list[dict[str, Any]]:
+    """Saved episodes and unsaved ones left on disk, newest first. `active` is the temporary
+    folder the recorder is using right now; it is not listed."""
     rows = []
     if not task_dir.is_dir():
         return rows
     for session_dir in sorted((p for p in task_dir.iterdir() if p.is_dir()), reverse=True):
-        for path in reversed(list_episodes(session_dir)):
+        found: list[tuple[Path, dict[str, Any], bool]] = []
+        for path in list_episodes(session_dir):
             try:
                 meta = json.loads((path / "episode.json").read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
-            flags = meta.get("flags", {})
-            rows.append({
-                "session": session_dir.name, "episode": path.name, "result": meta.get("result"),
-                "duration_s": meta.get("duration_s"), "text": meta.get("text", ""),
-                "dropouts": flags.get("dropouts", {}), "forced": bool(flags.get("forced_start")),
-                "max_gap_ms": max(
-                    (s.get("stats", {}).get("max_gap_ms", 0) for s in meta["streams"].values()),
-                    default=0,
-                ),
-            })
+            found.append((path, meta, False))
+        for path in recover.pending_episodes(session_dir):
+            meta = recover.describe(path)
+            if path != active and meta is not None:
+                found.append((path, meta, True))
+        for path, meta, pending in sorted(found, key=lambda item: item[0].name, reverse=True):
+            rows.append(_episode_row(session_dir.name, path, meta, pending))
     return rows
 
 
@@ -325,26 +343,45 @@ def create_app(hub: Hub, recorder: Recorder) -> FastAPI:
     # ---- saved episodes ---------------------------------------------------------------------
 
     def episode_path(session: str, episode: str) -> Path:
-        if not LABEL_PATTERN.match(session) or not LABEL_PATTERN.match(episode):
+        """A saved episode folder, or an unsaved one (`ep_NNNN.tmp`) the recorder is not
+        using."""
+        if not LABEL_PATTERN.match(session) or not LABEL_PATTERN.match(
+            episode.removesuffix(TMP_SUFFIX)
+        ):
             raise HTTPException(400, "bad session or episode name")
         path = recorder.task_dir / session / episode
-        if not (path / "episode.json").is_file():
+        if episode.endswith(TMP_SUFFIX):
+            if path == recorder.active_tmp_dir:
+                raise HTTPException(409, "the recorder is using this episode")
+            if recover.describe(path) is None:
+                raise HTTPException(404, "no such episode")
+        elif not (path / "episode.json").is_file():
             raise HTTPException(404, "no such episode")
         return path
 
     @app.get("/api/episodes")
     def episodes() -> dict[str, Any]:
-        return {"task_dir": str(recorder.task_dir), "episodes": episode_rows(recorder.task_dir)}
+        return {
+            "task_dir": str(recorder.task_dir),
+            "episodes": episode_rows(recorder.task_dir, recorder.active_tmp_dir),
+        }
 
     @app.post("/api/episodes/label")
     def label(body: LabelBody) -> dict[str, Any]:
+        """Change the label of a saved episode, or keep an unsaved one under that label."""
         if body.result not in ("success", "failure"):
             raise HTTPException(400, "result must be success or failure")
-        path = episode_path(body.session, body.episode) / "episode.json"
+        folder = episode_path(body.session, body.episode)
+        if body.episode.endswith(TMP_SUFFIX):
+            try:
+                return {"episode": recover.keep(folder, body.result).name}
+            except (recover.RecoverError, OSError) as error:
+                raise HTTPException(409, str(error)) from error
+        path = folder / "episode.json"
         meta = json.loads(path.read_text(encoding="utf-8"))
         meta["result"] = body.result
         path.write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        return {}
+        return {"episode": folder.name}
 
     @app.delete("/api/episodes/{session}/{episode}")
     def delete(session: str, episode: str) -> dict[str, Any]:

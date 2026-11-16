@@ -6,7 +6,6 @@ from __future__ import annotations
 import select
 import sys
 import termios
-import time
 import tty
 
 from rich.console import Console, Group
@@ -64,6 +63,10 @@ def render(hub: Hub, recorder: Recorder, message: str) -> Group:
         flags = status["summary"]["flags"]
         for name, count in flags["dropouts"].items():
             parts.append(Text(f"주의: {name} 끊김 {count}회", style="red"))
+        for name, error in flags["write_errors"].items():
+            parts.append(Text(f"주의: {name} 쓰기 실패 ({error})", style="red"))
+        if flags["disk_low"]:
+            parts.append(Text("주의: 디스크 여유가 부족해 자동으로 멈췄습니다", style="red"))
     if message:
         parts.append(Text(message, style="cyan"))
     parts.append(Text(KEYS[status["state"]], style="dim"))
@@ -118,6 +121,3 @@ def run(hub: Hub, recorder: Recorder) -> None:
                 live.update(render(hub, recorder, message))
     finally:
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, saved)
-        if recorder.state == RECORDING:
-            recorder.discard()
-        time.sleep(0)
