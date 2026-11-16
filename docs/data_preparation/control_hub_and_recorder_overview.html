@@ -134,6 +134,7 @@ details > .body { padding: 2px 16px 14px; border-top: 1px solid var(--line); }
     <div class="grp">녹화</div>
     <a href="#rec">녹화기</a>
     <a href="#time">시간 맞추기 (이론)</a>
+    <a href="#latency">지연 실측 실험</a>
     <a href="#conv">변환기</a>
     <a href="#teleop">텔레옵과의 연결</a>
     <div class="grp">운영</div>
@@ -145,6 +146,7 @@ details > .body { padding: 2px 16px 14px; border-top: 1px solid var(--line); }
     <a href="#review">리뷰 뒤 고친 것</a>
     <a href="#field">실물 시험 가이드</a>
     <a href="#ref">설정과 미검증 목록</a>
+    <a href="#biblio">참고 자료</a>
   </nav>
   <button id="all-btn" type="button">전체 펼쳐 보기</button>
 </aside>
@@ -495,7 +497,68 @@ staleness_s[k] = g_k − t_s[i(k)]        # 그 값이 얼마나 오래됐나</c
 
 <h2>5. 고주파 촉각 창</h2>
 <p>30 fps 한 스텝 안에 촉각은 3번 온다. <code>dataset.tactile_hr: 3</code> 이면 스텝마다 그 스텝 시각과 그 앞 1/3, 2/3 스텝 시각의 값을 함께 넣는다(<code>observation.tactile.resultant_hr</code>). 마지막 값이 스텝 시각의 값이라 여기에도 미래 값은 없다.</p>
-<div class="next"><a href="#rec">← 녹화기</a><a href="#conv">변환기 →</a></div>
+<p>이 규칙이 어디서 왔고 무엇과 다른지는 <a href="#biblio">참고 자료</a>에, 4절의 지연값을 실제로 재는 방법은 <a href="#latency">지연 실측 실험</a>에 있다.</p>
+<div class="next"><a href="#rec">← 녹화기</a><a href="#latency">지연 실측 실험 →</a></div>
+</section>
+
+<!-- ============================================================ 지연 실측 -->
+<section class="page" id="latency">
+<h1>지연 실측 실험 (논문용)</h1>
+<p class="lead">스트림마다 "일이 일어난 순간 → 녹화기가 받은 순간"과 "명령 → 실제 움직임"을 재서 표로 남긴다. UMI(Chi et al., RSS 2024) 부록 A 의 방법을 우리 장치에 옮긴 계획이다. <span class="tag new">11/17 추가</span> <span class="tag field">계획. 아직 실행 안 함</span></p>
+
+<h2>왜 해야 하나</h2>
+<div class="why"><b>UMI 보다 우리가 더 필요하다.</b> UMI 는 손에 든 GoPro 하나가 영상·IMU·그리퍼 폭을 같이 찍어서, 수집한 데이터 안의 스트림끼리는 지연이 0이다(논문 §IV "Hardware-specific latency"). 그래서 지연은 로봇에서 실행할 때만 맞춘다. 우리는 데이터 자체를 실물 로봇의 분산된 장치(다른 PC 의 팔, USB 촉각, USB 카메라)로 모은다. <b>지연이 녹화 데이터에 이미 들어 있고, 실행 때도 다시 생긴다.</b></div>
+<ul>
+<li><b>효과가 크다.</b> UMI 는 같은 정책에서 지연 맞추기만 끄자(측정값을 0으로) 동작이 떨리고, 던지기 성공이 105/120 = 87.5% 에서 69/120 = 57.5% 로 떨어졌다(§V-B, Fig. 8).</li>
+<li><b>촉각 논문의 근거가 된다.</b> "접촉 순간"을 영상·손 위치와 맞춘다고 주장하려면 그 정렬 오차가 몇 ms 인지 수치가 있어야 한다. 30 fps 한 스텝이 33.3 ms 이므로, 카메라 지연이 그 정도면 촉각과 영상이 한 스텝 어긋난다.</li>
+<li><b>지금은 비어 있다.</b> <code>dataset.latency_ms</code> 는 <code>{}</code> 이고, 팔 <code>remote_wall</code> 변환은 "가장 짧았던 전송 지연"을 0으로 둔다(<a href="#time">시간 맞추기</a> 3절). 이 둘을 채우는 실험이다.</li>
+</ul>
+
+<h2>두 종류의 지연</h2>
+<table>
+<tr><th>종류</th><th>뜻</th><th>데이터에서</th><th>실행에서</th></tr>
+<tr><td><b>관측 지연</b> l<sub>obs</sub></td><td>일이 일어난 순간 → 녹화기가 받은 순간 (노출·전송·디코딩·USB)</td><td>뺀다 (<code>latency_ms</code>). 측정 장치가 만든 거짓 지연이다</td><td>같은 값으로 스트림을 맞춘다 (아래 "실행 쪽 주의")</td></tr>
+<tr><td><b>실행 지연</b> l<sub>exec</sub></td><td>명령을 보낸 순간 → 실제로 그 위치에 간 순간</td><td>빼지 않는다. 물리적으로 실제 있는 지연이다</td><td>action chunk 의 앞부분을 버리거나 미리 보내는 근거 (UMI PD1.2)</td></tr>
+</table>
+
+<h2>측정 항목과 방법</h2>
+<table>
+<tr><th>#</th><th>무엇</th><th>UMI 의 방법 (부록 A)</th><th>우리 방법</th><th>도구</th></tr>
+<tr><td>L1</td><td>카메라 관측 지연</td><td>A1. 모니터에 현재 시각을 QR 로 띄우고 카메라로 찍는다. l<sub>camera</sub> = t<sub>recv</sub> − t<sub>display</sub> − l<sub>display</sub></td><td>User PC 모니터에 <code>CLOCK_MONOTONIC</code> 을 QR 로 띄우고 D405 로 찍어 녹화한다. 녹화기와 같은 시계라 바로 뺄 수 있다. l<sub>display</sub> 는 모니터 갱신 주기(60 Hz 면 최대 16.7 ms)와 패널 지연이라 따로 잡는다</td><td><span class="tag risk">없음</span> QR 표시 + 분석 스크립트</td></tr>
+<tr><td>L2</td><td>팔 관측 지연</td><td>A2. 로봇이 전역 시각을 주면 t<sub>recv</sub> − t<sub>robot</sub>. 아니면 ping 왕복의 절반</td><td>(a) <code>ping 10.42.0.241</code> 왕복의 절반으로 근사. (b) chrony 로 두 PC 시계를 맞추면 <code>header.stamp</code> 로 직접 잰다. 이 값이 <code>remote_wall</code> 이 0으로 둔 상수다</td><td>(a) ping. (b) <code>check arm_state</code> 의 <code>delay_ms</code></td></tr>
+<tr><td>L3</td><td>손 관측 지연</td><td>-</td><td>같은 PC UDP 라 <code>check hand</code> 의 <code>delay_ms</code> (약 1 ms 예상). 모터 피드백을 읽는 데 걸리는 시간은 따로다 <span class="tag field">미검증</span></td><td><code>tactile-rec check hand</code></td></tr>
+<tr><td>L4</td><td>촉각 관측 지연</td><td>-</td><td>장치 시각이 없어 절대값은 못 잰다. 손끝으로 책상을 쳐서 촉각 힘 · 모터 전류 · 카메라(닿는 프레임)의 상대 차이를 잰다. 카메라를 L1 로 재면 그걸 기준으로 촉각의 절대값을 얻는다</td><td><code>tactile-rec tap</code> (있음, 실물 6단계)</td></tr>
+<tr><td>E1</td><td>손 실행 지연</td><td>A3. 그리퍼에 사인파 위치 명령을 주고 명령과 측정 폭을 cross-correlation 해서 l<sub>e2e</sub> 를 구한 뒤 l<sub>action</sub> = l<sub>e2e</sub> − l<sub>obs</sub></td><td>패킷의 <code>sent</code> 와 <code>pos</code> 를 cross-correlation. 이미 매 틱 기록된다. 사인파 명령 대신 텔레옵 에피소드에서도 구할 수 있다</td><td><span class="tag risk">없음</span> 분석 스크립트</td></tr>
+<tr><td>E2</td><td>팔 실행 지연</td><td>A4. 안전 때문에 사람이 텔레옵으로 목표 자세를 만들고, 목표와 실제 자세의 최적 정렬</td><td>leader(<code>arm_action</code>) 와 follower(<code>arm_state</code>) 의 cross-correlation. 우리 수집 방식이 바로 이 형태다. 두 스트림이 같은 PC 를 지나 오므로 관측 지연이 같다고 보면 차이가 실행 지연이다 <span class="tag field">가정</span></td><td><span class="tag risk">없음</span> 분석 스크립트 (E1 과 같은 함수)</td></tr>
+</table>
+
+<div class="note"><b>지금 있는 도구의 한계.</b> <code>tactile-rec tap</code> 은 사건이 시작되는 순간(onset)을 스트림마다 찾아 <em>서로의</em> 차이만 낸다. 그래서 카메라 하나의 절대 지연(L1)이나 명령 → 위치의 실행 지연(E1, E2)은 나오지 않는다. 표의 <span class="tag risk">없음</span> 세 가지가 새로 만들어야 하는 것이다. 코드는 아직 쓰지 않았다.</div>
+
+<h2>실험 순서 (제안)</h2>
+<ol class="steps">
+<li><b>L2 팔.</b> 1분 동안 ping 해서 왕복의 중앙값과 p95 를 적는다. 가능하면 chrony 로 맞춘 뒤 <code>check arm_state</code> 의 <code>delay_ms</code> 와 비교한다.</li>
+<li><b>L3 손.</b> <code>check hand</code> 30초.</li>
+<li class="human"><b>L1 카메라.</b> 녹화 설정(해상도, fps, <code>exposure_us</code>)을 데이터 수집 때와 같게 두고, 모니터의 QR 을 60초 이상 찍는다. 프레임마다 l<sub>camera</sub> 를 구해 중앙값, p95, spread 를 적는다. 노출을 바꾸면 지연도 바뀌므로 설정마다 따로 잰다.</li>
+<li class="human"><b>L4 촉각.</b> 실물 시험 6단계의 톡 치기. 카메라에 손끝이 보이게 둔다.</li>
+<li class="human"><b>E1 · E2 실행.</b> 텔레옵으로 손을 천천히 쥐었다 폈다, 팔을 좌우로 흔드는 30초짜리 에피소드를 각 3개 찍는다.</li>
+<li><b>닫힘 검사.</b> 잰 값을 <code>latency_ms</code> 에 넣고 다시 변환한 뒤 <code>tap</code> 을 돌린다. "같은 순간이어야 하는 쌍"의 차이가 0 근처로 줄어야 한다. 줄지 않으면 측정이나 보정 방향이 틀린 것이다.</li>
+<li><b>재현성.</b> 다른 날 한 번 더 잰다. 값이 바뀌면 USB 포트, 케이블, 부하를 같이 적는다.</li>
+</ol>
+
+<h2>논문에 남길 표</h2>
+<table>
+<tr><th>스트림</th><th>종류</th><th>방법</th><th>중앙값 (ms)</th><th>p95 (ms)</th><th>spread (ms)</th><th>N</th></tr>
+<tr><td>cam_wrist (D405)</td><td>l<sub>obs</sub></td><td>QR (L1)</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td>arm_state / arm_action</td><td>l<sub>obs</sub></td><td>½ RTT 또는 stamp (L2)</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td>hand</td><td>l<sub>obs</sub></td><td>UDP delay (L3)</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td>tactile_a / tactile_b</td><td>l<sub>obs</sub></td><td>tap vs 카메라 (L4)</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td>LEAP</td><td>l<sub>exec</sub></td><td>sent ↔ pos xcorr (E1)</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td>OMY</td><td>l<sub>exec</sub></td><td>leader ↔ follower xcorr (E2)</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+</table>
+<p>값은 재는 대로 <code>docs/results/YYYY-MM-DD-latency.md</code> 에 조건(커밋, rig.yaml, USB 포트, 노출)과 함께 적고, 이 표에는 그 결과를 인용한다. 시간과 학습 자원이 있으면 UMI 처럼 <b>보정 있음/없음으로 학습한 정책을 비교</b>하는 ablation 이 가장 강한 근거가 된다(비용이 커서 선택).</p>
+
+<div class="note"><b>실행 쪽 주의 (확인 필요).</b> 데이터에서 카메라를 35 ms 당겨 맞췄다면, 실행 때도 같은 기준으로 맞춰야 학습과 실행이 같다. UMI 는 실행 때 가장 늦은 스트림(카메라)의 캡처 시각에 맞춰 나머지를 고른다(PD1.1). 우리 <code>tactile_rec/live.py</code> 의 <code>observe()</code> 는 지금 각 스트림의 최신 값을 그대로 쓰고 <code>latency_ms</code> 를 보지 않는다. 지연을 데이터에 적용하기로 하면 이 부분도 같이 바꿔야 한다.</div>
+<div class="next"><a href="#time">← 시간 맞추기</a><a href="#conv">변환기 →</a></div>
 </section>
 
 <!-- ============================================================ 변환기 -->
@@ -551,7 +614,7 @@ staleness_s[k] = g_k − t_s[i(k)]        # 그 값이 얼마나 오래됐나</c
 </table>
 <p>제외는 그 에피소드만 건너뛰고 나머지는 계속한다. 이유는 출력 옆의 <code>&lt;이름&gt;.conversion_report.json</code> 에 남는다.</p>
 <div class="note"><span class="tag field">현장 미검증</span> 실제 <code>lerobot</code> 로 쓰는 경로는 stand-in 클래스로만 시험했다. openpi 환경에서 <code>pytest tests/test_convert.py</code> 를 돌리면 실제 라이브러리로 한 에피소드를 써 보는 smoke test 가 실행된다(다른 곳에서는 skip). pi0.5 입력에 우리 키를 연결하는 openpi 데이터 설정은 아직 없다.</div>
-<div class="next"><a href="#time">← 시간 맞추기</a><a href="#teleop">텔레옵과의 연결 →</a></div>
+<div class="next"><a href="#latency">← 지연 실측 실험</a><a href="#teleop">텔레옵과의 연결 →</a></div>
 </section>
 
 <!-- ============================================================ 텔레옵 -->
@@ -930,6 +993,7 @@ return f"ssh -tt -o ConnectTimeout=5 ... {host} {quote(remote)}"   # -tt: Ctrl+C
 <ul>
 <li><code>offset</code> 이 + 면 그 스트림이 기준보다 늦게 보인다. 같은 순간이어야 하는 쌍(촉각 힘 대 모터 전류, 손 위치 대 카메라)의 값을 <code>dataset.latency_ms</code> 에 넣는다.</li>
 <li><code>spread</code> 가 수십 ms 면 지연이 일정하지 않다는 뜻이다. 값 하나로 보정되지 않으니 원인부터 본다.</li>
+<li>이 단계는 스트림 사이의 <em>상대</em> 차이만 잰다. 카메라의 절대 지연(QR)과 명령 → 위치의 실행 지연은 <a href="#latency">지연 실측 실험</a>의 L1, E1, E2 로 따로 잰다.</li>
 </ul>
 
 <h2>7단계. 오래 돌리기</h2>
@@ -1012,7 +1076,52 @@ return f"ssh -tt -o ConnectTimeout=5 ... {host} {quote(remote)}"   # -tt: Ctrl+C
 <li><code>docs/data_preparation/2026-11-13-cyclo-analysis.md</code>: Cyclo 분석</li>
 <li><code>docs/manus_teleop_guide.html</code>: 텔레옵 현장 절차</li>
 </ul>
-<div class="next"><a href="#field">← 실물 시험 가이드</a><a href="#overview">처음으로</a></div>
+<div class="next"><a href="#field">← 실물 시험 가이드</a><a href="#biblio">참고 자료 →</a></div>
+</section>
+
+<!-- ============================================================ 참고 자료 -->
+<section class="page" id="biblio">
+<h1>참고 자료</h1>
+<p class="lead">시간 맞추기와 지연 실측의 근거. 각 항목에 우리 코드의 어느 부분과 이어지는지, 그리고 원문을 어디까지 읽었는지 적는다. <span class="tag new">11/17 추가</span></p>
+
+<div class="note"><b>읽은 범위.</b> UMI 는 원문 PDF 에서 §IV(PD1), §V-B, 부록 A 를 읽었다. 나머지는 검색 결과의 요약만 보았다. 인용하기 전에 원문을 확인한다.</div>
+
+<h2>1. 고르는 규칙: causal, 보간 없음</h2>
+<table>
+<tr><th>자료</th><th>내용</th><th>우리와의 관계</th><th>읽은 범위</th></tr>
+<tr><td><a href="https://en.wikipedia.org/wiki/Zero-order_hold">Zero-order hold (Wikipedia)</a>, <a href="https://archive.nptel.ac.in/content/storage2/courses/117101055/group11/11b_1.htm">NPTEL Sampling and Reconstruction</a>. 교과서: Oppenheim &amp; Schafer, sampling 장</td><td>다음 샘플이 올 때까지 값을 계단처럼 들고 있는 복원. first-order hold(선형 보간)와 비교</td><td><code>align.pick_latest</code> 가 이 계단을 격자 시각에서 읽는다</td><td>요약</td></tr>
+<tr><td>LeRobot <code>record.py</code> 녹화 루프 (공식 <code>huggingface/lerobot</code>)</td><td>1/fps 루프마다 <code>get_observation()</code> 으로 최신 값을 읽고 <code>busy_wait</code> 로 주기를 맞춘다</td><td>같은 규칙을 녹화 중에 바로 한다. 우리는 원본을 남겨 나중에 한다</td><td>요약 (미러 코드)</td></tr>
+<tr><td><code>docs/data_preparation/2026-11-13-cyclo-analysis.md</code></td><td>Cyclo 의 causal 리샘플, staleness 보고, frame_reuse</td><td>우리가 그대로 가져온 원본</td><td>레포 문서</td></tr>
+</table>
+
+<h2>2. 대조군: 가장 가까운 시각끼리 묶기</h2>
+<table>
+<tr><th>자료</th><th>내용</th><th>우리와의 관계</th><th>읽은 범위</th></tr>
+<tr><td><a href="https://mirror.umd.edu/roswiki/message_filters(2f)ApproximateTime.html">ROS message_filters ApproximateTime (ROS wiki)</a>, <a href="https://docs.ros.org/en/rolling/p/message_filters/doc/index.html">ROS 2 문서</a></td><td>토픽별 queue 머리에서 가장 늦은 메시지를 pivot 으로 잡고 시각 차이가 가장 작은 조합을 찾는다. 파라미터가 없다</td><td>가까우면 미래 메시지도 묶는다. 분석에는 좋지만 정책 학습에서는 실행 때와 달라진다</td><td>요약</td></tr>
+</table>
+
+<h2>3. 다른 시계 옮기기</h2>
+<table>
+<tr><th>자료</th><th>내용</th><th>우리와의 관계</th><th>읽은 범위</th></tr>
+<tr><td>E. Olson, <a href="https://april.eecs.umich.edu/pdfs/olson2010.pdf">"A Passive Solution to the Sensor Synchronization Problem"</a>, 2010. 구현 예: <a href="https://relatedrepos.com/gh/hanley6/time_sync">hanley6/time_sync</a></td><td>센서가 협조하지 않아도, 받는 쪽에서 "offset 은 모르고 지연은 항상 양수"라는 조건만으로 시계 차이를 추정한다</td><td>팔의 <code>remote_wall</code> 변환(offset = min(t_recv − t_src))과 촉각 <code>respread</code>("받은 시각보다 앞으로만")가 같은 생각이다. 가장 가까운 이론</td><td>요약</td></tr>
+</table>
+
+<h2>4. 지연 실측</h2>
+<table>
+<tr><th>자료</th><th>내용</th><th>우리와의 관계</th><th>읽은 범위</th></tr>
+<tr><td>C. Chi et al., <a href="https://arxiv.org/abs/2402.10329">"Universal Manipulation Interface"</a>, RSS 2024. <a href="https://umi-gripper.github.io">프로젝트 페이지</a></td><td>부록 A: 카메라는 QR 시각, 고유감각은 로봇 시각 또는 ½ ping, 실행 지연은 명령과 측정의 cross-correlation. 실행 때는 가장 늦은 스트림 기준으로 맞추고(PD1.1) 실행 지연만큼 앞선 action 을 버린다(PD1.2). 지연 맞추기를 끄면 던지기 87.5% → 57.5%</td><td><a href="#latency">지연 실측 실험</a>의 L1, L2, E1, E2 가 이 방법을 옮긴 것이다</td><td>원문 §IV PD1, §V-B, 부록 A</td></tr>
+<tr><td>P. Furgale, J. Rehder, R. Siegwart, "Unified Temporal and Spatial Calibration for Multi-Sensor Systems", IROS 2013. <a href="https://github.com/ethz-asl/kalibr/wiki/camera-imu-calibration">Kalibr wiki</a></td><td>카메라와 IMU 의 time offset 을 continuous-time batch 추정으로 공간 보정과 함께 구한다. 초기값은 두 센서가 본 각속도의 상관</td><td><code>tap</code> 의 "같은 사건이 두 스트림에 언제 보이나"를 정식으로 푼 것이다. 더 정밀하게 갈 때 본다</td><td>요약</td></tr>
+<tr><td>T. Qin, S. Shen, <a href="https://arxiv.org/abs/1808.00692">"Online Temporal Calibration for Monocular Visual-Inertial Systems"</a>, arXiv 2018 (학회 미확인)</td><td>보정판 없이 time offset 을 상태에 넣어 온라인으로 추정</td><td>센서 사이 offset 을 패턴 없이 잡는 다른 길</td><td>요약</td></tr>
+</table>
+
+<h2>읽는 순서 추천</h2>
+<ol class="steps">
+<li>Zero-order hold 위키 (고르는 규칙)</li>
+<li>UMI §IV PD1 과 부록 A (지연을 왜, 어떻게 재나)</li>
+<li>Olson 2010 (다른 시계 옮기기)</li>
+<li>필요하면 Kalibr, Qin &amp; Shen (정밀한 offset 추정)</li>
+</ol>
+<div class="next"><a href="#ref">← 설정과 미검증 목록</a><a href="#overview">처음으로</a></div>
 </section>
 
 </main>
