@@ -141,6 +141,8 @@ class Supervisor:
                 run.scanner.poll()
                 info["issues"] = list(run.scanner.issues)
                 info["last_line"] = run.scanner.last_line
+                if run.scanner.streams:  # the recorder: what it last said about each stream
+                    info["streams"] = dict(run.scanner.streams)
             info.update(run=run.run, command=run.command, flags=run.flags,
                         started_at=run.started_at)
         if window.dead:

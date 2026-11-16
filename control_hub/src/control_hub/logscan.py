@@ -53,6 +53,18 @@ def read_chunk(path: Path, offset: int) -> tuple[int, str]:
     return offset + len(data) - len(pending), clean(text)
 
 
+# The recorder prints one such line whenever a stream's status changes (tactile_rec.hub).
+RECORDER_STREAM = re.compile(
+    r"\[tactile-rec\] stream (?P<name>\w+): (?P<status>\w+)(?: \((?P<message>.*)\))?\s*$")
+STREAM_TEXT = {"error": "오류", "stale": "끊김", "slow": "느림", "off": "없음"}
+STREAM_LEVEL = {"error": "bad", "stale": "bad", "slow": "warn"}  # "off" is said, not an event
+
+
+def stream_text(name: str, status: str, message: str) -> str:
+    text = f"녹화기 {name}: {STREAM_TEXT.get(status, status)}"
+    return f"{text} ({message})" if message else text
+
+
 @dataclass(frozen=True)
 class LogEvent:
     t: float
@@ -62,6 +74,7 @@ class LogEvent:
     motors: tuple[int, ...]
     hint: str | None
     count: int = 1  # lines this event stands for (repeats held back by the rate limit)
+    stream: str = ""  # recorder stream the line is about: decides the device, not the process
 
 
 class LogScanner:
@@ -76,6 +89,7 @@ class LogScanner:
         self.ready_seen = False
         self.issues: deque[dict] = deque(maxlen=MAX_ISSUES)
         self.last_line = ""
+        self.streams: dict[str, dict[str, str]] = {}  # recorder stream -> its last status
         self._now = now
         self._offset = 0
         self._partial = ""
@@ -122,6 +136,14 @@ class LogScanner:
         self.last_line = line
         if self.ready is not None and not self.ready_seen and self.ready.search(line):
             self.ready_seen = True
+        stream = RECORDER_STREAM.search(line)
+        if stream is not None:
+            name, status, message = stream["name"], stream["status"], stream["message"] or ""
+            self.streams[name] = {"status": status, "message": message}
+            if status in STREAM_LEVEL:
+                self._emit(STREAM_LEVEL[status], stream_text(name, status, message), line, (),
+                           None, stream=name)
+            return
         hint_text = None
         for hint in self.hints:
             if hint.pattern.search(line):
@@ -157,7 +179,7 @@ class LogScanner:
         return False
 
     def _emit(self, level: str, text: str, line: str, motors: tuple[int, ...],
-              hint: str | None, key: str | None = None) -> None:
+              hint: str | None, key: str | None = None, stream: str = "") -> None:
         if self._quiet:
             return
         now = self._now()
@@ -169,4 +191,4 @@ class LogScanner:
             self._last_sent = {k: t for k, t in self._last_sent.items() if now - t < EVENT_GAP_S}
         self._last_sent[key] = now
         count = 1 + self._held.pop(key, 0)
-        self._events.append(LogEvent(now, level, text, line[:400], motors, hint, count))
+        self._events.append(LogEvent(now, level, text, line[:400], motors, hint, count, stream))

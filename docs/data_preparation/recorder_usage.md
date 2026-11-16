@@ -83,6 +83,9 @@ cd ../user_pc && env -u PYTHONPATH python -m pytest -q   # 텔레옵 시험 (싱
 
 현장에서 맞춰야 하는 값 (**[현장 미검증]**): 팔 스트림의 `hz`, 촉각 `places`, 손목 카메라 `rotation_deg` (90 또는 270), 외부 카메라 `serial`.
 
+- RealSense 가 둘 이상이면 모든 카메라에 `serial` 을 적어야 한다. 비우면 먼저 잡히는 카메라(손목 카메라일 수 있다)를 열기 때문에 설정 로드에서 멈춘다. 예시 설정의 `cam_ext` 는 주석으로 두었다. 외부 카메라를 달면 시리얼을 채우고 주석을 푼다.
+- 녹화기는 스트림 상태가 바뀔 때마다 `[tactile-rec] stream <이름>: <상태> (<메시지>)` 한 줄을 출력한다 (웹 UI, `--ui none`). control hub 가 이 줄을 읽어 해당 장치 칸에 표시한다.
+
 ## 4. 녹화
 
 ### 실행 순서
@@ -164,7 +167,9 @@ cd ../user_pc && env -u PYTHONPATH python -m pytest -q   # 텔레옵 시험 (싱
 | 3 | `tactile-rec check arm_state --config config/rig.yaml` | **[현장 미검증]** SDK 로 Jazzy 토픽 수신 | 값이 오고 Hz 가 측정됨 → 그 값을 설정의 `hz` 에 넣는다 |
 | 4 | `tactile-rec check arm_action --config config/rig.yaml` | **[현장 미검증]** 리더를 움직이는 동안 | 값이 오고 `source_stamps` 가 있는지 확인 |
 | 5 | `tactile-rec check tactile_a --config config/rig.yaml` | **[현장 미검증]** 센서 4개 동시 스트림 | Hz 측정, `missed` 0, `meta.layout` 의 모듈이 실제 배선과 같음 |
+| 5b | `tactile-rec check tactile_b --config config/rig.yaml` | **[현장 미검증]** 두 번째 보드 | 5 와 같음 |
 | 6 | `tactile-rec check cam_wrist --config config/rig.yaml` | **[현장 미검증]** `ts_domain`, `meta.usb` | 설정 fps 유지. `ts_domain` 이 0 이면 프레임 시각을 못 쓰므로 `dataset.time` 을 `recv` 로 둔다 |
+| 6b | `tactile-rec check cam_ext --config config/rig.yaml` | **[현장 미검증]** 외부 카메라를 달고 `rig.yaml` 에 넣은 뒤 | `meta.serial`, `model` 이 외부 카메라의 것 |
 
 막혔을 때:
 

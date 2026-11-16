@@ -224,6 +224,10 @@ def test_example_configs_are_valid():
         (lambda raw: raw["streams"].update(cam={"type": "webcam"}), "unknown type"),
         (lambda raw: raw["streams"]["cam_wrist"].update(rotation_deg=45), "rotation_deg"),
         (lambda raw: raw["dataset"].update(cameras=["cam_missing"]), "cam_missing"),
+        (lambda raw: raw["streams"].update(
+            cam_a={"type": "realsense", "width": 64, "height": 48, "fps": 30, "serial": "123"},
+            cam_b={"type": "realsense", "width": 64, "height": 48, "fps": 30},
+        ), "cam_b: serial is empty"),
         (lambda raw: raw["dataset"].update(time={"hand": "nearest"}), "dataset.time.hand"),
         (lambda raw: raw["session"].update(task="pick cup"), "folder name"),
         (lambda raw: raw.update(recrod={}), "unknown top-level"),

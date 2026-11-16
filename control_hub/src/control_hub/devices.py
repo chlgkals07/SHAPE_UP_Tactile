@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from control_hub.checks import CheckResult
 from control_hub.config import HubConfig
+from control_hub.logscan import STREAM_LEVEL, stream_text
 from control_hub.session import Event
 
 WINDOW_S = 60.0
@@ -27,6 +28,16 @@ def device_states(cfg: HubConfig, procs: dict[str, dict], checks: dict[str, Chec
                 causes.append((2, f"{cfg.checks[cid].title}: {result.detail}"))
             elif result.warn:
                 causes.append((1, result.warn))
+        # What a running recorder last said about this device's streams. Unlike an event
+        # this does not fade: the device stays marked until the recorder says "ok".
+        for info in procs.values():
+            if info.get("state") not in ("starting", "ready"):
+                continue
+            for name in device.recorder_stream:
+                said = info.get("streams", {}).get(name)
+                if said is not None and said["status"] != "ok":
+                    rank = 2 if STREAM_LEVEL.get(said["status"]) == "bad" else 1
+                    causes.append((rank, stream_text(name, said["status"], said["message"])))
         pids = (*device.processes, *device.tools)
         for pid in pids:
             if procs.get(pid, {}).get("state") == "failed":

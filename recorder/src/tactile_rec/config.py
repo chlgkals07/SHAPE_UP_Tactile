@@ -208,6 +208,13 @@ def parse_config(raw: dict[str, Any], source: str = "") -> Config:
     for stream, mode in dataset.time.items():
         if mode not in TIME_MODES:
             raise ConfigError(f"dataset.time.{stream}: must be one of {TIME_MODES}")
+    cameras = [name for name, s in streams.items() if s["type"] == "realsense"]
+    unnamed = [name for name in cameras if not str(streams[name]["serial"])]
+    if len(cameras) > 1 and unnamed:
+        raise ConfigError(
+            f"streams.{unnamed[0]}: serial is empty. With more than one RealSense every camera "
+            "needs its serial, or an empty one opens whichever camera it finds first"
+        )
     produced = set(streams)
     if any(s["type"] == "hand_udp" and s["glove"] for s in streams.values()):
         produced.add("glove")

@@ -228,6 +228,8 @@ def create_app(hub: Hub, recorder: Recorder) -> FastAPI:
         await asyncio.to_thread(recorder.tick)
         while not notices.empty():
             await broadcast(notices.get_nowait())
+        if tick % state_every == 0:
+            await asyncio.to_thread(hub.print_status_changes)  # with or without a browser
         if not clients:
             return
         # Built in a worker thread: status() waits while stop() writes an episode, and

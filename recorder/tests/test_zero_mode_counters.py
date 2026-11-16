@@ -233,3 +233,24 @@ def test_the_conversion_report_says_which_settings_it_was_made_with(rig, tmp_pat
     assert report["dataset"]["hand_action"] == "sent" and report["dataset"]["fps"] == 30
     assert report["dataset"]["time"] == {"hand": "src"}
     json.dumps(report)
+
+
+# ---- stream status in the log ------------------------------------------------------------------
+
+
+def test_stream_status_changes_are_printed_once_each_in_the_form_the_hub_reads(rig, capsys):
+    rig.hub.print_status_changes()  # the first time: every stream, so "off" is said too
+    first = capsys.readouterr().out.splitlines()
+    assert len(first) == len(rig.streams) and "[tactile-rec] stream hand: off" in first
+    rig.run(1.5)
+    rig.hub.print_status_changes()
+    assert "[tactile-rec] stream hand: ok" in capsys.readouterr().out.splitlines()
+    rig.hub.print_status_changes()
+    assert capsys.readouterr().out == ""  # nothing changed: nothing printed
+    rig.run(1.0, skip=("hand", "tactile_a"))
+    rig.streams["tactile_a"].set_error("read failed: device disconnected")
+    rig.hub.print_status_changes()
+    assert sorted(capsys.readouterr().out.splitlines()) == [
+        "[tactile-rec] stream hand: stale",
+        "[tactile-rec] stream tactile_a: error (read failed: device disconnected)",
+    ]

@@ -62,6 +62,12 @@ class Watcher:
                 return device.id
         return None
 
+    def _device_of_stream(self, stream: str) -> str | None:
+        for device in self.cfg.devices.values():
+            if stream in device.recorder_stream:
+                return device.id
+        return None
+
     def _title(self, ref: str) -> str:
         item = self.cfg.processes.get(ref) or self.cfg.checks.get(ref)
         return item.title if item is not None else ref
@@ -141,8 +147,9 @@ class Watcher:
     def _log_events(self, procs: dict[str, dict]) -> list[Event]:
         out = []
         for pid, found in self.supervisor.drain_events().items():
-            dev = self._device_of(pid)
             for e in found:
+                # a recorder line about a stream belongs to that stream's device
+                dev = self._device_of_stream(e.stream) if e.stream else self._device_of(pid)
                 out.append(Event(e.t, dev, "log", e.level, e.text, {
                     "pid": pid, "run": procs.get(pid, {}).get("run"),
                     "motors": list(e.motors), "count": e.count, "line": e.line,

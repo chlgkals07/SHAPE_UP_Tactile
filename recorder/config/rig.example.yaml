@@ -58,13 +58,15 @@ streams:
     fps: 30
     rotation_deg: 90         # 손 옆에 달려 있어서. 방향이 반대면 270 (확인 필요)
     exposure_us: 0           # 0 = 자동 노출. 고정하려면 마이크로초 값
-  cam_ext:
-    type: realsense
-    serial: ""               # 외부 고정 카메라 (D435i 예정). 시리얼 확인 필요
-    width: 640
-    height: 480
-    fps: 30
-    required: false          # 아직 설치 전이므로 없어도 녹화가 시작된다
+  # 외부 고정 카메라 (D435i 예정). 설치하면 시리얼을 채우고 주석을 푼다. 카메라가 둘 이상이면
+  # serial 을 비울 수 없다 (비우면 먼저 잡히는 카메라, 곧 손목 카메라를 열 수 있다)
+  # cam_ext:
+  #   type: realsense
+  #   serial: "<시리얼>"
+  #   width: 640
+  #   height: 480
+  #   fps: 30
+  #   required: false        # 없어도 녹화가 시작된다
 
 dataset:
   fps: 30

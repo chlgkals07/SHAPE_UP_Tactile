@@ -131,6 +131,8 @@ hub 는 가짜 설정과 자동 시험으로만 확인했다. 실물에서 아�
 | 11 | **장치 탐색**에 LEAP, Paxini 보드 두 개, 카메라 두 대, Manus 동글이 각각 구분되어 보임. 특히 Paxini 두 보드의 시리얼 번호가 서로 다른지 | 이름이 안 붙으면 `known_usb` 에 id 를 더한다. 구분이 되면 포트 자동 지정(추후)의 근거가 된다 |
 | 12 | LEAP 상세의 USB 속도, latency timer 가 맞게 나옴 (latency timer 1 이 정상) | 16 이면 경고가 뜬다. udev 규칙으로 1 로 맞춘다 |
 | 13 | 손목 카메라가 USB3 (5000 Mbps) 로 잡힘 | 480 이면 경고가 뜬다. USB3 포트·케이블로 바꾼다 |
+| 14 | 녹화기를 켠 채 촉각 보드 USB 를 뽑으면 촉각 칸이 빨강이 되고 "녹화기 tactile_a: 오류/끊김" 이 뜸. 다시 꽂으면 풀림 | `devices.tactile.recorder_stream` 의 이름이 `rig.yaml` 의 스트림 이름과 같은지 |
+| 15 | 녹화기가 켜진 동안 "스트림 확인" 도구가 막히고, 도구가 켜진 동안 녹화기가 막힘 | `processes.recorder.conflicts` |
 
 결과는 `docs/field-test/YYYY-MM-DD-results.md` 에 적는다.
 
@@ -155,6 +157,7 @@ hub 는 가짜 설정과 자동 시험으로만 확인했다. 실물에서 아�
 | 자주 보는 오류에 조치 붙이기 | `hints: [{match: 정규식, hint: 조치}]`. 무시할 줄은 `{match: ..., ignore: true}` |
 | 새 점검 | `checks` 에 `ping` / `tcp` / `file` / `http` / `ssh` / `usb` / `serial` / `process` / `no_process` / `command` 중 하나. `usb` 는 `warn_below_mbps` 로 느린 포트를 경고한다 |
 | 장치 칸에 묶을 것 | `devices.<id>` 의 `checks` / `processes` / `tools` / `recorder_stream` |
+| 녹화기 스트림을 장치에 | `devices.<id>.recorder_stream: [tactile_a, tactile_b]`. 녹화기가 그 스트림을 오류·끊김·느림·없음이라고 하면 이 장치 칸이 빨강/노랑이 되고, 녹화기가 다시 정상이라고 할 때까지 유지된다. 오류·끊김은 사건(사고 폴더)으로도 남는다 |
 | 로그 줄을 사건으로 | `devices.<id>.events: [{match: 정규식, level: bad/warn/info, text: "모터 응답 없음: {motors}"}]`. `(?P<motors>...)` 로 모터 번호를 뽑는다 |
 | 탐색 화면의 이름표 | `known_usb: {"vendor:product": 이름}` |
 

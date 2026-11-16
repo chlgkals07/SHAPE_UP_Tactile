@@ -62,6 +62,7 @@ class Hub:
         self._events: deque[dict[str, Any]] = deque(maxlen=MAX_EVENTS)
         self._lock = threading.Lock()
         self._running = False
+        self._reported: dict[str, tuple[str, str]] = {}  # stream -> (status, message) last told
 
     def start(self) -> None:
         if self._running:
@@ -81,6 +82,24 @@ class Hub:
     def health(self) -> dict[str, Health]:
         now_ns = self.clock.now_ns()
         return {name: stream.health(now_ns) for name, stream in self.streams.items()}
+
+    def status_changes(self) -> dict[str, Health]:
+        """Streams whose status or message differs from the last call (all of them the first
+        time). For telling a log or another program what the recorder sees."""
+        changed = {}
+        for name, health in self.health().items():
+            key = (health.status, health.message)
+            if self._reported.get(name) != key:
+                self._reported[name] = key
+                changed[name] = health
+        return changed
+
+    def print_status_changes(self) -> None:
+        """One line per stream whose status changed, in a fixed form that the control hub
+        reads from the recorder's log: `[tactile-rec] stream <name>: <status> (<message>)`."""
+        for name, health in self.status_changes().items():
+            detail = f" ({health.message})" if health.message else ""
+            print(f"[tactile-rec] stream {name}: {health.status}{detail}", flush=True)
 
     def add_event(self, kind: str, **detail: Any) -> dict[str, Any]:
         event = {"t_ns": self.clock.now_ns(), "type": kind, **detail}

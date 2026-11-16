@@ -54,7 +54,6 @@ hints:
   - {match: "No module named '?rclpy", hint: "PYTHONPATH 가 ROS 경로를 덮어썼다. envs 의 leap_env 줄이 있는지 확인한다"}
   - {match: "ModuleNotFoundError: No module named '?dynamixel_sdk", hint: "ROS 를 source 하지 않은 환경이다. sudo apt install ros-humble-dynamixel-sdk"}
   - {match: "No module named '?serial", hint: "sudo apt install python3-serial"}
-  - {match: "Connection to .* closed", hint: "ssh 가 끊겼다. 원격 프로세스도 같이 끝났다. 이더넷을 확인하고 다시 켠다"}
 
 processes:
   # ------------------------------------------------------------------ Robot PC
@@ -295,7 +294,9 @@ processes:
     group: User PC
     env: recorder
     cmd: tactile-rec record --config config/rig.yaml
-    conflicts: [camera_ros, recorder_fake, check_cam_wrist, check_tactile_a]
+    # 확인 도구는 녹화기와 같은 장치(직렬 포트, 카메라, UDP 포트)를 연다. 같이 켜면 서로 값을 뺏는다
+    conflicts: [camera_ros, recorder_fake, check_hand, check_glove, check_tactile_a,
+                check_tactile_b, check_cam_wrist, check_cam_ext]
     ready: {check: recorder_ui}
     help: |
       팔·손·촉각·카메라를 한 시간축으로 기록한다. 켜지면 오른쪽 띠의 "녹화기 열기"(:8800)로 간다.
@@ -334,6 +335,7 @@ processes:
     kind: tool
     env: recorder
     cmd: tactile-rec check hand --config config/rig.yaml
+    conflicts: [check_glove]           # 같은 UDP 포트를 듣는다: 둘이 패킷을 나눠 가진다
     help: 텔레옵이 --record-udp 로 돌고 있을 때. 약 50 Hz, delay_ms 중앙값 1 ms 안팎.
   check_glove:
     title: "스트림 확인: glove"
@@ -367,6 +369,13 @@ processes:
     env: recorder
     cmd: tactile-rec check tactile_a --config config/rig.yaml
     help: missed 0, meta.layout 의 모듈이 실제 배선과 같아야 한다.
+  check_tactile_b:
+    title: "스트림 확인: tactile_b"
+    group: 도구
+    kind: tool
+    env: recorder
+    cmd: tactile-rec check tactile_b --config config/rig.yaml
+    help: 두 번째 보드. missed 0, meta.layout 의 모듈이 실제 배선과 같아야 한다.
   check_cam_wrist:
     title: "스트림 확인: cam_wrist"
     group: 도구
@@ -375,6 +384,15 @@ processes:
     cmd: tactile-rec check cam_wrist --config config/rig.yaml
     conflicts: [camera_ros]
     help: 설정 fps 유지. ts_domain 이 0 이면 dataset.time 을 recv 로 둔다.
+  check_cam_ext:
+    title: "스트림 확인: cam_ext"
+    group: 도구
+    kind: tool
+    env: recorder
+    cmd: tactile-rec check cam_ext --config config/rig.yaml
+    help: |
+      rig.yaml 에 cam_ext 를 넣은 뒤에 쓴다 (serial 필수). 설정 fps 유지,
+      meta.serial 과 model 이 외부 카메라의 것인지 본다.
 
 checks:
   robot_ping:
@@ -482,7 +500,9 @@ profiles:
       - check_arm_state
       - check_arm_action
       - check_tactile_a
+      - check_tactile_b
       - check_cam_wrist
+      - {note: "외부 카메라를 달았으면 도구 목록의 '스트림 확인: cam_ext' 도 돌린다"}
 
 # 장치별 묶음. 홈 화면의 칸, 장치 페이지, 오류 위치가 이것으로 정해진다
 known_usb:
@@ -527,9 +547,9 @@ devices:
     tools: [leap_glovecal, manus_hz, check_glove]
   tactile:
     title: 촉각 (Paxini)
-    recorder_stream: tactile_a
+    recorder_stream: [tactile_a, tactile_b]
     checks: [paxini_port]
-    tools: [check_tactile_a]
+    tools: [check_tactile_a, check_tactile_b]
   cam_wrist:
     title: 손목 카메라
     recorder_stream: cam_wrist
@@ -540,3 +560,4 @@ devices:
     title: 외부 카메라
     recorder_stream: cam_ext
     checks: [cam_ext_usb]
+    tools: [check_cam_ext]

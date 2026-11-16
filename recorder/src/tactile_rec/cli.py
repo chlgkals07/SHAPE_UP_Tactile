@@ -110,6 +110,7 @@ def _record(args: argparse.Namespace) -> int:
                 print("error: --ui none needs --auto SECONDS", file=sys.stderr)
                 return 2
             time.sleep(2.0)  # let every stream fill its pre-roll buffer
+            hub.print_status_changes()
             for _ in range(args.episodes):
                 try:
                     number = recorder.start()
@@ -120,6 +121,7 @@ def _record(args: argparse.Namespace) -> int:
                 while time.monotonic() < end:
                     time.sleep(0.1)
                     recorder.tick()
+                    hub.print_status_changes()
                 # A time limit shorter than --auto has already stopped the episode.
                 summary = recorder.stop() if recorder.state == "recording" else (
                     recorder.status()["summary"]
