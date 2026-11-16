@@ -759,6 +759,18 @@ $("reload-btn").addEventListener("click", async () => {
   tick();
 });
 
+// Side menu collapse: the brand toggles it; the choice is remembered per browser.
+const setSideCollapsed = (collapsed) => {
+  document.querySelector(".app").classList.toggle("collapsed", collapsed);
+  $("side-toggle").setAttribute("aria-expanded", String(!collapsed));
+};
+try { setSideCollapsed(localStorage.getItem("hub.sideCollapsed") === "1"); } catch { /* storage blocked */ }
+$("side-toggle").addEventListener("click", () => {
+  const collapsed = !document.querySelector(".app").classList.contains("collapsed");
+  setSideCollapsed(collapsed);
+  try { localStorage.setItem("hub.sideCollapsed", collapsed ? "1" : "0"); } catch { /* storage blocked */ }
+});
+
 const routeFromHash = () => { const [name, arg] = location.hash.slice(1).split("/"); setPage(name || "home", arg); };
 window.addEventListener("hashchange", routeFromHash);
 tick().then(routeFromHash);
