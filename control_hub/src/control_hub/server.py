@@ -72,6 +72,7 @@ def describe(cfg: HubConfig, tmux: Tmux) -> dict[str, Any]:
             "where": _where(cfg, proc), "remote": proc.host != LOCAL, "help": proc.help,
             "env_lines": list(cfg.envs.get(proc.env, ())) if proc.env else [],
             "cmd": proc.cmd,
+            "ready_check": proc.ready.check if proc.ready is not None else None,
             "full_command": build_command(cfg, proc, [f.id for f in proc.flags if f.default]),
             "flags": [{"id": f.id, "label": f.label, "arg": f.arg, "default": f.default}
                       for f in proc.flags],

@@ -1,7 +1,7 @@
 # 녹화기 사용법과 테스트 방법
 
 `recorder/` 의 `tactile-rec` 프로그램을 설치하고, 실물 없이 돌려 보고, 현장에서 확인하고, 데이터셋으로 변환하는 순서다.
-설계와 결정 이유는 [`2026-11-14-recorder-design.html`](2026-11-14-recorder-design.html) 에 있다.
+구조, 시간 맞추기의 근거, control hub 와의 연결, 리뷰 뒤 바뀐 것, 실물 시험 순서는 [`control_hub_and_recorder_overview.html`](control_hub_and_recorder_overview.html) 에 있다 (11/14 의 [`2026-11-14-recorder-design.html`](2026-11-14-recorder-design.html) 은 그 전 검토 문서다).
 
 실물로 확인하지 않은 부분에는 **[현장 미검증]** 표시가 있다. 5절의 체크리스트가 그 확인 절차다.
 

@@ -3,6 +3,8 @@
 `control_hub/` 는 가이드(`docs/manus_teleop_guide.html`)의 명령을 브라우저 한 화면에서 켜고, 끄고, 상태와 로그를 보는 프로그램이다.
 터미널 여러 개에 명령을 복붙하던 것을 대신한다. 설계는 [`2026-11-14-control-hub-design.md`](../superpowers/specs/2026-11-14-control-hub-design.md) (프로세스·실행표), [`2026-11-15-control-hub-devices-design.md`](../superpowers/specs/2026-11-15-control-hub-devices-design.md) (홈·장치·탐색·로그) 에 있다.
 
+녹화기와 함께 본 전체 구조, 버튼별 실제 명령, 실물 시험 순서는 [`control_hub_and_recorder_overview.html`](control_hub_and_recorder_overview.html) 에 있다.
+
 실물로 확인하지 않은 부분에는 **[현장 미검증]** 표시가 있다. 5절이 그 확인 절차다.
 
 ## 1. 어떻게 동작하나
@@ -63,6 +65,7 @@ control-hub serve --config config/hub.yaml             # http://localhost:8700
 | **장치 / 각 장치** | 연결 정보(경로, by-id, 시리얼, USB 속도, latency timer, ping 지연), 관련 프로세스와 도구, 마지막 확인 결과, 이 장치의 기록. LEAP 은 모터 16개 표 (손가락 × 관절) |
 | **장치 탐색** | 지금 꽂힌 USB 장치 목록과 설정과 다른 곳에 꽂힌 것 경고. 보여 주기만 한다 (포트 자동 지정은 추후) |
 | **실행표** | 실행표(수집, 팔 + 손, 손만, leader 트리거, 센서 확인)를 고르면 단계가 순서대로 나온다. 위에서부터 하나씩 켠다. 체크박스 줄은 사람이 직접 하는 단계다 (5V 투입 등) |
+| **녹화** | 녹화기(`tactile-rec`)의 화면을 hub 안에 그대로 띄운다. 녹화기가 꺼져 있으면 켜는 버튼으로 안내한다. 주소는 `checks` 에서 `link` 가 있는 http 점검의 것이고, `127.0.0.1` 이면 hub 를 연 호스트 이름으로 바꿔 연다 (태블릿에서 쓰려면 녹화기도 `--host 0.0.0.0`). 녹화기의 키(Space 등)는 그 화면 안을 한 번 누른 뒤에 듣는다 |
 | **로그** | 세션별 사건 기록과 사고 폴더. 장치·수준으로 거른다. 사건을 누르면 그 실행의 로그가, 사고를 누르면 모아 둔 파일이 열린다 |
 | **전체** | 실행표와 무관하게 모든 프로세스와 도구. 캘리브레이션, pack / unpack, 확인 도구가 여기 있다 |
 

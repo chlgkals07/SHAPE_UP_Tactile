@@ -80,8 +80,12 @@ def test_reload_keeps_old_config_when_broken(config_path, tmux):
 
 def test_index_and_cli_validate(config_path, tmux, tmp_path, capsys):
     client = client_for(config_path, tmux)
-    assert "Control Hub" in client.get("/").text
+    page = client.get("/").text
+    assert "Control Hub" in page and 'id="rec-frame"' in page  # the recorder page
     assert client.get("/static/app.js").status_code == 200
+    described = client.get("/api/describe").json()["processes"]
+    assert described["gated"]["ready_check"] == "port"
+    assert described["server"]["ready_check"] is None
     assert main(["validate", "--config", str(config_path)]) == 0
     broken = tmp_path / "broken.yaml"
     broken.write_text("processes: {a: {cmd: x, requires: [nope]}}")

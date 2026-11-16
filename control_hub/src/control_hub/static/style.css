@@ -56,6 +56,13 @@ pre {
 @media (prefers-reduced-motion: reduce) { .dot { animation: none !important; } }
 
 main { padding: 20px 26px 40px; min-width: 0; }
+/* The recorder page: the recorder's own UI in a frame, using the width of the checks rail too. */
+.app.wide { grid-template-columns: var(--side) minmax(0, 1fr); }
+.app.wide .rail { display: none; }
+.app.wide main { padding: 0; grid-column: 2; grid-row: 1; }
+#rec-frame { display: block; width: 100%; height: 100vh; border: 0; }
+#rec-frame[hidden] { display: none; }
+#rec-off { padding: 20px 26px; }
 .bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; min-height: 40px; }
 .banner { border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 15px;
           border: 1px solid; white-space: pre-wrap; }

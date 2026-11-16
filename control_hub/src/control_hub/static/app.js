@@ -5,7 +5,7 @@
 const $ = (id) => document.getElementById(id);
 const LABEL = { off: "꺼짐", starting: "켜는 중", ready: "준비됨", stopping: "끄는 중", done: "끝남", failed: "오류" };
 const ALIVE = ["starting", "ready", "stopping"];
-const PAGES = ["home", "device", "scan", "run", "logs", "all"];
+const PAGES = ["home", "device", "scan", "run", "rec", "logs", "all"];
 const WORK_PAGES = ["run", "all"];  // pages with the process detail column
 const LEVEL_LABEL = { ok: "정상", warn: "주의", bad: "문제", idle: "꺼짐" };
 const FINGERS = [["검지", 0], ["중지", 4], ["약지", 8], ["엄지", 12]];
@@ -620,11 +620,37 @@ async function pollLog() {
   } catch { /* the state poll reports a lost connection */ } finally { log.busy = false; }
 }
 
+// ---------- recorder page ----------
+// The recorder is its own program on its own port (the check that has a `link`). Its page is
+// shown here in a frame, so recording does not need a second browser tab. The frame is loaded
+// once per start of the recorder: the 1 s redraw must not reload it.
+function recorderUrl(target) {
+  const url = new URL(target);
+  // The config names the recorder as seen from the hub PC. A tablet must ask the hub PC too.
+  if (["127.0.0.1", "localhost"].includes(url.hostname)) url.hostname = location.hostname;
+  return url.href;
+}
+function renderRec() {
+  const check = Object.values(D.checks).find((c) => c.link && c.kind === "http");
+  const up = Boolean(check && (S.checks[check.id] || {}).ok);
+  const frame = $("rec-frame");
+  if (up && frame.hidden) frame.src = recorderUrl(check.target);
+  if (!up && !frame.hidden) frame.removeAttribute("src");
+  frame.hidden = !up;
+  $("rec-off").hidden = up;
+  if (up) return;
+  const starters = Object.values(D.processes).filter((p) => p.ready_check === (check || {}).id);
+  setHTML($("rec-off"), `<div class="panel"><h2>녹화기가 꺼져 있습니다</h2>
+    <p class="muted">${check ? esc(check.help) : "hub.yaml 의 checks 에 link 가 있는 http 점검이 없습니다."}</p>
+    <p>${starters.map((p) => `<button class="btn" data-action="select" data-id="${esc(p.id)}">${esc(p.title)} ▸</button>`).join(" ")}</p></div>`);
+}
+
 // ---------- main loop ----------
 function render() {
   if (!D || !S) return;
   PAGES.forEach((p) => { $(`page-${p}`).hidden = page !== p; });
   $("work").hidden = !WORK_PAGES.includes(page);
+  document.querySelector(".app").classList.toggle("wide", page === "rec");
   renderNav();
   renderRail();
   if (page === "home") renderHome();
@@ -632,6 +658,7 @@ function render() {
   else if (page === "scan") renderScan();
   else if (page === "logs") renderLogs();
   else if (page === "run") renderRun();
+  else if (page === "rec") renderRec();
   else if (page === "all") renderAll();
   if (WORK_PAGES.includes(page)) renderDetail();
 }
