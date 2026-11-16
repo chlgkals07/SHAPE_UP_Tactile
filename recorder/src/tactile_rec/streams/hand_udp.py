@@ -115,6 +115,12 @@ class HandUdpStream(ThreadedStream):
         self.clock_mismatch = 0
         self._socket: socket.socket | None = None
 
+    def counters(self) -> dict[str, int]:
+        return {
+            **super().counters(), "bad_packets": self.bad_packets, "bad_glove": self.bad_glove,
+            "clock_mismatch": self.clock_mismatch,
+        }
+
     def _open(self) -> None:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -136,8 +142,9 @@ class HandUdpStream(ThreadedStream):
         t_recv_ns = self.clock.now_ns()
         try:
             packet = parse_packet(raw)
-        except ValueError:
+        except ValueError as error:
             self.bad_packets += 1
+            self.reject(f"packet rejected: {error}")
             return
         if packet.glove_error:
             self.bad_glove += 1

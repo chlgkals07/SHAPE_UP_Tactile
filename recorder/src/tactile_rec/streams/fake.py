@@ -14,7 +14,7 @@ import cv2
 import numpy as np
 
 from tactile_rec.clock import Clock
-from tactile_rec.stream import ThreadedStream
+from tactile_rec.stream import ThreadedStream, Zeroable
 from tactile_rec.streams import specs
 from tactile_rec.tactile import Module, TactileLayout, encode_payload, taxel_xy
 from tactile_rec.types import NO_TIME, SRC_NONE, StreamSpec
@@ -58,7 +58,7 @@ def _spec(name: str, cfg: dict[str, Any]) -> StreamSpec:
     return spec
 
 
-class FakeStream(ThreadedStream):
+class FakeStream(Zeroable, ThreadedStream):
     def __init__(self, name: str, cfg: dict[str, Any], clock: Clock | None = None):
         super().__init__(_spec(name, cfg), clock)
         self.like = cfg["like"]
@@ -68,7 +68,7 @@ class FakeStream(ThreadedStream):
         self._next_ns = 0
         self._started_ns = 0
         self._tick = 0
-        self._zero_requested = False
+        self._init_zero()
         if self.like == "tactile":
             self.layout = fake_layout(cfg["places"])
             self._xy = {}
@@ -76,9 +76,6 @@ class FakeStream(ThreadedStream):
                 xy = np.asarray(taxel_xy(module.points), dtype=np.float64)
                 span = np.ptp(xy, axis=0).max() or 1.0
                 self._xy[module.place] = (xy - xy.min(axis=0)) / span
-
-    def zero(self) -> None:
-        self._zero_requested = True
 
     def _open(self) -> None:
         self._next_ns = self._started_ns = self.clock.now_ns()
@@ -95,8 +92,8 @@ class FakeStream(ThreadedStream):
         if self._next_ns < now_ns - 10 * self.period_ns:  # fell far behind: do not burst
             self._next_ns = now_ns
         self._tick += 1
-        if self._zero_requested:
-            self._zero_requested = False
+        if self._take_zero_request():
+            self._zero_finished()
         elapsed_s = (now_ns - self._started_ns) / 1e9
         if self.drop_after_s > 0 and (elapsed_s % (self.drop_after_s + 2.0)) > self.drop_after_s:
             return  # simulated dropout: silent for 2 s after every drop_after_s

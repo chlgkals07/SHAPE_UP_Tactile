@@ -26,6 +26,16 @@ KEYS = {
 }
 
 
+def zero_message(results: dict[str, dict]) -> str:
+    if not results:
+        return "촉각 영점 보정: 보드 없음"
+    parts = [
+        f"{name} {'완료' if result['ok'] else '실패 (' + str(result['error']) + ')'}"
+        for name, result in results.items()
+    ]
+    return "촉각 영점 보정: " + ", ".join(parts)
+
+
 def render(hub: Hub, recorder: Recorder, message: str) -> Group:
     status = recorder.status()
     counts = status["counts"]
@@ -113,7 +123,7 @@ def run(hub: Hub, recorder: Recorder) -> None:
                         path = recorder.save(key == "s")
                         message = f"저장: {path}"
                     elif key == "z" and state == IDLE:
-                        message = f"촉각 영점 보정 요청: {recorder.zero_tactile() or '보드 없음'}"
+                        message = zero_message(recorder.zero_tactile())
                     if key in (" ", "!", "s", "f", "d"):
                         console.bell()
                 except RecorderError as error:

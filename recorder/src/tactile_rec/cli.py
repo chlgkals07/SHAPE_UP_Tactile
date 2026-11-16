@@ -170,6 +170,7 @@ def _convert(args: argparse.Namespace) -> int:
     except ConvertError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
+    report["config"] = str(Path(args.config).resolve())  # where report["dataset"] came from
     report_path = args.out.parent / f"{args.out.name}.conversion_report.json"
     report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     print(

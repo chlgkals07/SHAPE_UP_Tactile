@@ -16,6 +16,7 @@ from tactile_rec import features
 from tactile_rec.config import DatasetConfig
 from tactile_rec.convert import align
 from tactile_rec.convert.load import Episode, EpisodeError
+from tactile_rec.streams import specs
 from tactile_rec.tactile import decode_payload
 
 
@@ -143,6 +144,13 @@ def _convert(episode: Episode, cfg: DatasetConfig) -> Converted:
             f"{episode.name}: hand '{cfg.hand_action}' has missing values; "
             "use dataset.hand_action: cmd"
         )
+    # What the teleop was doing at each step. In "release" the hand moves to its rest pose on
+    # its own and in "hold" it is frozen: neither is the operator's action.
+    step_modes = hand.data["mode"][hand_action_rows]
+    mode_steps = {
+        name: int((step_modes == code).sum()) for code, name in enumerate(specs.HAND_MODES)
+    }
+    mode_steps["unknown"] = int(grid.size - sum(mode_steps.values()))
     names[features.KEY_STATE] = names[features.KEY_ACTION] = features.joint_names(
         arm_joints, cfg.arm_dof
     )
@@ -213,11 +221,17 @@ def _convert(episode: Episode, cfg: DatasetConfig) -> Converted:
         streams[name]["dropped_write"] = int(
             episode.spec(name).get("stats", {}).get("dropped_write", 0)
         )
+    streams[hand.name]["mode_steps"] = mode_steps
     worst = max(s["stale_max_ms"] for s in streams.values())
     problems = [
         f"{name}: a value was {s['stale_max_ms']:.0f} ms old (limit {cfg.max_staleness_ms:.0f})"
         for name, s in streams.items() if s["stale_max_ms"] > cfg.max_staleness_ms
     ]
+    if mode_steps["release"] or mode_steps["unknown"]:
+        problems.append(
+            f"{hand.name}: teleop was not driving the hand for {mode_steps['release']} step(s) "
+            f"in release and {mode_steps['unknown']} in an unknown mode"
+        )
     flags = meta.get("flags", {})
     for name, count in flags.get("dropouts", {}).items():
         problems.append(f"{name}: dropped out {count} time(s) while recording")

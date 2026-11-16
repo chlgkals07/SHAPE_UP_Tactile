@@ -160,6 +160,9 @@ def test_bad_packets_are_counted_and_do_not_stop_the_stream():
     address = stream._socket.getsockname()
     out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     out.sendto(b"garbage", address)
+    while stream.bad_packets < 1 and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert "packet rejected" in stream.health().message  # only bad packets: said, not "off"
     good = {"v": 1, "seq": 5, "t_ns": 9, "mode": "live", "cmd": [1.0] * 16}
     out.sendto(json.dumps(good).encode(), address)
     while stream.health().count < 1 and time.monotonic() < deadline:
@@ -167,6 +170,7 @@ def test_bad_packets_are_counted_and_do_not_stop_the_stream():
     stream.stop()
     out.close()
     assert stream.bad_packets == 1 and stream.health().count == 1
+    assert stream.counters()["bad_packets"] == 1
 
 
 # ---- paxini layout -----------------------------------------------------------------------------

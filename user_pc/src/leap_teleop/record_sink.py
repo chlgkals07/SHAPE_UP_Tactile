@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import socket
+import sys
 import time
 from collections.abc import Callable
 
@@ -85,12 +86,22 @@ class UdpRecordSink:
         self._seq = 0
         self._last_human_time: float | None = None
         self.send_errors = 0
+        self._failing = False
 
     def publish(self, command_degrees, feedback, mode: str, reading: Reading | None) -> None:
         try:
             self._publish(command_degrees, feedback, mode, reading)
-        except Exception:  # noqa: BLE001 - recording must never stop the hand
+        except Exception as error:  # noqa: BLE001 - recording must never stop the hand
             self.send_errors += 1
+            if not self._failing:  # said once when it starts, not at every tick
+                print(f"[teleop] record data is not being sent: {type(error).__name__}: {error}",
+                      file=sys.stderr)
+            self._failing = True
+        else:
+            if self._failing:
+                print(f"[teleop] record data is being sent again ({self.send_errors} lost)",
+                      file=sys.stderr)
+            self._failing = False
 
     def _publish(self, command_degrees, feedback, mode, reading) -> None:
         t_ns = self._clock_ns()

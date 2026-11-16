@@ -101,6 +101,21 @@ class Stream:
         with self._lock:
             self._error = message
 
+    def reject(self, message: str) -> None:
+        """A reading arrived but could not be used. While good readings keep coming this is
+        only counted by the adapter; when none is, the reason becomes the stream's error, so
+        the stream does not just look silent."""
+        now_ns = self.clock.now_ns()
+        with self._lock:
+            last = self._buffer[-1].t_recv_ns if self._buffer else None
+            if last is None or now_ns - last > self.stale_after_s * 1e9:
+                self._error = message
+
+    def counters(self) -> dict[str, int]:
+        """Things that went wrong without stopping the stream, counted since the start."""
+        with self._lock:
+            return {"subscriber_errors": self._subscriber_errors}
+
     # ---- consumer side ----------------------------------------------------------------------
 
     def latest(self) -> Sample | None:
@@ -152,6 +167,51 @@ class Stream:
         if hz < SLOW_FRACTION * self.spec.nominal_hz:
             return Health(STATUS_SLOW, hz, age_s, count, missed)
         return Health(STATUS_OK, hz, age_s, count, missed)
+
+
+class Zeroable:
+    """For a stream whose device is zeroed by its own reader thread (tactile boards).
+
+    zero() only asks; the reader thread does the work between two readings and reports with
+    _zero_finished(). wait_zero() gives the caller the outcome.
+    """
+
+    clock: Clock
+
+    def _init_zero(self) -> None:
+        self._zero_requested = threading.Event()
+        self._zero_done = threading.Event()
+        self._zero_result: dict[str, object] | None = None
+
+    def zero(self) -> None:
+        self._zero_done.clear()
+        self._zero_requested.set()
+
+    def _take_zero_request(self) -> bool:
+        if not self._zero_requested.is_set():
+            return False
+        self._zero_requested.clear()
+        return True
+
+    def _zero_finished(self, error: str = "") -> None:
+        self._zero_result = {"ok": not error, "error": error, "t_ns": self.clock.now_ns()}
+        self._zero_done.set()
+
+    def wait_zero(self, timeout_s: float) -> dict[str, object]:
+        """{"ok", "error", "t_ns"} of the zero asked for last. t_ns is when it finished:
+        samples received after it are on the new baseline."""
+        if not self._zero_done.wait(timeout_s):
+            return {
+                "ok": False, "t_ns": NO_TIME,
+                "error": f"no answer within {timeout_s:g} s (is the board connected?)",
+            }
+        return dict(self._zero_result or {})
+
+    @property
+    def last_zero(self) -> dict[str, object] | None:
+        """Result of the zero that finished last (also one that answered after wait_zero()
+        gave up), or None if the board was never zeroed since the program started."""
+        return None if self._zero_result is None else dict(self._zero_result)
 
 
 class ThreadedStream(Stream):

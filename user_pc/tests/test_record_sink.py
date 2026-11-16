@@ -52,9 +52,11 @@ def test_sink_sends_one_datagram_per_tick_and_a_glove_sample_only_when_new():
     assert first["glove"] is not None and second["glove"] is None
 
 
-def test_sink_never_raises_into_the_control_loop():
+def test_sink_never_raises_into_the_control_loop(capsys):
     sink = UdpRecordSink("127.0.0.1", 9)  # nobody listens; UDP send still succeeds
     sink.publish(np.zeros(16), None, "live", None)
     sink.close()
     sink.publish(np.zeros(16), None, "live", None)  # closed socket: swallowed and counted
-    assert sink.send_errors == 1
+    sink.publish(np.zeros(16), None, "live", None)
+    assert sink.send_errors == 2
+    assert capsys.readouterr().err.count("not being sent") == 1  # said once, not every tick

@@ -9,6 +9,7 @@ Two outputs:
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import shutil
 from collections.abc import Callable
@@ -219,6 +220,7 @@ def convert_many(
         "skipped": len(paths) - written,
         "mount": mount,
         "fps": cfg.fps,
+        "dataset": dataclasses.asdict(cfg),  # the settings every number below was made with
         "episodes": reports,
     }
 

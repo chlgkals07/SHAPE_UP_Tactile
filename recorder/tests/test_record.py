@@ -181,7 +181,7 @@ def test_changing_the_task_starts_a_new_session_folder(rig):
 def test_marker_and_zero_are_written_to_the_event_log(rig):
     recorder = Recorder(rig.hub)
     rig.run(1.5)
-    assert recorder.zero_tactile() == []  # passive test streams have no zero(); still logged
+    assert recorder.zero_tactile() == {}  # passive test streams have no zero(); still logged
     recorder.start()
     rig.run(0.2)
     recorder.mark("contact")

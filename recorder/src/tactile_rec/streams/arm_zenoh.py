@@ -94,6 +94,9 @@ class ArmZenohStream(ThreadedStream):
         self.bad_messages = 0
         self._subscriber: Any = None
 
+    def counters(self) -> dict[str, int]:
+        return {**super().counters(), "bad_messages": self.bad_messages}
+
     def _open(self) -> None:
         from zenoh_ros2_sdk import ROS2Subscriber  # optional dependency
 

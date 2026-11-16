@@ -29,7 +29,7 @@ from tactile_rec.config import ConfigError, SessionConfig, check_label
 from tactile_rec.hub import Hub
 from tactile_rec.record.writer import EpisodeWriter
 from tactile_rec.streams.specs import mode_code
-from tactile_rec.types import STATUS_OK, STATUS_SLOW
+from tactile_rec.types import NO_TIME, STATUS_OK, STATUS_SLOW
 
 IDLE, RECORDING, REVIEW = "idle", "recording", "review"
 FORMAT_VERSION = 1
@@ -220,6 +220,8 @@ class Recorder:
             self._start = self.clock.anchor()
             self._forced = bool(problems)
             self._dropouts, self._down = {}, set()
+            self._zero = self.hub.last_zero()
+            self._counters = self.hub.counters()
             free_gb = self._free_gb()
             self._disk_low = False
             self._disk_guard = free_gb is None or free_gb >= self.config.record.min_free_gb
@@ -229,8 +231,13 @@ class Recorder:
             )
             since_ns = self._start["mono_ns"] - int(self.config.record.preroll_s * 1e9)
             # Each stream hands over its buffered pre-roll and then every new sample, in order.
+            # A tactile board zeroed inside the pre-roll starts after the zero: what it sent
+            # before is on another baseline.
             self._unsubscribe = [
-                stream.subscribe(lambda sample, n=name: writer.add(n, sample), since_ns)
+                stream.subscribe(
+                    lambda sample, n=name: writer.add(n, sample),
+                    max(since_ns, int((self._zero.get(name) or {}).get("t_ns", NO_TIME)) + 1),
+                )
                 for name, stream in self.hub.streams.items()
             ]
             self.state = RECORDING
@@ -292,6 +299,8 @@ class Recorder:
             "mount": self.config.mount,
             "start": self._start,
             "preroll_s": self.config.record.preroll_s,
+            # board -> {"ok", "error", "t_ns"} of its last zero before this episode, or None
+            "tactile_zero": self._zero,
             "result": None,
             "flags": {
                 "forced_start": self._forced,
@@ -335,8 +344,14 @@ class Recorder:
         summary["flags"]["write_errors"] = {
             name: value["write_error"] for name, value in stats.items() if value.get("write_error")
         }
+        counters = self.hub.counters()
         for name, spec in summary["streams"].items():
             spec["stats"] = stats[name]
+            # what went wrong without stopping the stream, counted during this episode
+            spec["counters"] = {
+                key: value - self._counters.get(name, {}).get(key, 0)
+                for key, value in counters.get(name, {}).items()
+            }
         write_json(self._tmp_dir / EPISODE_FILE, summary)
         (self._tmp_dir / PROGRESS_FILE).unlink(missing_ok=True)
         return summary
@@ -402,11 +417,13 @@ class Recorder:
             self.hub.add_event("mark", label=label, episode=self._episode)
         self._notify("mark", label=label)
 
-    def zero_tactile(self) -> list[str]:
+    def zero_tactile(self) -> dict[str, dict[str, Any]]:
+        """Zero every tactile board and wait for the outcome: {board: {"ok", "error",
+        "t_ns"}}."""
         with self._lock:
             if self.state != IDLE:
                 raise RecorderError("tactile can only be zeroed while idle")
-            return self.hub.zero_tactile()
+            return self.hub.zero_tactile(self.config.record.zero_timeout_s)
 
     def tick(self) -> None:
         """Call about 10 times a second: enforces the time limit, watches for dropouts and

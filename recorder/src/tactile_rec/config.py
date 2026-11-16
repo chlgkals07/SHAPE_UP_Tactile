@@ -49,6 +49,7 @@ class RecordConfig:
     jpeg_quality: int = 95
     min_free_gb: float = 5.0  # refuse to start below this; stop a running episode below it
     flush_s: float = 5.0  # how often rows are written to disk while recording
+    zero_timeout_s: float = 3.0  # how long to wait for a tactile board to finish zeroing
 
 
 @dataclass(frozen=True)
@@ -66,7 +67,7 @@ class DatasetConfig:
     arm_action: str = "arm_action"
     hand: str = "hand"
     arm_dof: int = 6  # leading joints of the arm streams that go into state / action
-    hand_action: str = "sent"  # "sent" (after clip + slew, written to the motors) or "cmd" (after the stale guard)
+    hand_action: str = ""  # "sent" or "cmd": which hand column is the action. Must be set
     tactile: tuple[str, ...] = ()
     tactile_order: tuple[str, ...] = DEFAULT_ORDER
     tactile_hr: int = 3  # high-rate tactile samples packed into each dataset step
@@ -194,9 +195,14 @@ def parse_config(raw: dict[str, Any], source: str = "") -> Config:
         raise ConfigError("record.preroll_s must be 0..1.5 (streams keep 2 s of history)")
     if record.flush_s <= 0:
         raise ConfigError("record.flush_s must be positive")
+    if record.zero_timeout_s <= 0:
+        raise ConfigError("record.zero_timeout_s must be positive")
     dataset = _section(raw, "dataset", DatasetConfig)
     if dataset.hand_action not in ("cmd", "sent"):
-        raise ConfigError("dataset.hand_action must be 'cmd' or 'sent'")
+        raise ConfigError(
+            "dataset.hand_action must be set to 'sent' (written to the motors, after clip + "
+            "slew) or 'cmd' (before that, after the stale guard); there is no default"
+        )
     if dataset.tactile_hr < 1:
         raise ConfigError("dataset.tactile_hr must be >= 1")
     for stream, mode in dataset.time.items():

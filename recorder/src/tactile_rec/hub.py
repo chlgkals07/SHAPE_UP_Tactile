@@ -95,13 +95,26 @@ class Hub:
     def tactile_streams(self) -> dict[str, Stream]:
         return {n: s for n, s in self.streams.items() if "payload" in s.spec.fields}
 
-    def zero_tactile(self) -> list[str]:
-        """Zero every tactile board at its current load. Returns the boards asked."""
-        names = []
-        for name, stream in self.tactile_streams().items():
-            zero = getattr(stream, "zero", None)
-            if zero is not None:
-                zero()
-                names.append(name)
-        self.add_event("tactile_zero", streams=names)
-        return names
+    def zero_tactile(self, timeout_s: float) -> dict[str, dict[str, Any]]:
+        """Zero every tactile board at its current load and wait for each to answer.
+        Returns {board: {"ok", "error", "t_ns"}}."""
+        boards = {
+            name: stream for name, stream in self.tactile_streams().items()
+            if hasattr(stream, "zero")
+        }
+        for stream in boards.values():  # ask all first: the boards work at the same time
+            stream.zero()
+        results = {name: stream.wait_zero(timeout_s) for name, stream in boards.items()}
+        self.add_event("tactile_zero", streams=results)
+        return results
+
+    def last_zero(self) -> dict[str, dict[str, Any] | None]:
+        """{board: result of its last finished zero, or None if never zeroed}: the baseline
+        the tactile values are on right now."""
+        return {
+            name: stream.last_zero for name, stream in self.tactile_streams().items()
+            if hasattr(stream, "last_zero")
+        }
+
+    def counters(self) -> dict[str, dict[str, int]]:
+        return {name: stream.counters() for name, stream in self.streams.items()}

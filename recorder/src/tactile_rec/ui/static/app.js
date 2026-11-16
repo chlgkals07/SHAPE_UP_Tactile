@@ -398,6 +398,14 @@ function renderReview(summary) {
   if (summary.flags.forced_start) flags.push("점검 실패 상태에서 강제 시작");
   for (const [name, error] of Object.entries(summary.flags.write_errors || {})) flags.push(`${name} 쓰기 실패 (${error})`);
   if (summary.flags.disk_low) flags.push("디스크 여유가 부족해 자동으로 멈춤");
+  for (const [name, spec] of Object.entries(summary.streams)) {
+    const wrong = Object.entries(spec.counters || {}).filter(([, count]) => count > 0);
+    if (wrong.length) flags.push(`${name}: ${wrong.map(([key, count]) => `${COUNTER_LABEL[key] || key} ${count}`).join(", ")}`);
+  }
+  for (const [name, zero] of Object.entries(summary.tactile_zero || {})) {
+    if (zero === null) flags.push(`${name}: 영점 보정 없이 녹화`);
+    else if (!zero.ok) flags.push(`${name}: 마지막 영점 보정 실패`);
+  }
   box.replaceChildren(table, flags.length ? el("p", { class: "flag", text: `주의: ${flags.join(", ")}` }) : null);
 }
 
@@ -452,7 +460,15 @@ const actStop = () => command("/api/record/stop");
 const actSave = (success) => command("/api/record/save", { success }, success ? "성공으로 저장했습니다" : "실패로 저장했습니다");
 const actDiscard = () => command("/api/record/discard", {}, "버렸습니다");
 const actMark = () => command("/api/record/mark", { label: "" }, "표시를 남겼습니다");
-const actZero = () => command("/api/tactile/zero", {}, "촉각 영점 보정을 요청했습니다");
+const actZero = async () => {
+  const result = await command("/api/tactile/zero");
+  if (!result) return;
+  const entries = Object.entries(result.streams);
+  const failed = entries.filter(([, zero]) => !zero.ok);
+  if (!entries.length) toast("영점 보정할 촉각 보드가 없습니다", true);
+  else if (failed.length) toast(`촉각 영점 보정 실패: ${failed.map(([name, zero]) => `${name} (${zero.error})`).join(", ")}`, true);
+  else toast(`촉각 영점 보정 완료: ${entries.map(([name]) => name).join(", ")}`);
+};
 
 document.addEventListener("keydown", (event) => {
   if (event.target.matches("input, select, textarea") || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -540,6 +556,12 @@ function sparkline(canvas, values, nominal) {
   context.stroke();
 }
 
+const COUNTER_LABEL = {
+  subscriber_errors: "기록 실패", bad_packets: "잘못된 패킷", bad_glove: "잘못된 글러브 값",
+  clock_mismatch: "시각 불일치", bad_frames: "잘못된 프레임", bad_messages: "잘못된 메시지",
+  device_errors: "보드 오류 코드",
+};
+
 function renderSensors() {
   if (!state || !info) return;
   lastSensorRender = Date.now();
@@ -556,6 +578,11 @@ function renderSensors() {
       ...(stream.kind === "video" ? [["회전", `${(spec.meta || {}).rotation_deg || 0}° (미리보기와 변환에 적용)`]] : []),
       ["항목", Object.entries(spec.fields).map(([key, field]) => `${key}[${field.shape.join("x")}] ${field.unit}`).join(", ") || "-"],
     ];
+    // Readings that arrived but were thrown away, and rows a consumer failed to take.
+    const wrong = Object.entries(stream.counters || {}).filter(([, count]) => count > 0);
+    if (wrong.length) pairs.push(["버린 것", wrong.map(([key, count]) => `${COUNTER_LABEL[key] || key} ${count}`).join(", ")]);
+    const zero = (state.tactile_zero || {})[name];
+    if (zero !== undefined) pairs.push(["영점 보정", zero === null ? "프로그램 시작 후 안 함" : zero.ok ? "완료" : `실패 (${zero.error})`]);
     const meta = spec.meta || {};
     if (meta.firmware) pairs.push(["펌웨어", meta.firmware]);
     if (meta.layout) pairs.push(["모듈", meta.layout.modules.map((m) => `${m.name}→${m.place} (${m.points})`).join(", ")]);

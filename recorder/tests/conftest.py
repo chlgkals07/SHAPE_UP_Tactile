@@ -40,6 +40,7 @@ def fake_config_dict(tmp_path, **overrides):
             "cam_ext": {"type": "fake", "like": "camera", "hz": 30, "width": 64, "height": 48},
         },
         "dataset": {
+            "hand_action": "sent",
             "tactile": ["tactile_a", "tactile_b"],
             "cameras": ["cam_wrist", "cam_ext"],
             "time": {"hand": "src"},

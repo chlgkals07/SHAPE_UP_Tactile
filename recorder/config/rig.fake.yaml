@@ -27,6 +27,7 @@ streams:
 
 dataset:
   fps: 30
+  hand_action: sent
   tactile: [tactile_a, tactile_b]
   cameras: [cam_wrist, cam_ext]
   time: {hand: src, tactile_a: respread, tactile_b: respread}

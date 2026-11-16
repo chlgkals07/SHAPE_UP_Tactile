@@ -69,7 +69,7 @@ def build_state(hub: Hub, recorder: Recorder) -> dict[str, Any]:
         spec = hub.streams[name].spec
         streams[name] = {
             **health.to_json(), "nominal_hz": spec.nominal_hz, "required": spec.required,
-            "kind": spec.kind,
+            "kind": spec.kind, "counters": hub.streams[name].counters(),
         }
     free = recorder._free_gb()
     return {
@@ -78,6 +78,7 @@ def build_state(hub: Hub, recorder: Recorder) -> dict[str, Any]:
         "streams": streams,
         "problems": recorder.preflight() if status["state"] == "idle" else [],
         "disk_free_gb": None if free is None else round(free, 1),
+        "tactile_zero": hub.last_zero(),
     }
 
 

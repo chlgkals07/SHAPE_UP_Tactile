@@ -11,13 +11,12 @@ stream is also untested. Check with `tactile-rec check tactile_a` (field checkli
 
 from __future__ import annotations
 
-import threading
 from typing import Any
 
 import numpy as np
 
 from tactile_rec.clock import Clock
-from tactile_rec.stream import ThreadedStream
+from tactile_rec.stream import ThreadedStream, Zeroable
 from tactile_rec.streams import specs
 from tactile_rec.tactile import Module, TactileLayout
 from tactile_rec.types import Field
@@ -45,21 +44,25 @@ def layout_from_board(
     return TactileLayout(modules, has_resultant, has_distributed)
 
 
-class PaxiniStream(ThreadedStream):
+class PaxiniStream(Zeroable, ThreadedStream):
+    """zero() asks the reader thread to run the board's calibration (zero at the current
+    load); wait_zero() tells whether it worked."""
+
     def __init__(self, name: str, cfg: dict[str, Any], clock: Clock | None = None):
         super().__init__(specs.tactile_spec(name, float(cfg["hz"]), bool(cfg["required"])), clock)
         self.port, self.baudrate = str(cfg["port"]), int(cfg["baudrate"])
         self.places = {str(k): str(v) for k, v in cfg["places"].items()}
         self.layout: TactileLayout | None = None
         self.bad_frames = 0
+        self.device_errors = 0  # frames in which the board reported an error code
         self._board: Any = None
-        self._zero_requested = threading.Event()
-        self.last_zero_ns = 0
-        self.last_zero_error = ""
+        self._init_zero()
 
-    def zero(self) -> None:
-        """Ask the reader thread to run the board's calibration (zero at the current load)."""
-        self._zero_requested.set()
+    def counters(self) -> dict[str, int]:
+        return {
+            **super().counters(), "bad_frames": self.bad_frames,
+            "device_errors": self.device_errors,
+        }
 
     def _open(self) -> None:
         from paxini_sdk import HighSpeedHandBoard, registers, sensor_registry
@@ -100,8 +103,7 @@ class PaxiniStream(ThreadedStream):
         from paxini_sdk.exceptions import TimeoutError as PaxiniTimeoutError
         from paxini_sdk.protocol import parse_auto_push
 
-        if self._zero_requested.is_set():
-            self._zero_requested.clear()
+        if self._take_zero_request():
             self._run_zero()
             return
         try:
@@ -111,13 +113,20 @@ class PaxiniStream(ThreadedStream):
         t_recv_ns = self.clock.now_ns()
         try:
             parsed = parse_auto_push(raw)
-        except FrameError:
+        except FrameError as error:
             self.bad_frames += 1
+            self.reject(f"bad frame: {error}")
             return
         payload = np.frombuffer(parsed.valid_data, dtype=np.uint8)
         if payload.size != self.layout.payload_size:
             self.bad_frames += 1
+            self.reject(
+                f"frame carries {payload.size} payload bytes, the layout read at connect "
+                f"expects {self.layout.payload_size}"
+            )
             return
+        if parsed.error_code:
+            self.device_errors += 1
         self.push(
             {"payload": payload.copy(), "error_code": np.int16(parsed.error_code)},
             t_recv_ns=t_recv_ns,
@@ -126,12 +135,17 @@ class PaxiniStream(ThreadedStream):
     def _run_zero(self) -> None:
         # The calibration command expects a plain response, so the push stream is paused
         # around it.
-        self._board.disable_auto_push()
+        error = ""
         try:
-            self._board.calibrate()
-            self.last_zero_error = ""
-        except Exception as error:  # noqa: BLE001 - shown in the UI; streaming resumes
-            self.last_zero_error = str(error)
+            self._board.disable_auto_push()
+            try:
+                self._board.calibrate()
+            except Exception as failure:  # noqa: BLE001 - reported; streaming resumes
+                error = f"{type(failure).__name__}: {failure}"
+            finally:
+                self._board.enable_auto_push()
+        except Exception as failure:  # noqa: BLE001 - the push stream could not be paused
+            error = error or f"{type(failure).__name__}: {failure}"
+            raise  # or resumed: the reader thread reopens the board
         finally:
-            self.last_zero_ns = self.clock.now_ns()
-            self._board.enable_auto_push()
+            self._zero_finished(error)
