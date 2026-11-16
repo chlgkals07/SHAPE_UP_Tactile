@@ -21,6 +21,7 @@ pip install -e '.[viz]'                   # 선택: Rerun 재생
 
 - `zenoh-ros2-sdk` 는 처음 실행할 때 메시지 정의를 git 에서 내려받는다. **첫 실행은 인터넷이 되는 상태에서** 한다.
 - 이 venv 는 ROS 와 무관하다. 셸에 ROS 환경이 올라와 있어서 Python 이 섞이면 명령 앞에 `env -u PYTHONPATH` 를 붙인다.
+- 버전을 맞춰 설치하려면 `uv sync --extra ui --extra arm --extra tactile --extra camera` 를 쓴다. `uv.lock` 에 고정된 버전과 `.python-version`(3.12)을 따른다. Paxini SDK 는 그 뒤에 `uv pip install -e ../third_party/paxini` 로 넣는다.
 - `leap_teleop` 은 지금처럼 자기 환경에서 돌린다. 녹화기와 같은 venv 일 필요가 없다.
 
 ### 학습 서버 (변환하는 PC)
@@ -141,11 +142,12 @@ cd ../user_pc && env -u PYTHONPATH python -m pytest -q   # 텔레옵 시험 (싱
 
 | 경우 | 남는 것 |
 |---|---|
-| 녹화 중에 프로그램을 껐다 (Ctrl+C, 창 닫기 전 정상 종료) | 그 순간까지 전부. 에피소드를 멈춘 뒤 끝난다 |
+| 녹화 중에 프로그램을 껐다 (Ctrl+C, `kill`, 터미널·tmux 창 닫기, control hub 의 끄기·강제 종료) | 그 순간까지 전부. 에피소드를 멈춘 뒤 끝난다 |
 | 검토 화면에서 저장하지 않고 껐다 | 전부 |
-| 녹화 중에 프로그램이 죽었다 (kill, 정전, 강제 종료) | 마지막으로 디스크에 쓴 데까지. 최대 `record.flush_s`(기본 5초)를 잃는다 |
+| 녹화 중에 프로그램이 죽었다 (`kill -9`, 정전, 충돌) | 마지막으로 디스크에 쓴 데까지. 최대 `record.flush_s`(기본 5초)를 잃는다 |
 | 스트림 하나를 쓰지 못했다 (디스크 가득, 드라이브 빠짐) | 나머지 스트림 전부. 검토 화면에 "쓰기 실패"로 보인다 |
 
+- 브라우저 탭(카메라 미리보기)이 열려 있어도 Ctrl+C 한 번에 끝난다. 열린 연결은 `ui.shutdown_timeout_s`(기본 2초)만 기다린다.
 - 녹화 중에는 `record.flush_s` 초마다 `ep_NNNN.tmp/parts/` 에 조각 파일을 쓰고, 정지할 때 스트림당 `.npz` 하나로 합친다.
 - 남은 에피소드는 **에피소드 페이지**에 "미저장"으로 보인다. "성공으로 저장" / "실패로 저장"을 누르면 번호 그대로 `ep_NNNN` 이 되고, "삭제"로 지운다.
 - 죽어서 끊긴 에피소드는 저장할 때 조각을 합쳐 복구하며 `flags.recovered` 가 붙는다.

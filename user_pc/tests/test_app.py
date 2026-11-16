@@ -186,3 +186,32 @@ def test_hand_state_units_are_radians_and_milliamps():
     )
     pos, vel, eff = hand_state_units(fb)
     assert pos[0] == pytest.approx(np.pi) and vel[0] == pytest.approx(np.pi / 2) and eff[0] == 120.0
+
+
+@pytest.mark.parametrize("name", ["SIGTERM", "SIGHUP"])
+def test_a_killed_window_still_closes_the_driver(name):
+    """kill and a closed terminal (tmux kill-window sends SIGHUP) must end the loop the way
+    Ctrl+C does: the driver's close() is where Torque OFF happens."""
+    import signal
+
+    from leap_teleop.cli import stop_like_ctrl_c
+
+    clock = FakeClock()
+    driver = FakeDriver(clock)
+
+    class Killed(FakeSource):
+        def poll(self, now):
+            if now > 0.2:
+                signal.raise_signal(getattr(signal, name))
+            return super().poll(now)
+
+    source = Killed(lambda t: 0.0)
+    before = {number: signal.getsignal(number) for number in (signal.SIGTERM, signal.SIGHUP)}
+    stop_like_ctrl_c()
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            run(source, clock, driver)
+    finally:
+        for number, handler in before.items():
+            signal.signal(number, handler)
+    assert source.closed and driver.closed

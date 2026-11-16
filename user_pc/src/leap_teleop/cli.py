@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import signal
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -129,6 +130,13 @@ def build_driver(args: argparse.Namespace) -> HandDriver:
     return LeapHandDriver(controller)
 
 
+def stop_like_ctrl_c() -> None:
+    """Make SIGTERM and SIGHUP (kill, a closed terminal, a killed tmux window) end the program
+    the way Ctrl+C does, so the same clean-up runs."""
+    for number in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(number, lambda *_: signal.raise_signal(signal.SIGINT))
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
@@ -183,6 +191,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"error: {error}", file=sys.stderr)
         return 2
 
+    stop_like_ctrl_c()  # a killed window must still reach Torque OFF in run_teleop's finally
     try:
         run_teleop(source, retarget, guard, driver, rate_hz=args.rate, publisher=publisher)
     except KeyboardInterrupt:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
+import signal
 import sys
 import time
 from collections.abc import Sequence
@@ -94,6 +95,7 @@ def _record(args: argparse.Namespace) -> int:
     config = _apply_record_overrides(load_config(args.config), args)
     hub = Hub(config)
     recorder = Recorder(hub)
+    stop_like_ctrl_c()  # an episode being recorded is stopped and kept, not cut off
     print(f"[tactile-rec] rig {config.rig_name} ({config.mount}), data under {config.data_root}")
     hub.start()
     try:
@@ -180,6 +182,13 @@ def _convert(args: argparse.Namespace) -> int:
         f"({report['skipped']} skipped). Report: {report_path}"
     )
     return 0 if report["written"] else 1
+
+
+def stop_like_ctrl_c() -> None:
+    """Make SIGTERM and SIGHUP (kill, a closed terminal, a killed tmux window) end the program
+    the way Ctrl+C does, so the same clean-up runs."""
+    for number in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(number, lambda *_: signal.raise_signal(signal.SIGINT))
 
 
 def main(argv: Sequence[str] | None = None) -> int:

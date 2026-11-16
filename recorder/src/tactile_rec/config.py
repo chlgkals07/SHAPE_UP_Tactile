@@ -84,6 +84,7 @@ class UiConfig:
     port: int = 8800
     preview_hz: float = 15.0
     preview_width: int = 800
+    shutdown_timeout_s: int = 2  # on exit, how long to wait for open browser connections
 
 
 @dataclass(frozen=True)

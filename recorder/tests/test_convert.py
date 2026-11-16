@@ -249,3 +249,20 @@ def test_a_damaged_episode_is_skipped_and_reported(rig, tmp_path):
     )
     assert (report["written"], report["skipped"]) == (1, 1)
     assert "hand.npz" in report["episodes"][1]["skipped"]
+
+
+def test_real_lerobot_accepts_what_the_writer_sends(rig, tmp_path):
+    """Smoke test against the real library; the other writer tests use a stand-in. Skipped
+    where lerobot (the v2.1 one that openpi pins) is not installed: run it in that
+    environment."""
+    pytest.importorskip("lerobot.common.datasets.lerobot_dataset")
+    record(rig, seconds=1.0)
+    out = tmp_path / "lerobot"
+    writer = LeRobotV21Writer("shape_up/smoke", out, 30, "omy_f3m_leap")
+    report = convert_many(
+        [rig.config.data_root], rig.config.dataset, writer, log=lambda _line: None
+    )
+    assert report["written"] == 1
+    info = json.loads((out / "meta" / "info.json").read_text())
+    assert info["total_episodes"] == 1 and info["fps"] == 30
+    assert info["total_frames"] == report["episodes"][0]["steps"]

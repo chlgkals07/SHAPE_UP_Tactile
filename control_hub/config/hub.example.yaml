@@ -294,6 +294,7 @@ processes:
     group: User PC
     env: recorder
     cmd: tactile-rec record --config config/rig.yaml
+    confirm_stop: ["녹화 중이 아니다 (녹화 중에 끄면 그 에피소드는 멈추고 미저장으로 남는다)"]
     # 확인 도구는 녹화기와 같은 장치(직렬 포트, 카메라, UDP 포트)를 연다. 같이 켜면 서로 값을 뺏는다
     conflicts: [camera_ros, recorder_fake, check_hand, check_glove, check_tactile_a,
                 check_tactile_b, check_cam_wrist, check_cam_ext]

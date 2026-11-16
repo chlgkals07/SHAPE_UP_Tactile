@@ -83,4 +83,5 @@ dataset:
   latency_ms: {}             # 톡 치기 실측 뒤에 채운다. 예: {cam_wrist: 35}
 
 # host 를 0.0.0.0 으로 바꾸면 같은 네트워크의 태블릿에서도 열린다. 로그인이 없으므로 믿을 수 있는 망에서만.
-ui: {host: 127.0.0.1, port: 8800, preview_hz: 15, preview_width: 800}
+# shutdown_timeout_s: 끌 때 열려 있는 브라우저 연결(카메라 미리보기)을 기다리는 시간
+ui: {host: 127.0.0.1, port: 8800, preview_hz: 15, preview_width: 800, shutdown_timeout_s: 2}

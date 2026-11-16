@@ -401,4 +401,8 @@ def serve(hub: Hub, recorder: Recorder) -> None:
     print(f"[tactile-rec] open http://{'localhost' if ui.host == '0.0.0.0' else ui.host}:{ui.port}")
     if ui.host not in ("127.0.0.1", "localhost"):
         print("[tactile-rec] the UI is reachable from the network and has no login")
-    uvicorn.run(create_app(hub, recorder), host=ui.host, port=ui.port, log_level="warning")
+    # Without the timeout uvicorn waits for open camera previews, which never end.
+    uvicorn.run(
+        create_app(hub, recorder), host=ui.host, port=ui.port, log_level="warning",
+        timeout_graceful_shutdown=ui.shutdown_timeout_s,
+    )
