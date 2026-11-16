@@ -1082,9 +1082,9 @@ return f"ssh -tt -o ConnectTimeout=5 ... {host} {quote(remote)}"   # -tt: Ctrl+C
 <!-- ============================================================ 참고 자료 -->
 <section class="page" id="biblio">
 <h1>참고 자료</h1>
-<p class="lead">시간 맞추기와 지연 실측의 근거. 각 항목에 우리 코드의 어느 부분과 이어지는지, 그리고 원문을 어디까지 읽었는지 적는다. <span class="tag new">11/17 추가</span></p>
+<p class="lead">시간 맞추기와 지연 실측의 근거, 다른 수집 시스템과의 비교, 통신·장치 문서, 학습 쪽(openpi, LeRobot) 자료. 각 항목에 우리 코드의 어느 부분과 이어지는지, 그리고 원문을 어디까지 읽었는지 적는다. <span class="tag new">11/17 추가</span></p>
 
-<div class="note"><b>읽은 범위.</b> UMI 는 원문 PDF 에서 §IV(PD1), §V-B, 부록 A 를 읽었다. 나머지는 검색 결과의 요약만 보았다. 인용하기 전에 원문을 확인한다.</div>
+<div class="note"><b>읽은 범위.</b> UMI 는 원문 PDF 에서 §IV(PD1), §V-B, 부록 A 를 읽었다. openpi 는 <code>pyproject.toml</code> 원본을 읽었다. 5·6절은 11/16 리뷰 문서(<code>2026-11-16-recorder-review.html</code>)와 레포 문서에 이미 인용된 것을 옮겼다. 나머지는 검색 결과의 요약만 보았다. 인용하기 전에 원문을 확인한다.</div>
 
 <h2>1. 고르는 규칙: causal, 보간 없음</h2>
 <table>
@@ -1112,6 +1112,34 @@ return f"ssh -tt -o ConnectTimeout=5 ... {host} {quote(remote)}"   # -tt: Ctrl+C
 <tr><td>C. Chi et al., <a href="https://arxiv.org/abs/2402.10329">"Universal Manipulation Interface"</a>, RSS 2024. <a href="https://umi-gripper.github.io">프로젝트 페이지</a></td><td>부록 A: 카메라는 QR 시각, 고유감각은 로봇 시각 또는 ½ ping, 실행 지연은 명령과 측정의 cross-correlation. 실행 때는 가장 늦은 스트림 기준으로 맞추고(PD1.1) 실행 지연만큼 앞선 action 을 버린다(PD1.2). 지연 맞추기를 끄면 던지기 87.5% → 57.5%</td><td><a href="#latency">지연 실측 실험</a>의 L1, L2, E1, E2 가 이 방법을 옮긴 것이다</td><td>원문 §IV PD1, §V-B, 부록 A</td></tr>
 <tr><td>P. Furgale, J. Rehder, R. Siegwart, "Unified Temporal and Spatial Calibration for Multi-Sensor Systems", IROS 2013. <a href="https://github.com/ethz-asl/kalibr/wiki/camera-imu-calibration">Kalibr wiki</a></td><td>카메라와 IMU 의 time offset 을 continuous-time batch 추정으로 공간 보정과 함께 구한다. 초기값은 두 센서가 본 각속도의 상관</td><td><code>tap</code> 의 "같은 사건이 두 스트림에 언제 보이나"를 정식으로 푼 것이다. 더 정밀하게 갈 때 본다</td><td>요약</td></tr>
 <tr><td>T. Qin, S. Shen, <a href="https://arxiv.org/abs/1808.00692">"Online Temporal Calibration for Monocular Visual-Inertial Systems"</a>, arXiv 2018 (학회 미확인)</td><td>보정판 없이 time offset 을 상태에 넣어 온라인으로 추정</td><td>센서 사이 offset 을 패턴 없이 잡는 다른 길</td><td>요약</td></tr>
+</table>
+
+<h2>5. 다른 수집 시스템과의 비교 (related work)</h2>
+<p>수집 방식은 크게 둘이다. <b>루프 동기형</b>은 고정 주기 루프마다 모든 센서의 최신 값을 한 행으로 쓴다. <b>원본·오프라인 정렬형</b>은 센서마다 자기 속도로 시각과 함께 저장하고 나중에 격자에 맞춘다(우리, Cyclo, UMI). 비교 전체는 11/16 리뷰 문서 8절에 있다.</p>
+<table>
+<tr><th>자료</th><th>방식과 주기</th><th>우리와의 관계</th><th>읽은 범위</th></tr>
+<tr><td>HATO: T. Lin et al., "Learning Visuotactile Skills with Two Multifingered Hands", <a href="https://arxiv.org/abs/2404.16823">arXiv 2404.16823</a>, <a href="https://toruowo.github.io/hato">프로젝트</a></td><td>루프 동기형. 다지 손 + 촉각, 모든 모달리티를 10 Hz 로</td><td>목적이 가장 비슷하다. 촉각을 루프 주기로 낮췄고, 우리는 90 Hz 원본을 보존한다는 점이 차별점이다</td><td>리뷰 문서 (손끝 촉각 주기 세부 <span class="tag field">UNVERIFIED</span>)</td></tr>
+<tr><td>DROID: A. Khazatsky et al., <a href="https://arxiv.org/abs/2403.12945">arXiv 2403.12945</a></td><td>루프 동기형, 15 Hz, 스테레오 카메라 3대</td><td>대규모 수집의 운영(메타데이터, 장면 ID, 수집자)을 참고</td><td>리뷰 문서 (원본 형식 <span class="tag field">UNVERIFIED</span>)</td></tr>
+<tr><td>ALOHA: <a href="https://docs.trossenrobotics.com/aloha_docs/2.0/operation/data_collection.html">Trossen ALOHA data collection</a></td><td>루프 동기형(ROS), 에피소드마다 HDF5</td><td>센서가 균질할 때의 기준점. 우리 장비에는 맞지 않는다</td><td>리뷰 문서 (50 Hz · 30 fps <span class="tag field">UNVERIFIED</span>)</td></tr>
+<tr><td>LeRobot 녹화 (<code>lerobot-record</code>)</td><td>루프 동기형. 루프 시각 = 행 시각</td><td>원래 유력안이었다. 90 Hz 촉각 손실과 Python ≥ 3.12 요구(User PC 3.10) 때문에 버렸다</td><td>리뷰 문서</td></tr>
+<tr><td>UMI, Cyclo</td><td>원본·오프라인 정렬형</td><td>4절, 1절 참고</td><td>위와 같음</td></tr>
+</table>
+
+<h2>6. 통신과 장치</h2>
+<table>
+<tr><th>자료</th><th>내용</th><th>우리와의 관계</th><th>읽은 범위</th></tr>
+<tr><td><a href="https://zettascalelabs.github.io/ros-z/chapters/distro_compatibility.html">ros-z: distro compatibility</a></td><td>rmw_zenoh 배포판 사이의 타입 해시 차이</td><td>11/12 현장에서 Humble ↔ Jazzy 가 토픽은 보이고 데이터는 0개였던 현상의 근거. 녹화기가 ROS 를 거치지 않고 팔을 받는 이유(<a href="#arch">전체 구조</a>)</td><td>리뷰 문서</td></tr>
+<tr><td><a href="https://robotis-git.github.io/zenoh_ros2_sdk/">zenoh-ros2-sdk 문서</a>, <a href="https://pypi.org/project/zenoh-ros2-sdk/0.1.6/">PyPI 0.1.6</a>, <a href="https://github.com/ros2/rmw_zenoh">ros2/rmw_zenoh</a></td><td>ROS 없이 rmw_zenoh 토픽을 구독하는 Python SDK, 그 아래 RMW</td><td><code>streams/arm_zenoh.py</code> 가 쓰는 SDK. 실물 수신은 <span class="tag field">현장 미검증</span></td><td>리뷰 문서, 10/09 현장 문서</td></tr>
+<tr><td><a href="https://github.com/realsenseai/librealsense/blob/master/tools/enumerate-devices/readme.md">librealsense rs-enumerate-devices</a>, <a href="https://github.com/realsenseai/realsense-ros/blob/ros2-master/README.md">realsense-ros README</a></td><td>카메라 serial, USB 속도 확인, ROS 카메라 노드</td><td><code>streams/realsense.py</code>(pyrealsense2 직접)와 hub 의 "손목 카메라 ROS 노드"</td><td>수집 가이드 문서</td></tr>
+<tr><td>ROBOTIS OMY 문서: <a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/zenoh_communication/">zenoh 통신</a>, <a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/operation_guide/teleoperation/">teleoperation</a>, <a href="https://docs.robotis.com/docs/systems/omy/imitation_learning/data_recording/">data recording</a></td><td>Robot PC 컨테이너, zenoh 라우터, leader/follower, Cyclo 녹화</td><td>hub 의 Robot PC 버튼들과 Cyclo 분석의 출처</td><td>수집 가이드 문서</td></tr>
+</table>
+
+<h2>7. 학습 쪽: openpi 와 LeRobot 형식</h2>
+<table>
+<tr><th>자료</th><th>내용</th><th>우리와의 관계</th><th>읽은 범위</th></tr>
+<tr><td>Physical Intelligence, "π<sub>0.5</sub>: a Vision-Language-Action Model with Open-World Generalization", <a href="https://arxiv.org/abs/2504.16054">arXiv 2504.16054</a>, CoRL 2025 (<a href="https://proceedings.mlr.press/v305/black25a.html">PMLR v305</a>)</td><td>π<sub>0</sub> 위에 이종 데이터 co-training. flow-matching action expert</td><td>학습할 정책. 우리 키(<code>observation.state</code> 22, <code>action</code> 22, 촉각, 영상)를 이 입력에 잇는 설정이 아직 없다(<a href="#field">실물 시험</a> 8단계)</td><td>요약</td></tr>
+<tr><td><a href="https://github.com/Physical-Intelligence/openpi">Physical-Intelligence/openpi</a></td><td>π<sub>0</sub>, π<sub>0</sub>-FAST, π<sub>0.5</sub> 체크포인트와 학습 코드. 자기 데이터는 <code>LeRobotDataConfig</code> 를 가진 <code>TrainConfig</code> 를 <code>src/openpi/training/config.py</code> 에 추가하고 norm stats 를 먼저 계산한다</td><td>변환기 출력을 읽는 쪽. <code>pyproject.toml</code> 이 lerobot 을 commit <code>0cf86487</code> 로 고정하고 <code>requires-python = "&gt;=3.11"</code> 이다. 그래서 변환기는 User PC(3.10)가 아니라 학습 서버의 openpi 환경에서 돌린다</td><td><code>pyproject.toml</code> 원본. 설정 방법은 요약</td></tr>
+<tr><td>LeRobot (<a href="https://github.com/huggingface/lerobot">huggingface/lerobot</a>) dataset v2.1 / <a href="https://huggingface.co/docs/lerobot/lerobot-dataset-v3">v3.0</a></td><td>v2.1: <code>meta/info.json</code>(<code>codebase_version</code>), <code>episodes.jsonl</code>, <code>tasks.jsonl</code>, <code>episodes_stats.jsonl</code>, 에피소드마다 parquet 과 카메라별 mp4. v3.0 은 lerobot 0.4.0 부터 기본이고 여러 에피소드를 큰 파일에 묶는다</td><td><code>convert/dataset.py</code> 가 v2.1 로 쓰는 이유: openpi 가 고정한 lerobot 이 v2.1 을 읽는다. 그 commit 의 <code>CODEBASE_VERSION</code> 이 v2.1 인지는 2차 자료만 확인 <span class="tag field">UNVERIFIED</span></td><td>요약 (2차 자료)</td></tr>
 </table>
 
 <h2>읽는 순서 추천</h2>
