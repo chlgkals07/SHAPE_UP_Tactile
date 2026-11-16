@@ -33,21 +33,16 @@ pre {
   border-right: 1px solid var(--line); padding: 20px 14px; display: flex; flex-direction: column;
   position: sticky; top: 0; height: 100vh; background: var(--wash); overflow-y: auto;
 }
-.brand {
-  font: inherit; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; color: inherit;
-  background: none; border: 0; border-radius: 7px; cursor: pointer; text-align: left;
-  display: flex; align-items: center; gap: 8px; padding: 6px 10px; margin-bottom: 12px;
-}
-.brand:hover { background: #e9e9ec; }
-.brand-chev { margin-left: auto; color: var(--muted); font-size: 20px; line-height: 1; }
-/* Collapsed side menu: a narrow strip with the toggle and the connection dot. Useful on the
-   recorder page, whose own UI brings a second side menu. */
+.brand { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; padding: 0 10px 18px; }
+/* The brand is a plain button: it looks like the title and toggles the side menu. */
+button.brand { font-family: inherit; line-height: inherit; color: inherit; background: none; border: 0; text-align: left;
+               cursor: pointer; }
+/* Collapsed side menu: a narrow strip with the title on its side and the connection dot.
+   Useful on the recorder page, whose own UI brings a second side menu. */
 .app.collapsed { --side: 52px; }
 .app.collapsed .side { padding: 20px 6px; align-items: center; }
-.app.collapsed .brand { padding: 6px 10px; }
-.app.collapsed .brand-text, .app.collapsed #nav, .app.collapsed #conn-text,
-.app.collapsed #reload-btn { display: none; }
-.app.collapsed .brand-chev { margin-left: 0; transform: scaleX(-1); }
+.app.collapsed .brand { writing-mode: vertical-rl; padding: 0; }
+.app.collapsed #nav, .app.collapsed #conn-text, .app.collapsed #reload-btn { display: none; }
 .app.collapsed .side-foot { padding: 16px 0 0; }
 .app.collapsed .side-foot .dot { margin-right: 0; }
 #nav { display: flex; flex-direction: column; gap: 3px; }
