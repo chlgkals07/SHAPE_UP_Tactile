@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Control Hub</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">Control Hub</div>
+    <nav id="nav">
+      <a href="#home" data-page="home">홈</a>
+      <div class="nav-label">장치</div>
+      <div id="nav-devices"></div>
+      <a href="#scan" data-page="scan">장치 탐색</a>
+      <a href="#run" data-page="run">실행표</a>
+      <a href="#logs" data-page="logs">로그</a>
+      <a href="#all" data-page="all">전체</a>
+    </nav>
+    <div class="side-foot">
+      <div><span class="dot" id="conn-dot"></span><span id="conn-text">연결 중</span></div>
+      <button class="btn small" id="reload-btn" title="hub.yaml 을 다시 읽습니다. 도는 프로세스는 건드리지 않습니다">설정 다시 읽기</button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="banner bad" id="config-error" hidden></div>
+    <div class="banner bad" id="failed-banner" hidden></div>
+
+    <div class="page" id="page-home" hidden></div>
+    <div class="page" id="page-device" hidden></div>
+    <div class="page" id="page-scan" hidden></div>
+    <div class="page" id="page-logs" hidden></div>
+
+    <div class="work" id="work">
+      <section class="col-list">
+        <div class="page" id="page-run" hidden>
+          <header class="bar">
+            <div class="tabs" id="profile-tabs"></div>
+            <button class="btn small danger right" id="stop-all">전체 끄기</button>
+          </header>
+          <p class="muted profile-help" id="profile-help"></p>
+          <ol class="steps" id="steps"></ol>
+        </div>
+        <div class="page" id="page-all" hidden>
+          <header class="bar"><h1>전체 프로세스와 도구</h1></header>
+          <div id="groups"></div>
+        </div>
+      </section>
+      <aside class="col-detail" id="detail"></aside>
+    </div>
+  </main>
+
+  <aside class="rail" id="rail"></aside>
+</div>
+
+<dialog id="confirm">
+  <form method="dialog">
+    <h2 id="confirm-title"></h2>
+    <p class="muted" id="confirm-sub"></p>
+    <div id="confirm-items"></div>
+    <div class="dialog-actions">
+      <button class="btn" value="cancel">취소</button>
+      <button class="btn primary" id="confirm-ok" value="ok">확인</button>
+    </div>
+  </form>
+</dialog>
+<div class="toast" id="toast" hidden></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
