@@ -95,6 +95,7 @@ details > .body { padding: 2px 16px 14px; border-top: 1px solid var(--line); }
 .tag { font-size: 12px; font-weight: 600; padding: 0 8px; border-radius: 10px; border: 1px solid currentColor; white-space: nowrap; }
 .tag.where { color: var(--muted); } .tag.tool { color: var(--accent); } .tag.risk { color: var(--bad); }
 .tag.new { color: var(--new); } .tag.field { color: var(--warn); }
+.tag.ok { color: var(--ok); } .tag.no { color: var(--bad); }
 .sum-note { font-weight: 400; color: var(--muted); font-size: 13.5px; }
 .changed { border-left: 4px solid var(--new); background: var(--new-bg); border-radius: 0 8px 8px 0; padding: 10px 14px; margin: 14px 0; }
 .changed > b:first-child { color: var(--new); }
@@ -126,7 +127,7 @@ details > .body { padding: 2px 16px 14px; border-top: 1px solid var(--line); }
 <div class="app">
 <aside class="side">
   <div class="brand">Control Hub + 녹화기</div>
-  <div class="sub">구조와 근거, 현장 시험 가이드<br>2026-11-16 · feat/control-hub-and-recorder</div>
+  <div class="sub">구조와 근거, 현장 시험 가이드<br>2026-11-16 작성, 11/17 실물 결과 추가 · main</div>
   <nav id="nav">
     <a href="#overview">개요</a>
     <a href="#arch">전체 구조와 통신</a>
@@ -145,6 +146,7 @@ details > .body { padding: 2px 16px 14px; border-top: 1px solid var(--line); }
     <a href="#cyclo">Cyclo 와 다른 녹화 경로</a>
     <a href="#review">리뷰 뒤 고친 것</a>
     <a href="#field">실물 시험 가이드</a>
+    <a href="#r1117">11/17 실물 결과</a>
     <a href="#ref">설정과 미검증 목록</a>
     <a href="#biblio">참고 자료</a>
   </nav>
@@ -182,9 +184,10 @@ details > .body { padding: 2px 16px 14px; border-top: 1px solid var(--line); }
 <tr><td>코드 의존</td><td colspan="2">없다. 패키지가 서로를 import 하지 않는다. 접점은 로그 한 줄의 형식과 포트 번호 둘뿐이다</td></tr>
 </table>
 
-<div class="changed"><b>이 문서가 다루는 브랜치</b> <code>feat/control-hub-and-recorder</code>. <code>feat/recorder</code> 위에 리뷰 수정 4묶음을 얹고 <code>feat/control-hub</code> 를 합쳤다. 무엇을 왜 고쳤는지는 각 장의 초록색 상자와 <a href="#review">리뷰 뒤 고친 것</a>에 있다.</div>
+<div class="changed"><b>이 문서가 다루는 브랜치</b> <code>feat/control-hub-and-recorder</code>. <code>feat/recorder</code> 위에 리뷰 수정 4묶음을 얹고 <code>feat/control-hub</code> 를 합쳤다. 무엇을 왜 고쳤는지는 각 장의 초록색 상자와 <a href="#review">리뷰 뒤 고친 것</a>에 있다.
+<br><b>11/17</b> 첫 실물 시험 뒤 main 에 합쳤다 (<code>d7bcd0c</code>). 결과와 그날 고친 것은 <a href="#r1117">11/17 실물 결과</a>에 있다.</div>
 
-<div class="note"><b>검증 범위.</b> 두 프로그램 모두 가짜 장치와 자동 시험으로 확인했다. 실물(팔, LEAP, Paxini, 카메라)에서 확인하지 않은 것은 이 문서에서 <span class="tag field">현장 미검증</span> 으로 표시한다. 확인 순서는 <a href="#field">실물 시험 가이드</a>에 있다.</div>
+<div class="note"><b>검증 범위.</b> 두 프로그램 모두 가짜 장치와 자동 시험으로 확인했다. 실물(팔, LEAP, Paxini, 카메라)에서 확인하지 않은 것은 이 문서에서 <span class="tag field">현장 미검증</span> 으로 표시한다. 확인 순서는 <a href="#field">실물 시험 가이드</a>에 있다. 11/17 에 0~4단계 일부를 실물로 봤다. 무엇이 확인됐는지는 <a href="#ref">미검증 목록</a>의 "11/17" 칸에 있다.</div>
 <div class="next"><span></span><a href="#arch">전체 구조와 통신 →</a></div>
 </section>
 
@@ -208,7 +211,7 @@ details > .body { padding: 2px 16px 14px; border-top: 1px solid var(--line); }
 <h2>통신 표</h2>
 <table>
 <tr><th>무엇</th><th>보내는 쪽 → 받는 쪽</th><th>방식</th><th>주기</th><th>시각 정보</th></tr>
-<tr><td>팔 상태</td><td>follower → 녹화기 <code>arm_state</code></td><td>zenoh TCP :7447. <code>zenoh-ros2-sdk</code> 로 ROS 없이 구독 <span class="tag field">현장 미검증</span></td><td>약 100 Hz (측정해서 설정에 넣는다)</td><td><code>header.stamp</code> = Robot PC 벽시계</td></tr>
+<tr><td>팔 상태</td><td>follower → 녹화기 <code>arm_state</code></td><td>zenoh TCP :7447. <code>zenoh-ros2-sdk</code> 로 ROS 없이 구독 (client 모드, 11/17 확인)</td><td>400 Hz (11/17 실측. leader 는 300 Hz)</td><td><code>header.stamp</code> = Robot PC 벽시계</td></tr>
 <tr><td>팔 명령</td><td>leader → 녹화기 <code>arm_action</code></td><td>같음</td><td>같음</td><td>stamp 가 0 이면 받은 시각만</td></tr>
 <tr><td>손 명령·상태, 글러브</td><td><code>leap_teleop</code> → 녹화기 <code>hand</code>, <code>glove</code></td><td>UDP <code>127.0.0.1:47800</code>, 틱마다 JSON datagram 하나</td><td>50 Hz</td><td><code>t_ns</code> = 같은 PC 의 <code>CLOCK_MONOTONIC</code></td></tr>
 <tr><td>촉각</td><td>Paxini 보드 → 녹화기 <code>tactile_a</code>, <code>tactile_b</code></td><td>USB serial 921600 baud, 보드가 스스로 밀어 준다(auto-push)</td><td>약 90 Hz</td><td>없음. 받은 시각만</td></tr>
@@ -227,7 +230,7 @@ details > .body { padding: 2px 16px 14px; border-top: 1px solid var(--line); }
 <tr><td>TCP 7447 (Robot PC)</td><td>zenohd. 녹화기 <code>arm_*</code>, <code>leap_leader</code> 가 접속</td><td>zenohd 를 두 번 켜면 "Address already in use"</td></tr>
 <tr><td>UDP 47800 (localhost)</td><td><code>leap_teleop --record-udp</code> 가 보내고 녹화기 <code>hand</code> 가 받는다</td><td>확인 도구 <code>check hand</code> / <code>check glove</code> 를 녹화기와 같이 켜면 패킷을 나눠 갖는다. hub 가 conflict 로 막는다</td></tr>
 <tr><td><code>/dev/ttyUSB0</code></td><td>LEAP (텔레옵, <code>leap_check</code>, 영점 도구)</td><td>한 번에 하나만. hub conflicts</td></tr>
-<tr><td><code>/dev/ttyACM0·1</code></td><td>Paxini 보드 (녹화기, <code>check tactile_*</code>)</td><td>같음. 번호는 꽂는 순서에 달려 있다 <span class="tag field">현장 미검증</span></td></tr>
+<tr><td><code>/dev/ttyACM0·1</code></td><td>Paxini 보드 (녹화기, <code>check tactile_*</code>)</td><td>같음. 번호는 꽂는 순서에 달려 있다. 11/17: 보드 하나에 모듈 8개라 by-id 경로 하나로 고정</td></tr>
 <tr><td>RealSense</td><td>녹화기 또는 ROS 카메라 노드</td><td>둘이 동시에 못 연다. 녹화 때는 ROS 노드를 끈다</td></tr>
 <tr><td>TCP 8800 / 8700</td><td>녹화기 화면 / hub 화면</td><td>기본은 이 PC 에서만 열린다. <code>0.0.0.0</code> 이면 같은 망에서 열리고 로그인이 없다</td></tr>
 </table>
@@ -726,7 +729,8 @@ return f"ssh -tt -o ConnectTimeout=5 ... {host} {quote(remote)}"   # -tt: Ctrl+C
 <li><b>끌 때 확인 (eaacb33):</b> 녹화기에 <code>confirm_stop</code> 을 넣었다.</li>
 </ul></div>
 
-<div class="danger"><b>알려진 한계.</b> 원격 프로세스는 <code>ssh -tt … docker exec -it …</code> 로 돈다. 이더넷이 끊기거나 "강제 종료"로 창을 닫았을 때 컨테이너 안의 프로세스가 같이 끝나는지는 코드로 보장하지 못한다 <span class="tag field">현장 미검증</span>. 팔 bringup 을 강제 종료한 뒤에는 "로봇 중복 실행 확인" 도구로 남은 노드가 없는지 본다.</div>
+<div class="danger"><b>알려진 한계.</b> 원격 프로세스는 <code>ssh -tt … docker exec -it …</code> 로 돈다. 이더넷이 끊기거나 "강제 종료"로 창을 닫으면 컨테이너 안의 프로세스는 <b>남는다</b> (11/17 확인). 팔 bringup 을 강제 종료한 뒤에는 "로봇 중복 실행 확인" 도구로 남은 노드가 없는지 본다.</div>
+<div class="changed"><b>11/17 추가.</b> 원격 명령마다 <code>CONTROL_HUB_ID</code> 꼬리표를 붙이고 hub 가 5초마다 Robot PC 에 남은 것을 찾는다. 남아 있으면 그 줄이 빨강 "연결 끊김 · Robot PC 에서 아직 도는 중" 이 되고 [끄기] → [강제 종료] 로 정리한다. 정리 전에는 다시 켤 수 없다. 자세한 것은 <a href="#r1117">11/17 실물 결과</a>.</div>
 <div class="next"><a href="#teleop">← 텔레옵과의 연결</a><a href="#hubcmd">버튼과 명령 →</a></div>
 </section>
 
@@ -898,7 +902,7 @@ return f"ssh -tt -o ConnectTimeout=5 ... {host} {quote(remote)}"   # -tt: Ctrl+C
 
 <h2>0단계. 준비 (실물 없이, Ubuntu 워크스테이션)</h2>
 <div class="check">
-<label><input type="checkbox"> 브랜치 <code>feat/control-hub-and-recorder</code> 를 받는다</label>
+<label><input type="checkbox"> main 을 받는다 (11/17 에 <code>feat/control-hub-and-recorder</code> 를 합쳤다)</label>
 <label><input type="checkbox"> <code>sudo apt install tmux</code> (hub 시험 34개가 tmux 없이는 skip 된다)</label>
 <label><input type="checkbox"> 세 패키지 시험: <code>cd recorder && uv run --extra dev pytest -q</code> (122 passed, lerobot 없으면 1 skipped), <code>cd ../control_hub && uv run --extra dev pytest -q</code> (<b>skip 없이</b> 통과해야 한다), <code>cd ../user_pc && env -u PYTHONPATH python -m pytest -q</code></label>
 <label><input type="checkbox"> <code>recorder/config/rig.yaml</code>: <code>dataset.hand_action: sent</code> 가 있는가. serial 이 빈 <code>cam_ext</code> 가 없는가. (없으면 실행이 설정 오류로 멈춘다)</label>
@@ -1014,8 +1018,72 @@ return f"ssh -tt -o ConnectTimeout=5 ... {host} {quote(remote)}"   # -tt: Ctrl+C
 <li><code>*.conversion_report.json</code> 에서 제외된 에피소드와 이유, <code>dataset</code>(쓴 설정), <code>streams.hand.mode_steps</code> 를 본다.</li>
 <li>openpi 쪽에 우리 키를 pi0.5 입력에 잇는 데이터 설정을 만들고 정규화 통계와 학습 몇 스텝을 돌린다. 이 설정은 아직 없다.</li>
 </ol>
-<div class="next"><a href="#review">← 리뷰 뒤 고친 것</a><a href="#ref">설정과 미검증 목록 →</a></div>
+<div class="next"><a href="#review">← 리뷰 뒤 고친 것</a><a href="#r1117">11/17 실물 결과 →</a></div>
 </section>
+
+<!-- ============================================================ 11/17 -->
+<section class="page" id="r1117">
+<h1>11/17 실물 결과</h1>
+<p class="lead">처음으로 실물 전체(팔, LEAP, Manus, Paxini, 손목 카메라)를 hub 에서 켜고 녹화기로 에피소드 6개를 찍었다. 자세한 숫자와 로그는 <code>docs/field-test/2026-11-17-results.md</code>.</p>
+
+<h2>한눈에</h2>
+<table>
+<tr><th>항목</th><th>결과</th></tr>
+<tr><td>hub 실물 구동 (0·1단계)</td><td><span class="tag ok">확인</span> Robot PC 의 zenohd·팔을 켜고 Ctrl+C 로 정상 종료</td></tr>
+<tr><td>녹화기 팔 스트림</td><td><span class="tag ok">고침</span> 0개 → <b>399.7 Hz</b> (follower), <b>300.0 Hz</b> (leader). 최대 공백 8.6 ms</td></tr>
+<tr><td>촉각 (Paxini)</td><td><span class="tag ok">고침</span> 보드 하나에 모듈 8개. <code>tactile_a</code> 하나, 90.9 Hz, 빠짐 0</td></tr>
+<tr><td>손 / 글러브</td><td><span class="tag ok">확인</span> 48.7~49.1 Hz, 빠짐 0, 수신 지연 0.3 ms</td></tr>
+<tr><td>손목 카메라 (D405)</td><td><span class="tag field">일부</span> 30.0 Hz. USB 2 (480 Mbps) 로만 잡힘</td></tr>
+<tr><td>손목 뒤집기</td><td><span class="tag ok">정상</span> 손가락 위, 카메라 손 옆이 설계대로. 순정 선택지를 실행표에 추가</td></tr>
+<tr><td>끊김 뒤 남는 원격 프로세스</td><td><span class="tag field">일부</span> 남는 것 확인 → hub 에 감지·정리 추가</td></tr>
+<tr><td>USB 랜 (QinHeng 허브)</td><td><span class="tag no">문제</span> 30분에 19번 끊김. 한 번은 LEAP·카메라까지 빠짐</td></tr>
+<tr><td>촉각 영점 Z, 손가락 위치 확인, 5~8단계</td><td>아직</td></tr>
+</table>
+
+<h2>그날 고친 것</h2>
+<div class="changed"><b>녹화기 (<code>5575afe</code>)</b>
+<ul>
+<li><b>팔: zenoh client 모드.</b> SDK 의 기본 세션은 peer 다. peer 는 라우터에서 서로를 알아낸 뒤 직접 연결하는데, Robot PC 노드는 Docker 안이라 User PC 에서 그 주소로 갈 수 없어 0개를 받았다. <code>ZENOH_CONFIG_OVERRIDE='mode="client"'</code> 로 모든 것을 라우터를 거쳐 받는다.</li>
+<li><b>팔: 하나씩 열기.</b> 첫 실행에서 두 스트림이 동시에 SDK 를 열면 메시지 정의 git clone 이 경합해 한쪽이 "not found in registry" 로 실패했다.</li>
+<li><b>촉각: 보드 하나.</b> <code>tactile_b</code> 를 지우고 8개 모듈을 <code>tactile_a</code> 의 <code>places</code> 에 매핑. LEAP 은 손가락이 4개라 Little 을 ring 자리로. 포트는 by-id 로 고정.</li>
+<li>현장 사본 <code>config/rig.yaml</code> 은 git 에서 뺐다.</li>
+</ul></div>
+<div class="changed"><b>Control Hub (<code>b29e7b2</code>)</b>
+<ul>
+<li><b>끊김 뒤 정리 (리뷰 4번).</b> 원격 명령마다 <code>export CONTROL_HUB_ID=&lt;id&gt;</code> 를 붙이고, hub 가 5초마다 Robot PC 의 <code>/proc/*/environ</code> 을 본다. 창은 없는데 남아 있으면 빨강 "연결 끊김 · Robot PC 에서 아직 도는 중" + [끄기](Ctrl+C) → [강제 종료](SIGKILL). 정리 전에는 다시 켤 수 없다. 명령줄로 찾지 않는 이유: bash 가 <code>a &amp;&amp; b</code> 의 마지막 명령으로 자신을 바꿔 스크립트 문자열이 사라진다.</li>
+<li><b>실행표 하나.</b> "수집" 을 준비 / 점검 / 팔 / 손 + 녹화 로 묶고, 다른 실행표는 메뉴로. 팔 줄은 <b>손목 90° / 순정</b> 택일 (<code>[arm, arm_stock]</code>).</li>
+<li><b>설명 줄이기.</b> 줄마다 붙던 설명과 실행표·장치 설명은 없애거나 마우스를 올렸을 때만.</li>
+</ul></div>
+
+<h2>손목이 "90° 안 돈다"</h2>
+<p>소프트웨어와 모터 설정은 11/12 와 같았다 (Robot PC 패키지 동일, follower joint6 = leader + 90.0°, Homing Offset 모두 0). 팔은 꺼질 때 마지막 손목 각도를 그대로 두는데, 이날은 이미 +91.7° 에서 시작해 home 에서 돌 것이 없었다. 11/12 에는 0° 에서 시작해 도는 게 보였다. 손가락이 위, 카메라가 손 옆인 것이 설계(LEAP 기구 90° + joint6 +90°)대로다.</p>
+
+<h2>USB 랜이 가장 큰 문제</h2>
+<div class="danger"><b>QinHeng 허브(1a86:8095) 와 그 안의 랜(1a86:e397)</b> 이 <code>error -71</code> 로 20:28~21:00 사이 19번 끊겼다. 18:52 에피소드의 팔 공백 6.4 s · 3.1 s 가 이것이고, Robot PC 시각으로도 비어 있어 데이터는 잃었다.
+20:37 에는 리셋이 실패해 커널이 위쪽 허브(3-3)를 통째로 껐다 켰고, 같은 허브의 <b>LEAP 과 D405 도 빠졌다.</b> 텔레옵은 Torque OFF 확인을 받지 못해 "5V 차단" 오류로 끝났다.
+<br><b>조치:</b> QinHeng 허브를 빼고 로봇 랜을 노트북 포트에 직접 꽂는다. LEAP·카메라와 같은 허브에 두지 않는다.</div>
+
+<h2>에피소드</h2>
+<table>
+<tr><th>에피소드</th><th>길이</th><th>팔 Hz</th><th>비고</th></tr>
+<tr><td><code>2026-11-17_1749_hamin/ep_0001</code></td><td>36.5 s</td><td>0 / 0</td><td>수정 전. 강제 시작</td></tr>
+<tr><td><code>2026-11-17_1852_hamin/ep_0001</code></td><td>71.1 s</td><td>355 / 267</td><td>랜 끊김 2번. 추종 지연 약 68 ms, 오차 평균 0.1~0.8°</td></tr>
+<tr><td><code>2026-11-17_2035_hamin/ep_0001</code></td><td>54.5 s</td><td>399.7 / 300.0</td><td><b>깨끗함.</b> 모든 스트림 끊김 0</td></tr>
+<tr><td><code>2026-11-17_2035_hamin/ep_0002·0003</code></td><td>1.1 · 1.3 s</td><td>400 / 300</td><td>손 스트림 없음, 강제 시작 → 변환에서 제외</td></tr>
+</table>
+<p>모든 에피소드에서 <code>tactile_zero</code> 가 비어 있다. 다음에는 녹화 전에 Z 를 누른다.</p>
+
+<h2>다음에 할 것</h2>
+<ol>
+<li>로봇 랜을 노트북에 직접 꽂고 10분 녹화(7단계)에서 끊김 0 인지 본다.</li>
+<li>녹화 전 Z. <code>episode.json</code> 의 <code>tactile_zero.tactile_a.ok: true</code>.</li>
+<li>손가락을 하나씩 눌러 <code>places</code> 확인 (Little → ring).</li>
+<li>팔이 켜진 채 랜을 잠깐 뽑아 hub 의 [끄기] 를 실제 팔로 확인 (팔을 받친다).</li>
+<li>D405 를 USB3 포트에. LEAP 모터 12(엄지 첫 관절)가 안 움직이는 원인. leader 자기충돌 모델에 joint6 offset 반영.</li>
+</ol>
+<div class="next"><a href="#field">← 실물 시험 가이드</a><a href="#ref">설정과 미검증 목록 →</a></div>
+</section>
+
 
 <!-- ============================================================ ref -->
 <section class="page" id="ref">
@@ -1054,18 +1122,19 @@ return f"ssh -tt -o ConnectTimeout=5 ... {host} {quote(remote)}"   # -tt: Ctrl+C
 </table>
 
 <h2>실물에서 아직 보지 못한 것</h2>
+<p>11/17 칸: <span class="tag ok">확인</span> 실물에서 봤다, <span class="tag field">일부</span> 일부만 봤거나 문제가 남았다, 비어 있으면 아직.</p>
 <table>
-<tr><th>항목</th><th>확인하는 단계</th></tr>
-<tr><td>이 브랜치의 hub 를 tmux 와 함께 실제로 띄운 전체 동작. "녹화" 메뉴에서 켜고 끌 때의 전환과 키 입력</td><td>0</td></tr>
-<tr><td>ssh + docker exec 를 거친 Ctrl+C 가 원격 프로세스를 끝내는가. 강제 종료나 이더넷 끊김 뒤 남는 프로세스</td><td>1, 3</td></tr>
-<tr><td><code>zenoh-ros2-sdk</code> 로 Jazzy 팔 토픽을 받는가. 실제 Hz. <code>header.stamp</code> 유무</td><td>2</td></tr>
-<tr><td>Paxini: 보드 두 개 동시 스트림, 모듈 이름, <code>/dev/ttyACM*</code> 순서, 영점 명령의 실제 동작과 걸리는 시간</td><td>2, 4</td></tr>
-<tr><td>RealSense: <code>ts_domain</code>, USB 속도, <code>rotation_deg</code></td><td>2, 4</td></tr>
-<tr><td>SIGHUP / 강제 종료 뒤 LEAP 의 Torque OFF</td><td>3</td></tr>
-<tr><td>녹화기 스트림 오류가 hub 장치 칸에 뜨는 전체 경로</td><td>5</td></tr>
-<tr><td>스트림 사이의 실제 지연 → <code>latency_ms</code></td><td>6</td></tr>
-<tr><td>10분 녹화의 CPU, 디스크, 프레임 버림</td><td>7</td></tr>
-<tr><td>실제 lerobot 으로 쓰기, openpi 데이터 설정</td><td>8</td></tr>
+<tr><th>항목</th><th>확인하는 단계</th><th>11/17</th></tr>
+<tr><td>이 브랜치의 hub 를 tmux 와 함께 실제로 띄운 전체 동작. "녹화" 메뉴에서 켜고 끌 때의 전환과 키 입력</td><td>0</td><td><span class="tag ok">확인</span></td></tr>
+<tr><td>ssh + docker exec 를 거친 Ctrl+C 가 원격 프로세스를 끝내는가. 강제 종료나 이더넷 끊김 뒤 남는 프로세스</td><td>1, 3</td><td><span class="tag field">일부</span> Ctrl+C 로 정상 종료. 끊김 뒤에는 남는다 → hub 가 감지·정리 (실제 팔로는 아직)</td></tr>
+<tr><td><code>zenoh-ros2-sdk</code> 로 Jazzy 팔 토픽을 받는가. 실제 Hz. <code>header.stamp</code> 유무</td><td>2</td><td><span class="tag ok">확인</span> client 모드에서 400 / 300 Hz. leader 는 stamp 없음</td></tr>
+<tr><td>Paxini: 보드 두 개 동시 스트림, 모듈 이름, <code>/dev/ttyACM*</code> 순서, 영점 명령의 실제 동작과 걸리는 시간</td><td>2, 4</td><td><span class="tag field">일부</span> 보드 하나에 8모듈, 90.9 Hz. 영점과 손가락 위치는 아직</td></tr>
+<tr><td>RealSense: <code>ts_domain</code>, USB 속도, <code>rotation_deg</code></td><td>2, 4</td><td><span class="tag field">일부</span> 30 Hz. USB 2 로만 잡힘</td></tr>
+<tr><td>SIGHUP / 강제 종료 뒤 LEAP 의 Torque OFF</td><td>3</td><td><span class="tag field">일부</span> USB 가 통째로 빠지면 확인 불가 → "5V 차단" 오류</td></tr>
+<tr><td>녹화기 스트림 오류가 hub 장치 칸에 뜨는 전체 경로</td><td>5</td><td><span class="tag ok">확인</span> USB 끊김 때 장치 칸이 빨강 "녹화기 …: 끊김"</td></tr>
+<tr><td>스트림 사이의 실제 지연 → <code>latency_ms</code></td><td>6</td><td></td></tr>
+<tr><td>10분 녹화의 CPU, 디스크, 프레임 버림</td><td>7</td><td></td></tr>
+<tr><td>실제 lerobot 으로 쓰기, openpi 데이터 설정</td><td>8</td><td></td></tr>
 </table>
 
 <h2>같이 볼 문서</h2>
@@ -1076,7 +1145,7 @@ return f"ssh -tt -o ConnectTimeout=5 ... {host} {quote(remote)}"   # -tt: Ctrl+C
 <li><code>docs/data_preparation/2026-11-13-cyclo-analysis.md</code>: Cyclo 분석</li>
 <li><code>docs/manus_teleop_guide.html</code>: 텔레옵 현장 절차</li>
 </ul>
-<div class="next"><a href="#field">← 실물 시험 가이드</a><a href="#biblio">참고 자료 →</a></div>
+<div class="next"><a href="#r1117">← 11/17 실물 결과</a><a href="#biblio">참고 자료 →</a></div>
 </section>
 
 <!-- ============================================================ 참고 자료 -->
