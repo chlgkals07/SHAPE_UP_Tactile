@@ -210,7 +210,8 @@ def test_example_configs_are_valid():
     from tactile_rec.config import load_config
 
     folder = Path(__file__).parents[1] / "config"
-    names = sorted(p.name for p in folder.glob("*.yaml"))
+    # rig.yaml is the site's own copy (git-ignored, like control_hub's hub.yaml)
+    names = sorted(p.name for p in folder.glob("*.yaml") if p.name != "rig.yaml")
     assert names == ["rig.example.yaml", "rig.fake.yaml"]
     for name in names:
         config = load_config(folder / name)

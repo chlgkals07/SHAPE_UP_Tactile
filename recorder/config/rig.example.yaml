@@ -16,13 +16,13 @@ record:
   zero_timeout_s: 3          # 촉각 영점 보정이 끝나기를 기다리는 시간. 넘으면 실패로 본다
 
 streams:
-  # 팔: Robot PC 의 zenohd 에 ROS 없이 붙는다. hz 는 기대값이며 현장에서 측정해 맞춘다 (확인 필요)
+  # 팔: Robot PC 의 zenohd 에 ROS 없이 zenoh client 로 붙는다. hz 는 11/17 실측값
   arm_state:
     type: arm_zenoh
     message: joint_state
     topic: /joint_states
     joints: [joint1, joint2, joint3, joint4, joint5, joint6]
-    hz: 100
+    hz: 400                  # follower controller_manager 400 Hz (11/17 실측 400.7 Hz)
     router: "10.42.0.241:7447"
     domain_id: 30
   arm_action:
@@ -30,24 +30,22 @@ streams:
     message: joint_trajectory
     topic: /leader/joint_trajectory
     joints: [joint1, joint2, joint3, joint4, joint5, joint6]
-    hz: 100
+    hz: 300                  # leader controller_manager 300 Hz (11/17 실측 300.7 Hz). header stamp 없음
     router: "10.42.0.241:7447"
     domain_id: 30
 
   # 손 + 글러브: `leap-teleop ... --record-udp` 가 보내는 것을 받는다. glove 스트림이 같이 생긴다
   hand: {type: hand_udp, hz: 50, port: 47800, glove: true}
 
-  # 촉각: 보드당 스트림 하나. places 는 "보드가 보고하는 모듈 이름 -> 손의 위치" (확인 필요)
+  # 촉각: 보드당 스트림 하나. places 는 "보드가 보고하는 모듈 이름 -> 손의 위치".
+  # 11/17 실측: 보드 하나(S/N 56226A779988)가 8개 모듈을 다 보고한다. LEAP 에는 새끼손가락이 없어서
+  # 보드의 Little 은 LEAP 의 네 번째 손가락(ring) 자리다. ACM 번호는 꽂는 순서로 바뀌니 by-id 를 쓴다.
   tactile_a:
     type: paxini
-    port: /dev/ttyACM0
+    port: /dev/serial/by-id/usb-PaxiniAdapte3_Paxini__Adapter_56226A779988-if00
     hz: 90
-    places: {Thumb-Tip: thumb_tip, Thumb-Middle: thumb_pad, Index-Tip: index_tip, Index-Middle: index_pad}
-  tactile_b:
-    type: paxini
-    port: /dev/ttyACM1
-    hz: 90
-    places: {Middle-Tip: middle_tip, Middle-Middle: middle_pad, Ring-Tip: ring_tip, Ring-Middle: ring_pad}
+    places: {Thumb-Tip: thumb_tip, Thumb-Middle: thumb_pad, Index-Tip: index_tip, Index-Middle: index_pad,
+             Middle-Tip: middle_tip, Middle-Middle: middle_pad, Little-Tip: ring_tip, Little-Middle: ring_pad}
 
   # 카메라: 원본은 회전 없이 저장하고 rotation_deg 는 변환·미리보기에서 적용한다
   cam_wrist:
@@ -73,13 +71,13 @@ dataset:
   robot_type: omy_f3m_leap
   arm_dof: 6
   hand_action: sent          # 필수. sent = 관절 범위·속도 제한 후 모터에 쓴 값, cmd = 그 전 값 (리타게팅 + stale guard)
-  tactile: [tactile_a, tactile_b]
+  tactile: [tactile_a]
   tactile_order: [thumb_tip, thumb_pad, index_tip, index_pad, middle_tip, middle_pad, ring_tip, ring_pad]
   tactile_hr: 3              # 데이터셋 한 스텝에 묶어 넣는 고주파 촉각 샘플 수 (90 Hz / 30 fps)
   tactile_hr_distributed: false
   cameras: [cam_wrist]       # 외부 카메라를 달면 cam_ext 추가
   max_staleness_ms: 150
-  time: {hand: src, tactile_a: respread, tactile_b: respread}
+  time: {hand: src, tactile_a: respread}
   latency_ms: {}             # 톡 치기 실측 뒤에 채운다. 예: {cam_wrist: 35}
 
 # host 를 0.0.0.0 으로 바꾸면 같은 네트워크의 태블릿에서도 열린다. 로그인이 없으므로 믿을 수 있는 망에서만.

@@ -4,13 +4,15 @@ The Robot PC runs ROS 2 Jazzy on rmw_zenoh. The User PC's Humble rmw_zenoh canno
 those topics (it puts no type hash in the data key), so this adapter connects to the Robot
 PC's zenohd as a plain zenoh client and builds the Jazzy-style key itself.
 
-FIELD-UNVERIFIED: the SDK source was read (2026-11-13) but this adapter has not yet run
-against the robot. Check with `tactile-rec check arm_state` (field checklist item 1).
+Field 2026-11-17: receives /joint_states (~400 Hz) and /leader/joint_trajectory (~300 Hz)
+once the session runs in client mode (see `use_client_mode`).
 The message-to-array functions below are pure and tested.
 """
 
 from __future__ import annotations
 
+import os
+import threading
 from collections.abc import Sequence
 from typing import Any
 
@@ -25,6 +27,27 @@ MSG_TYPES = {
     "joint_state": "sensor_msgs/msg/JointState",
     "joint_trajectory": "trajectory_msgs/msg/JointTrajectory",
 }
+
+# The SDK's default session is a zenoh *peer*. Peers learn each other through the router and
+# then connect directly, but the Robot PC nodes run in a Docker container whose addresses the
+# User PC cannot reach, so a peer receives nothing (field 2026-11-17: 0 samples even on 30/**).
+# A *client* sends everything through the router we name. The SDK reads this variable when it
+# opens its shared session, so it must be set before the first subscriber is created.
+ZENOH_OVERRIDE_ENV = "ZENOH_CONFIG_OVERRIDE"
+CLIENT_MODE = 'mode="client"'
+
+# Both arm streams open on their own threads. On a first run the SDK clones the message
+# definitions from git; two opens at once raced and one failed with "not found in registry"
+# (field 2026-11-17). Opening one at a time avoids that.
+_OPEN_LOCK = threading.Lock()
+
+
+def use_client_mode(environ: dict[str, str] | os._Environ = os.environ) -> None:
+    """Add mode="client" to the SDK's zenoh override unless the user already chose a mode."""
+    current = environ.get(ZENOH_OVERRIDE_ENV, "").strip()
+    if "mode=" in current.replace(" ", ""):
+        return
+    environ[ZENOH_OVERRIDE_ENV] = f"{CLIENT_MODE};{current}" if current else CLIENT_MODE
 
 
 def stamp_ns(stamp: Any) -> int:
@@ -98,16 +121,18 @@ class ArmZenohStream(ThreadedStream):
         return {**super().counters(), "bad_messages": self.bad_messages}
 
     def _open(self) -> None:
+        use_client_mode()
         from zenoh_ros2_sdk import ROS2Subscriber  # optional dependency
 
-        self._subscriber = ROS2Subscriber(
-            topic=self.topic,
-            msg_type=MSG_TYPES[self.message],
-            callback=self._on_message,
-            domain_id=self.domain_id,
-            router_ip=self.router_ip,
-            router_port=self.router_port,
-        )
+        with _OPEN_LOCK:
+            self._subscriber = ROS2Subscriber(
+                topic=self.topic,
+                msg_type=MSG_TYPES[self.message],
+                callback=self._on_message,
+                domain_id=self.domain_id,
+                router_ip=self.router_ip,
+                router_port=self.router_port,
+            )
 
     def _close(self) -> None:
         if self._subscriber is not None:

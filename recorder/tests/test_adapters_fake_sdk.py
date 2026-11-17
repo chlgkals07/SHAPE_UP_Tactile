@@ -7,6 +7,7 @@ SDKs behave that way. That still has to be checked on the devices.
 
 from __future__ import annotations
 
+import os
 import sys
 from types import ModuleType, SimpleNamespace
 
@@ -15,7 +16,7 @@ import pytest
 from conftest import PLACES_A
 
 from tactile_rec.clock import FakeClock
-from tactile_rec.streams.arm_zenoh import ArmZenohStream
+from tactile_rec.streams.arm_zenoh import ArmZenohStream, use_client_mode
 from tactile_rec.streams.paxini import PaxiniStream
 from tactile_rec.streams.realsense import RealSenseStream
 from tactile_rec.types import NO_TIME, STATUS_ERROR
@@ -302,6 +303,27 @@ def test_arm_subscribes_with_the_configured_router_and_closes(zenoh):
     assert subscriber.kwargs["domain_id"] == 30
     stream._close()
     assert subscriber.closed and stream._subscriber is None
+
+
+def test_arm_opens_the_sdk_session_as_a_zenoh_client(monkeypatch, zenoh):
+    # A peer session receives nothing from the Robot PC container (field 2026-11-17).
+    monkeypatch.setenv("ZENOH_CONFIG_OVERRIDE", "")  # setenv so the change is undone after
+    arm()._open()
+    assert os.environ["ZENOH_CONFIG_OVERRIDE"] == 'mode="client"'
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        ("", 'mode="client"'),
+        ('scouting/multicast/enabled=false', 'mode="client";scouting/multicast/enabled=false'),
+        ('mode="peer"', 'mode="peer"'),  # a mode the user set on purpose is kept
+    ],
+)
+def test_client_mode_is_added_unless_a_mode_is_already_set(before, after):
+    env = {"ZENOH_CONFIG_OVERRIDE": before} if before else {}
+    use_client_mode(env)
+    assert env["ZENOH_CONFIG_OVERRIDE"] == after
 
 
 def test_arm_messages_become_samples_and_a_missing_joint_is_an_error(zenoh):
