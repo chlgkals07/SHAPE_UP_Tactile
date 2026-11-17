@@ -27,6 +27,17 @@ def test_loads_and_links(cfg):
     assert cfg.profiles[0].steps[1].process == "server"
 
 
+def test_either_or_steps_and_sections(tmp_path):
+    cfg = load_config(write(tmp_path, yaml.safe_dump({
+        "processes": {"a": {"cmd": "x"}, "b": {"cmd": "y"}},
+        "profiles": [{"id": "p", "steps": [{"section": "팔"}, ["a", "b"], "b"]}],
+    })))
+    head, pick, plain = cfg.profiles[0].steps
+    assert head.section == "팔" and head.process is None
+    assert pick.process == "a" and pick.choices == ("a", "b")
+    assert plain.process == "b" and plain.choices == ()
+
+
 def test_devices_parsed(cfg):
     dev = cfg.devices["hand"]
     assert dev.kind == "leap" and dev.processes == ("server", "motor") and dev.tools == ("once",)
@@ -61,6 +72,8 @@ def test_recorder_stream_accepts_list(tmp_path):
         ("checks: {c: {ping: a, file: b}}", "checks.c"),
         ("checks: {c: {tcp: nohostport}}", "checks.c.tcp"),
         ("processes: {a: {cmd: x}}\nprofiles: [{id: p, steps: [nope]}]", "profiles[0].steps[0]"),
+        ("processes: {a: {cmd: x}}\nprofiles: [{id: p, steps: [[a, nope]]}]", "profiles[0].steps[0]"),
+        ("processes: {a: {cmd: x}}\nprofiles: [{id: p, steps: [[a]]}]", "profiles[0].steps[0]"),
         ("chains: []", "chains 는 v2 에서 없어졌습니다"),
         ("devices: {d: {processes: [nope]}}", "devices.d.processes"),
         ("devices: {d: {checks: [nope]}}", "devices.d.checks"),

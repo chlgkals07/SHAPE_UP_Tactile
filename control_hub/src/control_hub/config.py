@@ -97,7 +97,9 @@ class Check:
 @dataclass(frozen=True)
 class Step:
     note: str | None = None
-    process: str | None = None
+    process: str | None = None        # the default; with `choices`, the first of them
+    choices: tuple[str, ...] = ()     # either-or: one row, the person picks which one runs
+    section: str | None = None        # a heading that groups the steps below it
 
 
 @dataclass(frozen=True)
@@ -470,10 +472,18 @@ def load_config(path: Path | str) -> HubConfig:
                 if sraw not in processes:
                     raise _fail(f"{where}.steps[{j}]", f"'{sraw}' 는 프로세스가 아닙니다")
                 steps.append(Step(process=sraw))
+            elif isinstance(sraw, list) and len(sraw) >= 2 and all(isinstance(s, str) for s in sraw):
+                missing = [s for s in sraw if s not in processes]
+                if missing:
+                    raise _fail(f"{where}.steps[{j}]", f"{missing} 는 프로세스가 아닙니다")
+                steps.append(Step(process=sraw[0], choices=tuple(sraw)))
             elif isinstance(sraw, dict) and set(sraw) == {"note"}:
                 steps.append(Step(note=str(sraw["note"])))
+            elif isinstance(sraw, dict) and set(sraw) == {"section"}:
+                steps.append(Step(section=str(sraw["section"])))
             else:
-                raise _fail(f"{where}.steps[{j}]", "프로세스 id 또는 {note: 문장} 이어야 합니다")
+                raise _fail(f"{where}.steps[{j}]",
+                            "프로세스 id, [id, id] (택일), {note: 문장}, {section: 제목} 중 하나여야 합니다")
         profiles.append(Profile(praw["id"], str(praw.get("title", praw["id"])), tuple(steps),
                                 str(praw.get("help", "")).strip()))
 

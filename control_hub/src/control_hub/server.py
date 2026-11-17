@@ -21,9 +21,10 @@ from pydantic import BaseModel
 
 from control_hub.checks import CheckRunner
 from control_hub.command import build_command
-from control_hub.config import LOCAL, ConfigError, HubConfig, Process, load_config
+from control_hub.config import LOCAL, ConfigError, HubConfig, Process, Step, load_config
 from control_hub.incidents import Incidents
 from control_hub.leapcheck import LEAP_JOINTS
+from control_hub.remote import RemoteWatcher
 from control_hub.session import SessionLog
 from control_hub.supervisor import HubError, Supervisor
 from control_hub.tmux import Tmux, TmuxError
@@ -38,6 +39,11 @@ class StartBody(BaseModel):
 
 
 class StopBody(BaseModel):
+    confirmed: bool = False
+
+
+class RemoteStopBody(BaseModel):
+    force: bool = False
     confirmed: bool = False
 
 
@@ -58,6 +64,16 @@ def _title(cfg: HubConfig, ref: str) -> str:
     if ref in cfg.processes:
         return cfg.processes[ref].title
     return cfg.checks[ref].title if ref in cfg.checks else ref
+
+
+def _step(step: Step) -> dict[str, Any]:
+    if step.section is not None:
+        return {"section": step.section}
+    if step.note is not None:
+        return {"note": step.note}
+    if step.choices:
+        return {"process": step.process, "choices": list(step.choices)}
+    return {"process": step.process}
 
 
 def describe(cfg: HubConfig, tmux: Tmux) -> dict[str, Any]:
@@ -92,8 +108,7 @@ def describe(cfg: HubConfig, tmux: Tmux) -> dict[str, Any]:
                           "help": c.help, "link": c.link} for c in cfg.checks.values()},
         "profiles": [
             {"id": p.id, "title": p.title, "help": p.help,
-             "steps": [{"note": s.note} if s.note is not None else {"process": s.process}
-                       for s in p.steps]}
+             "steps": [_step(s) for s in p.steps]}
             for p in cfg.profiles
         ],
         "devices": {
@@ -113,7 +128,8 @@ def create_app(config_path: Path | str, tmux: Tmux | None = None,
     cfg = load_config(config_path)
     tmux = tmux or Tmux(cfg.tmux_socket, cfg.tmux_session)
     runner = CheckRunner(cfg)
-    supervisor = Supervisor(cfg, tmux, runner.results)
+    remote = RemoteWatcher(cfg)
+    supervisor = Supervisor(cfg, tmux, runner.results, remote)
     session = SessionLog(cfg.session_dir, cfg.keep_sessions)
     incidents = Incidents(session, supervisor.log_path)
     watcher = Watcher(cfg, supervisor, runner, session, incidents)
@@ -124,14 +140,17 @@ def create_app(config_path: Path | str, tmux: Tmux | None = None,
         if background:
             runner.start()
             watcher.start()
+            remote.start()
         try:
             yield
         finally:
+            remote.stop()
             watcher.stop()
             runner.stop()  # the processes themselves belong to tmux and keep running
 
     app = FastAPI(title="Control Hub", docs_url=None, redoc_url=None, lifespan=lifespan)
     app.state.supervisor = supervisor
+    app.state.remote = remote
     app.state.runner = runner
     app.state.watcher = watcher
     app.state.incidents = incidents
@@ -191,6 +210,15 @@ def create_app(config_path: Path | str, tmux: Tmux | None = None,
     def api_kill(pid: str) -> dict[str, Any]:
         return call(supervisor.kill, pid)
 
+    @app.post("/api/process/{pid}/remote-stop")
+    def api_remote_stop(pid: str, body: RemoteStopBody) -> dict[str, Any]:
+        """What a dropped ssh link left running on the Robot PC: Ctrl+C, or SIGKILL with force."""
+        try:
+            count = supervisor.remote_stop(pid, body.force, body.confirmed)
+        except KeyError:
+            raise HTTPException(404, f"'{pid}' 는 설정에 없습니다") from None
+        return {"ok": True, "signalled": count}
+
     @app.post("/api/process/{pid}/clear")
     def api_clear(pid: str) -> dict[str, Any]:
         return call(supervisor.clear, pid)
@@ -225,6 +253,7 @@ def create_app(config_path: Path | str, tmux: Tmux | None = None,
         supervisor.reload(new)
         runner.reload(new)
         watcher.reload(new)
+        remote.reload(new)
         return {"ok": True}
 
     def confined(read, *args):

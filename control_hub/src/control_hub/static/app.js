@@ -120,7 +120,7 @@ async function startProcess(pid) {
     .filter((c) => !c.unless_flag || !flags.includes(c.unless_flag)).map((c) => c.text);
   if (items.length) {
     const verb = proc.kind === "tool" ? "실행" : "켜기";
-    if (!await confirmDialog(`${proc.title} ${verb}`, `${proc.where} 에서 실행합니다. 모두 확인해야 진행됩니다.`, items, verb)) return;
+    if (!await confirmDialog(`${proc.title} ${verb}`, proc.where, items, verb)) return;
   }
   select(pid);
   await api(`/api/process/${pid}/start`, { flags, confirmed: items.length > 0 });
@@ -142,25 +142,38 @@ async function killProcess(pid) {
     ["Ctrl+C 로 꺼지지 않는 것을 확인했다"], "강제 종료", true);
   if (ok) await api(`/api/process/${pid}/kill`, {});
 }
+async function remoteStop(pid, force) {
+  const proc = D.processes[pid];
+  const items = [...(force ? ["끄기(Ctrl+C)로 꺼지지 않는 것을 확인했다"] : []), ...proc.confirm_stop];
+  const verb = force ? "강제 종료" : "끄기";
+  const sub = force ? "Robot PC 에 남은 프로세스를 바로 끝냅니다 (SIGKILL)." : "Robot PC 에 남은 프로세스에 Ctrl+C 를 보냅니다.";
+  if (items.length && !await confirmDialog(`${proc.title}: Robot PC 에서 ${verb}`, sub, items, verb, true)) return;
+  const res = await api(`/api/process/${pid}/remote-stop`, { force, confirmed: items.length > 0 });
+  toast(`Robot PC 로 보냈습니다 (${res.signalled}개)`);
+}
+const needsStop = (pid) => ALIVE.includes(stateOf(pid).state) || Boolean(stateOf(pid).remote_left);
+const stillUp = (pid) => (stateOf(pid).remote_left ? true : ALIVE.includes(stateOf(pid).state));
 async function stopAll() {
   const profile = D.profiles.find((p) => p.id === profileId);
-  const ordered = profile ? profile.steps.filter((s) => s.process).map((s) => s.process) : [];
-  const running = Object.keys(S.processes).filter((pid) => ALIVE.includes(stateOf(pid).state));
+  const ordered = profile ? profile.steps.flatMap((s) => s.choices || (s.process ? [s.process] : [])) : [];
+  const running = Object.keys(S.processes).filter(needsStop);
   running.sort((a, b) => ordered.indexOf(b) - ordered.indexOf(a)); // reverse of the start order
   if (!running.length) { toast("켜져 있는 프로세스가 없습니다"); return; }
   const items = running.flatMap((pid) => (D.processes[pid]?.confirm_stop || []).map((t) => `${titleOf(pid)}: ${t}`));
   if (!items.length) items.push("전부 꺼도 된다");
   if (!await confirmDialog("전체 끄기", `이 순서로 하나씩 끕니다: ${running.map(titleOf).join(" → ")}`, items, "전체 끄기", true)) return;
   for (const pid of running) {
-    try { await api(`/api/process/${pid}/stop`, { confirmed: true }); } catch (error) { toast(error.message, true); continue; }
-    const grace = (D.processes[pid]?.stop_grace_s || 10) * 1000 + 2000;
+    const left = Boolean(stateOf(pid).remote_left);
+    const path = left ? `/api/process/${pid}/remote-stop` : `/api/process/${pid}/stop`;
+    try { await api(path, { confirmed: true }); } catch (error) { toast(error.message, true); continue; }
+    const grace = (D.processes[pid]?.stop_grace_s || 10) * 1000 + (left ? 7000 : 2000);
     const until = Date.now() + grace;
     while (Date.now() < until) {
       await new Promise((r) => setTimeout(r, 400));
       await tick();
-      if (!ALIVE.includes(stateOf(pid).state)) break;
+      if (!stillUp(pid)) break;
     }
-    if (ALIVE.includes(stateOf(pid).state)) {
+    if (stillUp(pid)) {
       toast(`${titleOf(pid)} 이(가) 꺼지지 않아 여기서 멈춥니다. 확인 후 강제 종료하거나 다시 누릅니다.`, true);
       select(pid);
       return;
@@ -172,6 +185,13 @@ async function stopAll() {
 // ---------- rendering: rows ----------
 function rowSub(pid, proc, st) {
   const issue = st.issues && st.issues.length ? st.issues[st.issues.length - 1] : null;
+  const left = st.remote_left;
+  if (left) {
+    if (left.stop_overdue) return ["bad", "Robot PC 에서 꺼지지 않음 · 강제 종료"];
+    if (left.stop_sent_at) return ["warn", "Robot PC 에서 끄는 중"];
+    return ["bad", "연결 끊김 · Robot PC 에서 아직 도는 중"];
+  }
+  if (st.state === "failed" && st.remote_unknown) return ["bad", "연결 끊김 · Robot PC 에 닿지 않음"];
   if (st.state === "failed") {
     const why = issue ? (issue.hint || issue.line) : (st.last_line || "");
     return ["bad", `종료 코드 ${st.exit_code ?? "?"}${why ? " · " + why : ""}`];
@@ -183,11 +203,16 @@ function rowSub(pid, proc, st) {
     if (st.stale_config) return ["warn", `${up} · 설정이 바뀜, 다시 켜야 적용`];
     return issue ? ["warn", `${up} · 로그에 문제 ${st.issues.length}건`] : ["", up];
   }
-  if (st.state === "done") return ["", "정상적으로 끝남"];
+  if (st.state === "done") return ["", ""];
   if (st.blockers && st.blockers.length) return ["warn", st.blockers.join(" / ")];
-  return ["", proc ? proc.help.split("\n")[0] : "설정에 없는 프로세스"];
+  return ["", proc ? "" : "설정에 없는 프로세스"];
 }
 function rowButton(pid, proc, st) {
+  if (st.remote_left) {
+    return st.remote_left.stop_overdue
+      ? `<button class="btn small stop" data-action="remote-kill" data-id="${esc(pid)}">강제 종료</button>`
+      : `<button class="btn small danger" data-action="remote-stop" data-id="${esc(pid)}" ${st.remote_left.stop_sent_at ? "disabled" : ""}>끄기</button>`;
+  }
   if (!proc && !ALIVE.includes(st.state)) return "";
   if (st.state === "stopping") {
     return st.stop_overdue
@@ -199,43 +224,74 @@ function rowButton(pid, proc, st) {
   const verb = proc.kind === "tool" ? "실행" : "켜기";
   return `<button class="btn small primary" data-action="start" data-id="${esc(pid)}" ${blocked ? "disabled" : ""}>${verb}</button>`;
 }
-function processRow(pid, num, extra) {
+function processRow(pid, num, extra, below) {
   const proc = D.processes[pid];
   const st = stateOf(pid);
   const [subClass, sub] = rowSub(pid, proc, st);
-  const classes = ["row", pid === selected ? "selected" : "", st.state === "failed" ? "failed" : "", extra || ""].join(" ");
+  const bad = st.state === "failed" || st.remote_left;
+  const classes = ["row", pid === selected ? "selected" : "", bad ? "failed" : "", extra || ""].join(" ");
   return `<li class="${classes}" data-action="select" data-id="${esc(pid)}" tabindex="0">
     <span class="num">${num ?? ""}</span>
-    <span class="title"><span class="dot ${st.state}"></span><span class="name">${esc(proc ? proc.title : pid)}</span>
-      ${proc && proc.remote ? '<span class="where">Robot PC</span>' : ""}
-      <span class="tag ${st.state}">${LABEL[st.state]}</span></span>
+    <span class="title"><span class="dot ${st.remote_left ? "failed" : st.state}"></span><span class="name" title="${esc(proc ? proc.title : pid)}">${esc(proc ? proc.title : pid)}</span>
+      ${st.state === "off" ? "" : `<span class="tag ${st.state}">${LABEL[st.state]}</span>`}</span>
     ${rowButton(pid, proc, st)}
-    <span class="sub ${subClass}">${esc(sub)}</span>
+    ${below || ""}${sub ? `<span class="sub ${subClass}">${esc(sub)}</span>` : ""}
   </li>`;
 }
 
+const choiceKey = (profile, i) => `hub.choice.${profile.id}:${i}`;
+function stepProcess(profile, step, i) {
+  // an either-or step shows the one that is running (or left running); otherwise the saved pick
+  if (!step.choices) return step.process;
+  const busy = step.choices.find((pid) => needsStop(pid) || stateOf(pid).state === "failed");
+  if (busy) return busy;
+  let saved = null;
+  try { saved = localStorage.getItem(choiceKey(profile, i)); } catch { /* storage blocked */ }
+  return step.choices.includes(saved) ? saved : step.process;
+}
+function shortLabels(titles) {
+  // "팔 bringup 손목 90° (…)" / "팔 bringup 순정 (…)" -> "손목 90°" / "순정" (full title on hover)
+  let n = 0;
+  while (titles.every((t) => t[n] !== undefined && t[n] === titles[0][n])) n += 1;
+  n = titles[0].lastIndexOf(" ", n) + 1;
+  return titles.map((t) => t.slice(n).replace(/\s*\([^)]*\)$/, "") || t);
+}
 function renderRun() {
-  setHTML($("profile-tabs"), D.profiles.map((p) =>
-    `<button class="${p.id === profileId ? "on" : ""}" data-action="profile" data-id="${p.id}">${esc(p.title)}</button>`).join(""));
   const profile = D.profiles.find((p) => p.id === profileId);
   if (!profile) { setHTML($("steps"), '<li class="empty muted">설정에 실행표(profiles)가 없습니다. 전체 페이지를 씁니다.</li>'); return; }
-  setHTML($("profile-help"), esc(profile.help));
+  const others = D.profiles.filter((p) => p.id !== profile.id);
+  setHTML($("profile-tabs"), `<h1 title="${esc(profile.help)}">${esc(profile.title)}</h1>
+    ${others.length ? `<select id="profile-select" aria-label="다른 실행표"><option value="">다른 실행표</option>${
+      others.map((p) => `<option value="${esc(p.id)}">${esc(p.title)}</option>`).join("")}</select>` : ""}`);
   const done = notesDone();
   let nextFound = false;
+  let num = 0;
   const html = profile.steps.map((step, i) => {
+    if (step.section !== undefined) return `<li class="section">${esc(step.section)}</li>`;
+    num += 1;
     if (step.note !== null && step.note !== undefined) {
       const key = `${profile.id}:${i}`;
       const checked = Boolean(done[key]);
       const isNext = !checked && !nextFound;
       if (isNext) nextFound = true;
       return `<li class="row note ${checked ? "checked" : ""} ${isNext ? "next" : ""}">
-        <span class="num">${i + 1}</span>
+        <span class="num">${num}</span>
         <label><input type="checkbox" data-note="${key}" ${checked ? "checked" : ""}><span>${esc(step.note)}</span></label></li>`;
     }
-    const state = stateOf(step.process).state;
+    const pid = stepProcess(profile, step, i);
+    const state = stateOf(pid).state;
     const isNext = !nextFound && !["ready", "done"].includes(state);
     if (isNext) nextFound = true;
-    return processRow(step.process, i + 1, isNext && state !== "starting" ? "next" : "");
+    let below = "";
+    if (step.choices) {
+      const locked = step.choices.some((c) => needsStop(c));
+      const titles = step.choices.map(titleOf);
+      const labels = shortLabels(titles);
+      below = `<span class="choices">${step.choices.map((c, k) => `<button class="${c === pid ? "on" : ""}"
+        data-action="choose" data-key="${esc(choiceKey(profile, i))}" data-id="${esc(c)}" title="${esc(titles[k])}"
+        ${locked ? "disabled" : ""}>${esc(labels[k])}</button>`).join("")}</span>`;
+    }
+    return processRow(pid, num, isNext && state !== "starting" ? "next" : "", below);
   }).join("");
   setHTML($("steps"), html);
 }
@@ -265,7 +321,6 @@ function select(pid) {
     <form class="input-row" id="input-form" ${proc && proc.input ? "" : "hidden"}>
       <input type="text" id="input-text" placeholder="프로세스에 보낼 한 줄 (비워 두면 Enter 만)" autocomplete="off">
       <button class="btn small primary">보내기</button></form>
-    <div class="attach">터미널에서 직접 보기: <code>${esc(D.attach)}</code> 후 <code>Ctrl+b w</code> 로 창 선택</div>
   </div>`;
   $("detail")._html = null;
   render();
@@ -273,7 +328,7 @@ function select(pid) {
 }
 function renderDetail() {
   if (!selected || !$("d-top")) {
-    setHTML($("detail"), '<div class="panel empty muted">왼쪽에서 항목을 누르면 명령, 상태, 로그가 여기에 나옵니다.</div>');
+    setHTML($("detail"), '<div class="panel empty muted">항목을 누르면 로그가 나옵니다.</div>');
     return;
   }
   const pid = selected;
@@ -282,7 +337,7 @@ function renderDetail() {
   const alive = ALIVE.includes(st.state);
   const flags = chosenFlags(pid);
   const meta = [];
-  if (proc) meta.push(`위치: ${proc.where}`, proc.kind === "tool" ? "도구 (한 번 실행)" : "서비스 (계속 실행)");
+  if (proc) meta.push(proc.where);
   if (st.started_at && st.state !== "off") meta.push(alive ? `켜진 지 ${elapsed(st.started_at)}` : `시작 ${new Date(st.started_at * 1000).toLocaleTimeString("ko-KR")}`);
   if (st.exit_code !== null && st.exit_code !== undefined) meta.push(`종료 코드 ${st.exit_code}`);
 
@@ -290,7 +345,13 @@ function renderDetail() {
     <span class="tag ${st.state}">${LABEL[st.state]}</span><code class="right muted">${esc(pid)}</code></div>
     <div class="meta">${meta.map((m) => `<span>${esc(m)}</span>`).join("")}</div>`;
   if (!proc) html += '<div class="notice warn">설정 파일에서 빠진 프로세스입니다. 아직 돌고 있어서 끌 수 있게 남겨 두었습니다.</div>';
-  if (proc && proc.help) html += `<p class="help">${esc(proc.help)}</p>`;
+  const left = st.remote_left;
+  if (left) {
+    html += `<div class="notice bad"><b>연결이 끊긴 뒤에도 Robot PC 에서 돌고 있습니다 (${left.count}개)</b>
+      <ul>${left.procs.map((c) => `<li class="mono">${esc(c)}</li>`).join("")}</ul></div>`;
+  } else if (st.state === "failed" && st.remote_unknown) {
+    html += `<div class="notice bad">Robot PC 에 닿지 않아 남아 있는지 모릅니다 (${esc(st.remote_unknown)})</div>`;
+  }
   if (!alive && st.blockers && st.blockers.length) {
     html += `<div class="notice warn"><b>지금은 켤 수 없습니다</b><ul>${st.blockers.map((b) => `<li>${esc(b)}</li>`).join("")}</ul></div>`;
   }
@@ -303,7 +364,11 @@ function renderDetail() {
   }
   const buttons = [];
   const verb = proc && proc.kind === "tool" ? "실행" : "켜기";
-  if (proc && !alive) buttons.push(`<button class="btn primary" data-action="start" data-id="${esc(pid)}" ${st.blockers.length ? "disabled" : ""}>${st.state === "off" ? verb : "다시 " + verb}</button>`);
+  if (left) {
+    buttons.push(`<button class="btn danger" data-action="remote-stop" data-id="${esc(pid)}" ${left.stop_sent_at && !left.stop_overdue ? "disabled" : ""}>Robot PC 에서 끄기 (Ctrl+C)</button>`);
+    if (left.stop_sent_at) buttons.push(`<button class="btn stop" data-action="remote-kill" data-id="${esc(pid)}">강제 종료</button>`);
+  }
+  if (proc && !alive && !left) buttons.push(`<button class="btn primary" data-action="start" data-id="${esc(pid)}" ${st.blockers.length ? "disabled" : ""}>${st.state === "off" ? verb : "다시 " + verb}</button>`);
   if (alive) buttons.push(`<button class="btn danger" data-action="stop" data-id="${esc(pid)}">${st.state === "stopping" ? "Ctrl+C 다시 보내기" : "끄기 (Ctrl+C)"}</button>`);
   if (st.state === "stopping") buttons.push(`<button class="btn stop" data-action="kill" data-id="${esc(pid)}">강제 종료</button>`);
   if (["done", "failed"].includes(st.state)) buttons.push(`<button class="btn" data-action="clear" data-id="${esc(pid)}">닫기</button>`);
@@ -319,9 +384,11 @@ function renderDetail() {
     const related = [];
     if (proc.requires.length) related.push(`먼저 필요: ${proc.requires.map((r) => r.title).join(", ")}`);
     if (proc.conflicts.length) related.push(`같이 켤 수 없음: ${proc.conflicts.map((r) => r.title).join(", ")}`);
-    html += `<details ${alive ? "" : "open"}><summary>실행하는 명령 (${esc(proc.where)})</summary><pre>${esc(lines.join("\n"))}</pre>
+    if (proc.help) html += `<details><summary>설명</summary><p class="help">${esc(proc.help)}</p></details>`;
+    html += `<details><summary>명령</summary><pre>${esc(lines.join("\n"))}</pre>
       ${st.command ? `<pre title="실제로 창에서 실행된 한 줄">${esc(st.command)}</pre>` : ""}
-      ${related.length ? `<p class="muted" style="margin-top:6px">${esc(related.join(" · "))}</p>` : ""}</details>`;
+      ${related.length ? `<p class="muted" style="margin-top:6px">${esc(related.join(" · "))}</p>` : ""}
+      <p class="muted" style="margin-top:6px">터미널: <code>${esc(D.attach)}</code> 후 <code>Ctrl+b w</code></p></details>`;
   }
   setHTML($("d-top"), html);
 }
@@ -449,7 +516,7 @@ function motorTable(d, st) {
   const tool = d.tools[0];
   const rows = FINGERS.map(([finger, start]) =>
     `<tr><th>${finger}</th>${[0, 1, 2, 3].map((k) => motorCell(start + k, d, table, st.motors || {})).join("")}</tr>`).join("");
-  const how = tool ? `아래에서 "${titleOf(tool)}"을 실행하면 모터별 값이 채워집니다` : "";
+  const how = tool ? `"${titleOf(tool)}" 실행 후 채워짐` : "";
   return `<div class="panel-head"><h2>모터</h2>
       <span class="muted">${table ? `${esc(titleOf(result.pid))} ${clock(result.t)} 결과` : esc(how)}</span></div>
     <table class="motors">${rows}</table>
@@ -470,11 +537,8 @@ function renderDevice(id) {
   if (devEvents.id !== id || Date.now() - devEvents.at > 3000) loadDevEvents(id);
   const events = devEvents.id === id ? devEvents.list : [];
   const procs = [...d.processes, ...d.tools];
-  const recorder = d.recorder_stream.length
-    ? `<p class="muted">녹화기 스트림: ${esc(d.recorder_stream.join(", "))}. 실시간 값과 영상은 녹화기 화면에서 봅니다.</p>` : "";
-  setHTML($("page-device"), `<header class="bar"><span class="dot ${st.level}"></span><h1>${esc(d.title)}</h1>
+  setHTML($("page-device"), `<header class="bar"><span class="dot ${st.level}"></span><h1 title="${esc(d.help)}">${esc(d.title)}</h1>
       <span class="tag ${st.level}">${LEVEL_LABEL[st.level]}</span><span class="muted">${esc(st.summary)}</span></header>
-    ${d.help ? `<p class="help">${esc(d.help)}</p>` : ""}${recorder}
     <div class="panel"><div class="panel-head"><h2>연결</h2></div>
       ${d.checks.map(checkCard).join("") || '<p class="muted">이 장치에 걸린 점검이 없습니다.</p>'}</div>
     ${d.kind === "leap" ? `<div class="panel">${motorTable(d, st)}</div>`
@@ -495,7 +559,7 @@ function renderScan() {
     <td class="mono">${esc([...u.ttys, ...u.videos].join(", "))}${u.by_id.length ? `<div class="muted">${esc(u.by_id.join(", "))}</div>` : ""}</td>
     <td class="mono">${esc(u.bus_path)}</td></tr>`).join("");
   setHTML($("page-scan"), `<header class="bar"><h1>장치 탐색</h1>
-      <span class="muted">지금 꽂힌 USB 장치입니다. 보여 주기만 합니다 (포트 자동 지정은 추후).</span></header>
+      <span class="muted">지금 꽂힌 USB 장치</span></header>
     ${scan.misplaced.map((m) => `<div class="notice warn">${esc(m.text)} (설정: ${esc(m.expected)})</div>`).join("")}
     <div class="panel"><table><tr><th>장치</th><th>vendor:product</th><th>시리얼</th><th>속도</th><th>포트</th><th>버스</th></tr>
       ${rows || '<tr><td colspan="6" class="muted">USB 장치가 없습니다</td></tr>'}</table></div>`);
@@ -554,7 +618,7 @@ function renderLogs() {
       <select id="logs-dev" class="right" aria-label="장치">${options(Object.values(D.devices).map((d) => [d.id, d.title]), v.dev, "모든 장치")}</select>
       <select id="logs-level" aria-label="수준">${options([["bad", "문제"], ["warn", "주의"], ["info", "정보"]], v.level, "모든 수준")}</select></header>
     <div class="logs-grid"><div>
-      <div class="panel"><div class="panel-head"><h2>사고 ${v.incidents.length}</h2><span class="muted">오류마다 로그와 상태를 모은 폴더</span></div>
+      <div class="panel"><div class="panel-head"><h2>사고 ${v.incidents.length}</h2></div>
         <ul class="problems">${incidents || '<li class="muted">사고가 없습니다</li>'}</ul></div>
       <div class="panel"><div class="panel-head"><h2>사건</h2><span class="muted">최신이 위</span></div>
         <ul class="problems">${v.events.map(problemRow).join("") || '<li class="muted">사건이 없습니다</li>'}</ul></div>
@@ -701,6 +765,14 @@ document.addEventListener("click", (event) => {
   if (action === "start") { event.stopPropagation(); act(() => startProcess(id)); }
   else if (action === "stop") act(() => stopProcess(id));
   else if (action === "kill") act(() => killProcess(id));
+  else if (action === "choose") {
+    event.stopPropagation();
+    try { localStorage.setItem(target.dataset.key, id); } catch { /* storage blocked */ }
+    select(id);
+    render();
+  }
+  else if (action === "remote-stop") { event.stopPropagation(); act(() => remoteStop(id, false)); }
+  else if (action === "remote-kill") { event.stopPropagation(); act(() => remoteStop(id, true)); }
   else if (action === "clear") act(() => api(`/api/process/${id}/clear`, {}));
   else if (action === "profile") { profileId = id; localStorage.setItem("hub.profile", id); render(); }
   else if (action === "select") {
@@ -725,7 +797,11 @@ document.addEventListener("keydown", (event) => {
 });
 document.addEventListener("change", (event) => {
   const el = event.target;
-  if (el.dataset.note) {
+  if (el.id === "profile-select" && el.value) {
+    profileId = el.value;
+    try { localStorage.setItem("hub.profile", profileId); } catch { /* storage blocked */ }
+    render();
+  } else if (el.dataset.note) {
     const done = notesDone();
     if (el.checked) done[el.dataset.note] = true; else delete done[el.dataset.note];
     localStorage.setItem("hub.notes", JSON.stringify(done));

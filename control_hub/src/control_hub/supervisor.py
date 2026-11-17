@@ -20,8 +20,9 @@ from typing import Any
 
 from control_hub.checks import CheckResult
 from control_hub.command import build_command
-from control_hub.config import ID_PATTERN, HubConfig, Process
+from control_hub.config import ID_PATTERN, LOCAL, HubConfig, Process
 from control_hub.logscan import LogEvent, LogScanner, read_chunk
+from control_hub.remote import RemoteWatcher
 from control_hub.tmux import Tmux, TmuxError, Window
 
 RUN_PATTERN = re.compile(r"^\d{8}-\d{6}(-\d+)?$")
@@ -52,10 +53,14 @@ class Run:
 
 class Supervisor:
     def __init__(self, cfg: HubConfig, tmux: Tmux,
-                 checks: Callable[[], dict[str, CheckResult]] = dict) -> None:
+                 checks: Callable[[], dict[str, CheckResult]] = dict,
+                 remote: RemoteWatcher | None = None) -> None:
         self.cfg = cfg
         self.tmux = tmux
         self._checks = checks
+        self.remote = remote
+        self._last_alive: dict[str, float] = {}    # when the hub last saw it running here
+        self._remote_stop_at: dict[str, float] = {}  # a stop was sent to its host
         self._runs: dict[str, Run] = {}
         self._lock = threading.RLock()
         for name in self.tmux.windows():  # adopt what is already running
@@ -181,9 +186,37 @@ class Supervisor:
             return self.cfg.checks[ref].title
         return ref
 
+    def _remote_state(self, proc: Process, info: dict[str, Any], now: float) -> None:
+        """What the host says about a remote process the hub no longer runs (ssh died)."""
+        if self.remote is None or proc.host == LOCAL:
+            return
+        if info["state"] in ("starting", "ready", "stopping"):
+            self._last_alive[proc.id] = now
+            self._remote_stop_at.pop(proc.id, None)
+            return
+        report = self.remote.report(proc.host)
+        if report is None:
+            return
+        # a report from before the window ended may still list it: wait for a newer one
+        fresh = report.checked_at > self._last_alive.get(proc.id, 0.0) + 1.0
+        left = report.found.get(proc.id) if fresh else None
+        if left:
+            info["remote_left"] = {"count": len(left), "procs": [cmd for _, cmd in left[:4]],
+                                   "checked_at": report.checked_at}
+            asked = self._remote_stop_at.get(proc.id)
+            if asked is not None:
+                info["remote_left"]["stop_sent_at"] = asked
+                info["remote_left"]["stop_overdue"] = now - asked > proc.stop_grace_s
+        elif fresh:
+            self._remote_stop_at.pop(proc.id, None)
+        if report.error and info["state"] == "failed":
+            info["remote_unknown"] = report.error
+
     def _blockers(self, proc: Process, states: dict[str, dict[str, Any]],
                   checks: dict[str, CheckResult]) -> list[str]:
         out = []
+        if states.get(proc.id, {}).get("remote_left"):
+            out.append("Robot PC 에 이전 실행이 아직 돌고 있음: 먼저 끕니다")
         for ref in proc.requires:
             if ref in self.cfg.processes:
                 state = states.get(ref, {}).get("state", "off")
@@ -207,6 +240,10 @@ class Supervisor:
             ids = list(self.cfg.processes) + [w for w in windows if w not in self.cfg.processes]
             states = {pid: self._base_state(pid, windows.get(pid), checks) for pid in ids}
             alive = ("starting", "ready", "stopping")
+            now = time.time()
+            for pid, info in states.items():
+                if pid in self.cfg.processes:
+                    self._remote_state(self.cfg.processes[pid], info, now)
             for pid, info in states.items():
                 proc = self.cfg.processes.get(pid)
                 info.setdefault("issues", [])
@@ -312,6 +349,29 @@ class Supervisor:
             if pid not in self.tmux.windows():
                 raise HubError(f"{self._title(pid)}: 켜져 있지 않습니다")
             self._close(pid)
+
+    def remote_stop(self, pid: str, force: bool = False, confirmed: bool = False) -> int:
+        """Ctrl+C (or, with `force`, SIGKILL) to what this process left on its host."""
+        with self._lock:
+            proc = self._proc(pid)
+            if proc.host == LOCAL or self.remote is None:
+                raise HubError(f"{proc.title}: 원격 프로세스가 아닙니다")
+            state = self.status()[pid]
+            if state["state"] in ("starting", "ready", "stopping"):
+                raise HubError(f"{proc.title}: 허브 창에서 돌고 있습니다. 끄기를 씁니다")
+            if proc.confirm_stop and not confirmed:
+                raise HubError(f"{proc.title}: 끄기 전 확인이 필요합니다")
+        try:  # ssh takes a moment: not under the lock
+            count = self.remote.signal(proc.host, pid, "KILL" if force else "INT")
+        except (OSError, ValueError) as exc:
+            raise HubError(f"{proc.title}: Robot PC 에 닿지 않습니다 ({exc})") from exc
+        except Exception as exc:  # subprocess timeout and the like
+            raise HubError(f"{proc.title}: Robot PC 에 보내지 못했습니다 ({exc})") from exc
+        if count == 0:
+            raise HubError(f"{proc.title}: Robot PC 에 남은 프로세스가 없습니다")
+        with self._lock:
+            self._remote_stop_at.setdefault(pid, time.time())
+        return count
 
     def clear(self, pid: str) -> None:
         with self._lock:

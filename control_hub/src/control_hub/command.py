@@ -9,6 +9,7 @@ import shlex
 from collections.abc import Iterable
 
 from control_hub.config import LOCAL, HubConfig, Process
+from control_hub.remote import tag_line
 
 SSH_OPTIONS = (
     "-o", "ConnectTimeout=5", "-o", "ServerAliveInterval=5", "-o", "ServerAliveCountMax=3",
@@ -31,10 +32,11 @@ def build_command(cfg: HubConfig, proc: Process, flags: Iterable[str] = ()) -> s
     if proc.host == LOCAL:
         return f"bash -c {shlex.quote(script)}"
     host = cfg.hosts[proc.host]
-    remote = script
+    # the tag lets the hub find this run's processes on the host if the ssh link dies
+    remote = f"{tag_line(proc.id)} && {script}"
     if host.container:
         # -it: the container side needs a terminal so that Ctrl+C reaches the process
-        remote = f"docker exec -it {shlex.quote(host.container)} bash -c {shlex.quote(script)}"
+        remote = f"docker exec -it {shlex.quote(host.container)} bash -c {shlex.quote(remote)}"
     options = " ".join(shlex.quote(o) for o in (*SSH_OPTIONS, *host.ssh_options))
     # -tt: a terminal on the far side, so Ctrl+C in the window stops the remote process
     return f"ssh -tt {options} {shlex.quote(host.ssh)} {shlex.quote(remote)}"

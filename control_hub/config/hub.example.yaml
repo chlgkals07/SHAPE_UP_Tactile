@@ -71,7 +71,7 @@ processes:
       - {match: "Address already in use", hint: "zenohd 가 이미 떠 있다. 그대로 쓰면 된다 (이 창은 닫는다)"}
 
   arm:
-    title: 팔 bringup (omy_ai_wrist_flip)
+    title: 팔 bringup 손목 90° (omy_ai_wrist_flip)
     group: Robot PC
     host: robot_container
     env: robot_ros
@@ -102,14 +102,16 @@ processes:
     env: robot_ros
     cmd: ros2 launch open_manipulator_bringup omy_ai.launch.py
     requires: [zenoh_port]
+    conflicts: [pack, unpack]
     ready: {log: "(?i)leader"}
     stop_grace_s: 15
     help: |
-      순정 장착(손가락이 아래)일 때만 쓴다. 90° 장착에서는 omy_ai_wrist_flip 을 쓴다.
+      손목 offset 없이 켠다 (home 에서 joint6 0°). 지금의 90° 장착이면 손가락이 옆을 향한다.
+      녹화하면 rig.yaml 의 rig.mount 를 맞춘다 (wrist_flip 데이터와 섞지 않는다).
     confirm_start:
-      - LEAP 이 순정 장착(손가락 아래)이다. 90° 장착이 아니다
-      - 작업 공간을 비웠다. 누르는 즉시 팔이 움직인다
-      - leader 를 손으로 잡고 있다
+      - 작업 공간을 비웠고 비상 정지 수단을 확인했다. 누르는 즉시 팔이 움직인다
+      - LEAP 은 주먹 상태다
+      - leader 를 손으로 잡고 트리거를 쥐고 있다
     confirm_stop:
       - 팔을 손으로 받치고 있다
     hints:
@@ -445,20 +447,23 @@ checks:
 # 실행표. 가이드의 "켜는 순서": LEAP 5V(편 손) → Manus 노드 → zenohd → omy_ai_wrist_flip → leap_* → 녹화
 profiles:
   - id: collect
-    title: 수집 (팔 + 손 + 녹화)
-    help: 데이터 수집 세션. 위에서부터 하나씩 켠다. 끌 때는 "전체 끄기"가 역순으로 끈다.
+    title: 수집
+    help: 위에서부터 하나씩. 끌 때는 "전체 끄기" (역순).
     steps:
-      - {note: "로봇 전원을 켜고 LED 가 흰색이 될 때까지 기다린다. 이더넷 연결"}
-      - {note: "LEAP 을 편 손으로 두고 5V 를 켠다. 5V 차단 수단을 손 닿는 곳에 둔다"}
-      - {note: "글러브를 착용한다. MANUS Core Dashboard 는 끈다"}
+      - {section: 준비}
+      - {note: "로봇 전원 ON, LED 흰색, 이더넷 연결"}
+      - {note: "LEAP 편 손, 5V ON (차단 수단은 손 닿는 곳)"}
+      - {note: "글러브 착용, MANUS Dashboard 끔"}
+      - {section: 점검}
       - manus
       - leap_check
       - robot_precheck
       - zenohd
-      - {note: "LEAP 을 주먹으로 둔다. leader 를 손으로 잡고 트리거를 쥔다"}
-      - arm
+      - {section: 팔}
+      - {note: "LEAP 주먹, leader 잡고 트리거"}
+      - [arm, arm_stock]          # 택일: 손목 90° (기본) / 순정
+      - {section: 손 + 녹화}
       - leap_manus
-      - {note: "손목 카메라 ROS 노드가 꺼져 있는지 본다 (녹화기가 카메라를 직접 연다)"}
       - recorder
   - id: arm_hand
     title: 팔 + 손 (4단계)
