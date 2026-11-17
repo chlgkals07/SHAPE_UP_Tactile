@@ -28,3 +28,5 @@ third_party/manus/MANUS[[:space:]]Core[[:space:]]Dashboard[[:space:]](Linux[[:sp
 third_party/manus/MANUS[[:space:]]Core[[:space:]]Dashboard[[:space:]](Linux[[:space:]]build)/MANUS[[:space:]]Core[[:space:]]Dashboard[[:space:]](Linux[[:space:]]build)/MANUS_Core_Data/StreamingAssets/Firmware~/nrfutil filter=lfs diff=lfs merge=lfs -text
 third_party/manus/MANUS[[:space:]]Core[[:space:]]Dashboard[[:space:]](Linux[[:space:]]build)/MANUS[[:space:]]Core[[:space:]]Dashboard[[:space:]](Linux[[:space:]]build)/MANUS_Core_Data/sharedassets0.assets.resS filter=lfs diff=lfs merge=lfs -text
 third_party/manus/MANUS[[:space:]]Core[[:space:]]Dashboard[[:space:]](Linux[[:space:]]build)/MANUS[[:space:]]Core[[:space:]]Dashboard[[:space:]](Linux[[:space:]]build)/MANUS_Core_Data/Plugins/x86_64/libManusSDK-amd64.so filter=lfs diff=lfs merge=lfs -text
+data/samples/**/*.npz filter=lfs diff=lfs merge=lfs -text
+data/samples/**/*.mjpeg filter=lfs diff=lfs merge=lfs -text

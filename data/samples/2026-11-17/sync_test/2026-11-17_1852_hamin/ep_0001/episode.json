@@ -1,0 +1,407 @@
+{
+  "format": 1,
+  "episode": 1,
+  "task": "sync_test",
+  "text": "sync test",
+  "operator": "hamin",
+  "rig": "omy_f3m_leap",
+  "mount": "wrist_flip",
+  "start": {
+    "mono_ns": 7528863271451,
+    "wall_ns": 1794909143932418043
+  },
+  "preroll_s": 1.0,
+  "tactile_zero": {
+    "tactile_a": null
+  },
+  "result": "success",
+  "flags": {
+    "forced_start": false,
+    "dropouts": {
+      "arm_state": 2,
+      "arm_action": 2
+    },
+    "disk_low": false,
+    "write_errors": {},
+    "recovered": false
+  },
+  "streams": {
+    "arm_state": {
+      "name": "arm_state",
+      "kind": "numeric",
+      "fields": {
+        "pos": {
+          "shape": [
+            6
+          ],
+          "dtype": "float64",
+          "unit": "rad"
+        },
+        "vel": {
+          "shape": [
+            6
+          ],
+          "dtype": "float64",
+          "unit": "rad/s"
+        },
+        "eff": {
+          "shape": [
+            6
+          ],
+          "dtype": "float64",
+          "unit": ""
+        }
+      },
+      "nominal_hz": 400.0,
+      "required": true,
+      "src_clock": "remote_wall",
+      "meta": {
+        "message": "joint_state",
+        "joints": [
+          "joint1",
+          "joint2",
+          "joint3",
+          "joint4",
+          "joint5",
+          "joint6"
+        ]
+      },
+      "stats": {
+        "count": 25621,
+        "hz": 355.5,
+        "max_gap_ms": 6401.79,
+        "missed": 0
+      },
+      "counters": {
+        "subscriber_errors": 0,
+        "bad_messages": 0
+      }
+    },
+    "arm_action": {
+      "name": "arm_action",
+      "kind": "numeric",
+      "fields": {
+        "pos": {
+          "shape": [
+            6
+          ],
+          "dtype": "float64",
+          "unit": "rad"
+        }
+      },
+      "nominal_hz": 300.0,
+      "required": true,
+      "src_clock": "remote_wall",
+      "meta": {
+        "message": "joint_trajectory",
+        "joints": [
+          "joint1",
+          "joint2",
+          "joint3",
+          "joint4",
+          "joint5",
+          "joint6"
+        ]
+      },
+      "stats": {
+        "count": 19268,
+        "hz": 267.35,
+        "max_gap_ms": 6402.9,
+        "missed": 0
+      },
+      "counters": {
+        "subscriber_errors": 0,
+        "bad_messages": 0
+      }
+    },
+    "hand": {
+      "name": "hand",
+      "kind": "numeric",
+      "fields": {
+        "cmd": {
+          "shape": [
+            16
+          ],
+          "dtype": "float32",
+          "unit": "deg"
+        },
+        "sent": {
+          "shape": [
+            16
+          ],
+          "dtype": "float32",
+          "unit": "deg"
+        },
+        "pos": {
+          "shape": [
+            16
+          ],
+          "dtype": "float32",
+          "unit": "deg"
+        },
+        "vel": {
+          "shape": [
+            16
+          ],
+          "dtype": "float32",
+          "unit": "deg/s"
+        },
+        "cur": {
+          "shape": [
+            16
+          ],
+          "dtype": "float32",
+          "unit": "mA"
+        },
+        "mode": {
+          "shape": [],
+          "dtype": "int8",
+          "unit": "0 live, 1 hold, 2 release"
+        }
+      },
+      "nominal_hz": 50.0,
+      "required": true,
+      "src_clock": "mono",
+      "meta": {
+        "joints": [
+          "index_mcp_side",
+          "index_mcp_flex",
+          "index_pip_flex",
+          "index_dip_flex",
+          "middle_mcp_side",
+          "middle_mcp_flex",
+          "middle_pip_flex",
+          "middle_dip_flex",
+          "ring_mcp_side",
+          "ring_mcp_flex",
+          "ring_pip_flex",
+          "ring_dip_flex",
+          "thumb_cmc_side",
+          "thumb_cmc_flex",
+          "thumb_mcp_flex",
+          "thumb_ip_flex"
+        ],
+        "modes": [
+          "live",
+          "hold",
+          "release"
+        ]
+      },
+      "stats": {
+        "count": 3510,
+        "hz": 48.71,
+        "max_gap_ms": 56.96,
+        "missed": 0
+      },
+      "counters": {
+        "subscriber_errors": 0,
+        "bad_packets": 0,
+        "bad_glove": 0,
+        "clock_mismatch": 0
+      }
+    },
+    "glove": {
+      "name": "glove",
+      "kind": "numeric",
+      "fields": {
+        "ergo": {
+          "shape": [
+            20
+          ],
+          "dtype": "float32",
+          "unit": "deg"
+        },
+        "nodes": {
+          "shape": [
+            32,
+            7
+          ],
+          "dtype": "float32",
+          "unit": "m, quaternion xyzw"
+        },
+        "n_nodes": {
+          "shape": [],
+          "dtype": "int16",
+          "unit": ""
+        }
+      },
+      "nominal_hz": 50.0,
+      "required": false,
+      "src_clock": "mono",
+      "meta": {
+        "node_names": [
+          "Hand/Invalid",
+          "Thumb/MCP",
+          "Thumb/PIP",
+          "Thumb/DIP",
+          "Thumb/TIP",
+          "Index/MCP",
+          "Index/PIP",
+          "Index/IP",
+          "Index/DIP",
+          "Index/TIP",
+          "Middle/MCP",
+          "Middle/PIP",
+          "Middle/IP",
+          "Middle/DIP",
+          "Middle/TIP",
+          "Ring/MCP",
+          "Ring/PIP",
+          "Ring/IP",
+          "Ring/DIP",
+          "Ring/TIP",
+          "Pinky/MCP",
+          "Pinky/PIP",
+          "Pinky/IP",
+          "Pinky/DIP",
+          "Pinky/TIP"
+        ]
+      },
+      "stats": {
+        "count": 3510,
+        "hz": 48.71,
+        "max_gap_ms": 56.96,
+        "missed": 0
+      },
+      "counters": {
+        "subscriber_errors": 0
+      }
+    },
+    "tactile_a": {
+      "name": "tactile_a",
+      "kind": "numeric",
+      "fields": {
+        "payload": {
+          "shape": [
+            972
+          ],
+          "dtype": "uint8",
+          "unit": "board bytes"
+        },
+        "error_code": {
+          "shape": [],
+          "dtype": "int16",
+          "unit": ""
+        }
+      },
+      "nominal_hz": 90.0,
+      "required": true,
+      "src_clock": "none",
+      "meta": {
+        "layout": {
+          "has_resultant": true,
+          "has_distributed": true,
+          "payload_size": 972,
+          "modules": [
+            {
+              "name": "Thumb-Middle",
+              "points": 25,
+              "place": "thumb_pad",
+              "model": "PXSR-STDIP03B"
+            },
+            {
+              "name": "Thumb-Tip",
+              "points": 52,
+              "place": "thumb_tip",
+              "model": "PXSR-STDDP03G"
+            },
+            {
+              "name": "Index-Middle",
+              "points": 25,
+              "place": "index_pad",
+              "model": "PXSR-STDIP03B"
+            },
+            {
+              "name": "Index-Tip",
+              "points": 52,
+              "place": "index_tip",
+              "model": "PXSR-STDDP03G"
+            },
+            {
+              "name": "Middle-Middle",
+              "points": 25,
+              "place": "middle_pad",
+              "model": "PXSR-STDIP03B"
+            },
+            {
+              "name": "Middle-Tip",
+              "points": 52,
+              "place": "middle_tip",
+              "model": "PXSR-STDDP03G"
+            },
+            {
+              "name": "Little-Middle",
+              "points": 25,
+              "place": "ring_pad",
+              "model": "PXSR-STDIP03B"
+            },
+            {
+              "name": "Little-Tip",
+              "points": 52,
+              "place": "ring_tip",
+              "model": "PXSR-STDDP03G"
+            }
+          ]
+        },
+        "firmware": "ADAPTER_FW02.26",
+        "port": "/dev/serial/by-id/usb-PaxiniAdapte3_Paxini__Adapter_56226A779988-if00"
+      },
+      "stats": {
+        "count": 6548,
+        "hz": 90.85,
+        "max_gap_ms": 34.11,
+        "missed": 0
+      },
+      "counters": {
+        "subscriber_errors": 0,
+        "bad_frames": 0,
+        "device_errors": 0
+      }
+    },
+    "cam_wrist": {
+      "name": "cam_wrist",
+      "kind": "video",
+      "fields": {
+        "image": {
+          "shape": [
+            240,
+            424,
+            3
+          ],
+          "dtype": "uint8",
+          "unit": "BGR"
+        },
+        "ts_domain": {
+          "shape": [],
+          "dtype": "int8",
+          "unit": "RealSense timestamp domain"
+        }
+      },
+      "nominal_hz": 30.0,
+      "required": true,
+      "src_clock": "host_wall",
+      "meta": {
+        "rotation_deg": 90,
+        "width": 424,
+        "height": 240,
+        "serial": "335122272125",
+        "model": "RealSense D405",
+        "usb": "2.1",
+        "exposure_us": 0
+      },
+      "stats": {
+        "count": 2164,
+        "hz": 30.03,
+        "max_gap_ms": 55.87,
+        "missed": 0,
+        "dropped_write": 0,
+        "failed_write": 0
+      },
+      "counters": {
+        "subscriber_errors": 0
+      }
+    }
+  },
+  "end_ns": 7599933608202,
+  "duration_s": 71.07
+}

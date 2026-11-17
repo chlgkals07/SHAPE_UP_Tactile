@@ -1,0 +1,144 @@
+{
+  "format": 1,
+  "recorder_version": "0.1.0",
+  "git_commit": "b29e7b2",
+  "created": {
+    "mono_ns": 13725815524834,
+    "wall_ns": 1794915341810658507
+  },
+  "task": "sync_test",
+  "text": "sync test",
+  "operator": "hamin",
+  "rig": "omy_f3m_leap",
+  "mount": "wrist_flip",
+  "config": {
+    "rig_name": "omy_f3m_leap",
+    "mount": "wrist_flip",
+    "data_root": "/home/jiwoo/data/shape_up",
+    "streams": {
+      "arm_state": {
+        "router": "10.42.0.241:7447",
+        "domain_id": 30,
+        "required": true,
+        "type": "arm_zenoh",
+        "message": "joint_state",
+        "topic": "/joint_states",
+        "joints": [
+          "joint1",
+          "joint2",
+          "joint3",
+          "joint4",
+          "joint5",
+          "joint6"
+        ],
+        "hz": 400
+      },
+      "arm_action": {
+        "router": "10.42.0.241:7447",
+        "domain_id": 30,
+        "required": true,
+        "type": "arm_zenoh",
+        "message": "joint_trajectory",
+        "topic": "/leader/joint_trajectory",
+        "joints": [
+          "joint1",
+          "joint2",
+          "joint3",
+          "joint4",
+          "joint5",
+          "joint6"
+        ],
+        "hz": 300
+      },
+      "hand": {
+        "host": "127.0.0.1",
+        "port": 47800,
+        "glove": true,
+        "required": true,
+        "type": "hand_udp",
+        "hz": 50
+      },
+      "tactile_a": {
+        "baudrate": 921600,
+        "required": true,
+        "type": "paxini",
+        "port": "/dev/serial/by-id/usb-PaxiniAdapte3_Paxini__Adapter_56226A779988-if00",
+        "hz": 90,
+        "places": {
+          "Thumb-Tip": "thumb_tip",
+          "Thumb-Middle": "thumb_pad",
+          "Index-Tip": "index_tip",
+          "Index-Middle": "index_pad",
+          "Middle-Tip": "middle_tip",
+          "Middle-Middle": "middle_pad",
+          "Little-Tip": "ring_tip",
+          "Little-Middle": "ring_pad"
+        }
+      },
+      "cam_wrist": {
+        "serial": "335122272125",
+        "rotation_deg": 90,
+        "exposure_us": 0,
+        "required": true,
+        "type": "realsense",
+        "width": 424,
+        "height": 240,
+        "fps": 30
+      }
+    },
+    "record": {
+      "preroll_s": 1.0,
+      "time_limit_s": 0,
+      "jpeg_quality": 95,
+      "min_free_gb": 5,
+      "flush_s": 5,
+      "zero_timeout_s": 3
+    },
+    "session": {
+      "task": "sync_test",
+      "text": "sync test",
+      "operator": "hamin"
+    },
+    "dataset": {
+      "fps": 30,
+      "robot_type": "omy_f3m_leap",
+      "arm_state": "arm_state",
+      "arm_action": "arm_action",
+      "hand": "hand",
+      "arm_dof": 6,
+      "hand_action": "sent",
+      "tactile": [
+        "tactile_a"
+      ],
+      "tactile_order": [
+        "thumb_tip",
+        "thumb_pad",
+        "index_tip",
+        "index_pad",
+        "middle_tip",
+        "middle_pad",
+        "ring_tip",
+        "ring_pad"
+      ],
+      "tactile_hr": 3,
+      "tactile_hr_distributed": false,
+      "cameras": [
+        "cam_wrist"
+      ],
+      "max_staleness_ms": 150,
+      "time": {
+        "hand": "src",
+        "tactile_a": "respread"
+      },
+      "latency_ms": {}
+    },
+    "ui": {
+      "host": "127.0.0.1",
+      "port": 8800,
+      "preview_hz": 15,
+      "preview_width": 800,
+      "shutdown_timeout_s": 2
+    },
+    "source": "config/rig.yaml"
+  }
+}

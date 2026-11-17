@@ -1,0 +1,10 @@
+{"t_ns": 7528865572928, "type": "record_start", "episode": 1}
+{"t_ns": 7530473728764, "type": "dropout", "stream": "arm_state", "status": "stale"}
+{"t_ns": 7530473734552, "type": "dropout", "stream": "arm_action", "status": "stale"}
+{"t_ns": 7536584396616, "type": "recovered", "stream": "arm_state"}
+{"t_ns": 7536584399498, "type": "recovered", "stream": "arm_action"}
+{"t_ns": 7538625013425, "type": "dropout", "stream": "arm_state", "status": "stale"}
+{"t_ns": 7538625017212, "type": "dropout", "stream": "arm_action", "status": "stale"}
+{"t_ns": 7541477224376, "type": "recovered", "stream": "arm_state"}
+{"t_ns": 7541477229226, "type": "recovered", "stream": "arm_action"}
+{"t_ns": 7599933627031, "type": "record_stop", "episode": 1}
