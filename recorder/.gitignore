@@ -1,0 +1,7 @@
+.venv/
+data_fake/
+__pycache__/
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+config/rig.yaml

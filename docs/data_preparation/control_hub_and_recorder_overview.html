@@ -1,0 +1,1197 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Control Hub + 녹화기 구조</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1b2330; --ink2: #47525f; --muted: #6b7682; --line: #dde2e8;
+  --accent: #1f5fbf; --accent-bg: #e8f0fc; --ok: #1a7f4b; --warn: #a15c00; --warn-bg: #fff4dd;
+  --bad: #b3261e; --bad-bg: #fdeceb; --code-bg: #f0f2f5; --new: #0b6b5c; --new-bg: #e3f5f1;
+  --side: 250px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12161c; --panel: #1a2029; --ink: #e6eaf0; --ink2: #b9c2cd; --muted: #8b96a3; --line: #2c3541;
+    --accent: #7fb0ff; --accent-bg: #1c2a40; --ok: #5fcf95; --warn: #f0b860; --warn-bg: #3a2c12;
+    --bad: #ff8d85; --bad-bg: #3d1c1a; --code-bg: #212833; --new: #6fd6c3; --new-bg: #153530;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.65;
+  font: 15.5px/1.65 -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; }
+code, pre, kbd { font-family: ui-monospace, "SF Mono", Menlo, Consolas, "D2Coding", monospace; font-size: 13.5px; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+pre { background: var(--code-bg); padding: 12px 14px; border-radius: 8px; overflow-x: auto; line-height: 1.5; margin: 10px 0; }
+pre code { background: none; padding: 0; overflow-wrap: normal; }
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--panel); }
+a { color: var(--accent); }
+h1 { font-size: 26px; margin: 0 0 6px; line-height: 1.3; }
+h2 { font-size: 20px; margin: 34px 0 10px; padding-top: 6px; }
+h3 { font-size: 16.5px; margin: 24px 0 8px; }
+p { margin: 8px 0; }
+ul, ol { margin: 8px 0; padding-left: 22px; }
+li { margin: 3px 0; }
+.app { display: grid; grid-template-columns: var(--side) minmax(0, 1fr); min-height: 100vh; }
+.side { position: sticky; top: 0; height: 100vh; overflow-y: auto; border-right: 1px solid var(--line);
+  background: var(--panel); padding: 18px 12px; }
+.side .brand { font-weight: 700; font-size: 16px; padding: 0 8px 4px; }
+.side .sub { color: var(--muted); font-size: 12.5px; padding: 0 8px 12px; }
+.side a { display: block; padding: 6px 10px; border-radius: 6px; color: var(--ink2); text-decoration: none; font-size: 14.5px; }
+.side a:hover { background: var(--code-bg); }
+.side a.on { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+.side .grp { margin: 14px 8px 4px; font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+.side button { margin: 14px 8px 0; font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink2); cursor: pointer; }
+main { padding: 26px 34px 80px; max-width: 1120px; min-width: 0; }
+section.page { display: none; }
+section.page.on, body.all section.page { display: block; }
+body.all section.page { border-bottom: 1px solid var(--line); padding-bottom: 30px; margin-bottom: 30px; }
+.lead { color: var(--ink2); font-size: 16.5px; margin: 4px 0 18px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 14px 0; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin: 14px 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+.card h3 { margin: 0 0 4px; font-size: 15.5px; }
+.card p { margin: 4px 0; color: var(--ink2); font-size: 14.5px; }
+.card .port { color: var(--muted); font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14.5px; display: block; overflow-x: auto; }
+th, td { border-bottom: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 13.5px; white-space: nowrap; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+figure { margin: 16px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+figcaption { color: var(--muted); font-size: 13.5px; margin-top: 8px; }
+svg.fig { width: 100%; height: auto; display: block; }
+svg.fig text { font-family: inherit; }
+.grp { fill: none; stroke: var(--line); stroke-width: 1.5; stroke-dasharray: 6 4; }
+.grp-t { font-size: 12.5px; fill: var(--muted); font-weight: 600; }
+.bx { fill: var(--panel); stroke: var(--muted); stroke-width: 1.2; }
+.bx.ours { fill: var(--accent-bg); stroke: var(--accent); stroke-width: 1.6; }
+.bx.dev { fill: var(--code-bg); stroke: var(--muted); }
+.bx.store { fill: var(--warn-bg); stroke: var(--warn); }
+.bx.inner { fill: var(--panel); stroke: var(--accent); }
+.bx.ghost { stroke-dasharray: 4 3; opacity: .7; }
+.bx-t { font-size: 13px; font-weight: 600; fill: var(--ink); text-anchor: middle; }
+.bx-s { font-size: 11.5px; fill: var(--ink2); text-anchor: middle; }
+text.bx-t[text-anchor="start"], text.bx-s[text-anchor="start"] { text-anchor: start; }
+text.bx-s[text-anchor="end"] { text-anchor: end; }
+.ar { fill: none; stroke: var(--ink2); stroke-width: 1.5; }
+.ar.d { stroke: var(--accent); stroke-dasharray: 5 4; }
+.ah { fill: var(--ink2); } .ah.d { fill: var(--accent); }
+.lb { font-size: 11.5px; fill: var(--ink2); }
+.lb-bg { fill: var(--panel); opacity: .92; }
+.grid { stroke: var(--accent); stroke-width: 1.2; stroke-dasharray: 3 4; }
+.axis { stroke: var(--line); stroke-width: 2; }
+.smp { fill: var(--panel); stroke: var(--muted); stroke-width: 1.4; }
+.smp.on { fill: var(--accent); stroke: var(--accent); }
+.pick { fill: none; stroke: var(--accent); stroke-width: 1.2; }
+details { background: var(--panel); border: 1px solid var(--line); border-radius: 9px; margin: 8px 0; }
+details > summary { cursor: pointer; padding: 9px 14px; font-weight: 600; list-style: none; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before { content: "▸"; color: var(--muted); font-weight: 400; }
+details[open] > summary::before { content: "▾"; }
+details > .body { padding: 2px 16px 14px; border-top: 1px solid var(--line); }
+.tag { font-size: 12px; font-weight: 600; padding: 0 8px; border-radius: 10px; border: 1px solid currentColor; white-space: nowrap; }
+.tag.where { color: var(--muted); } .tag.tool { color: var(--accent); } .tag.risk { color: var(--bad); }
+.tag.new { color: var(--new); } .tag.field { color: var(--warn); }
+.sum-note { font-weight: 400; color: var(--muted); font-size: 13.5px; }
+.changed { border-left: 4px solid var(--new); background: var(--new-bg); border-radius: 0 8px 8px 0; padding: 10px 14px; margin: 14px 0; }
+.changed > b:first-child { color: var(--new); }
+.note { border-left: 4px solid var(--warn); background: var(--warn-bg); border-radius: 0 8px 8px 0; padding: 10px 14px; margin: 14px 0; }
+.danger { border-left: 4px solid var(--bad); background: var(--bad-bg); border-radius: 0 8px 8px 0; padding: 10px 14px; margin: 14px 0; }
+.why { border-left: 4px solid var(--accent); background: var(--accent-bg); border-radius: 0 8px 8px 0; padding: 10px 14px; margin: 14px 0; }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin: 8px 0; font-size: 14.5px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; }
+.tree { white-space: pre; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.55; overflow-x: auto; }
+.tree .c { color: var(--muted); }
+.steps { counter-reset: s; list-style: none; padding: 0; }
+.steps > li { counter-increment: s; position: relative; padding: 2px 0 2px 38px; margin: 6px 0; }
+.steps > li::before { content: counter(s); position: absolute; left: 0; top: 2px; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent-bg); color: var(--accent); font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+.steps > li.human::before { content: "✋"; background: var(--warn-bg); }
+.check label { display: block; position: relative; padding: 3px 0 3px 26px; }
+.check input { position: absolute; left: 2px; top: 8px; }
+.next { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 14.5px; }
+.filter { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--ink); width: min(360px, 100%); }
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  .side { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+  main { padding: 18px 16px 60px; }
+}
+@media print { .side, .next { display: none; } .app { display: block; } section.page { display: block !important; } details > .body { display: block; } }
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side">
+  <div class="brand">Control Hub + 녹화기</div>
+  <div class="sub">구조와 근거, 현장 시험 가이드<br>2026-11-16 · feat/control-hub-and-recorder</div>
+  <nav id="nav">
+    <a href="#overview">개요</a>
+    <a href="#arch">전체 구조와 통신</a>
+    <a href="#tree">폴더 구조</a>
+    <div class="grp">녹화</div>
+    <a href="#rec">녹화기</a>
+    <a href="#time">시간 맞추기 (이론)</a>
+    <a href="#latency">지연 실측 실험</a>
+    <a href="#conv">변환기</a>
+    <a href="#teleop">텔레옵과의 연결</a>
+    <div class="grp">운영</div>
+    <a href="#hub">Control Hub</a>
+    <a href="#hubcmd">버튼과 명령</a>
+    <a href="#ui">한 화면에서 쓰기</a>
+    <div class="grp">배경과 시험</div>
+    <a href="#cyclo">Cyclo 와 다른 녹화 경로</a>
+    <a href="#review">리뷰 뒤 고친 것</a>
+    <a href="#field">실물 시험 가이드</a>
+    <a href="#ref">설정과 미검증 목록</a>
+    <a href="#biblio">참고 자료</a>
+  </nav>
+  <button id="all-btn" type="button">전체 펼쳐 보기</button>
+</aside>
+<main>
+
+<!-- ============================================================ 개요 -->
+<section class="page" id="overview">
+<h1>Control Hub + 녹화기</h1>
+<p class="lead">OMY 팔, LEAP Hand, Paxini 촉각, 손목 카메라를 한 시간축으로 기록해 LeRobot 데이터셋을 만드는 두 프로그램과, 그 둘이 텔레옵에 붙는 방식을 정리한다.</p>
+
+<div class="cards">
+  <div class="card"><h3>녹화기 <code>recorder/</code></h3><p>모든 센서를 이 PC 의 시계 하나로 시각을 찍어 원본 그대로 저장한다. 정렬과 리샘플은 나중에 변환기가 한다.</p><p class="port">명령 <code>tactile-rec</code> · 화면 :8800 · ROS 없음</p></div>
+  <div class="card"><h3>Control Hub <code>control_hub/</code></h3><p>터미널 여러 개에 붙여 넣던 명령을 버튼으로 켜고 끈다. 프로세스는 tmux 가 붙들고, hub 는 리모컨이다.</p><p class="port">명령 <code>control-hub</code> · 화면 :8700</p></div>
+  <div class="card"><h3>텔레옵 <code>user_pc/</code></h3><p>글러브 → 리타게팅 → LEAP. 기존 프로그램이고, 녹화기에 손 값을 보내는 출력 하나(<code>--record-udp</code>)가 붙었다.</p><p class="port">명령 <code>leap-teleop</code> · 50 Hz 루프</p></div>
+</div>
+
+<figure><svg class="fig" viewBox="0 0 1000 560" role="img" aria-label="전체 구성: Robot PC, 장치, User PC 의 프로세스와 통신"><title>전체 구성: Robot PC, 장치, User PC 의 프로세스와 통신</title><defs><marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0L10,5L0,10z"/></marker><marker id="ah1d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah d" d="M0,0L10,5L0,10z"/></marker></defs><rect class="grp" x="16" y="16" width="290" height="190" rx="10"/><text class="grp-t" x="28" y="36">Robot PC (OMY 본체 · Docker · ROS 2 Jazzy)</text><rect class="bx proc" x="32" y="48" width="258" height="46" rx="7"/><text class="bx-t" x="161.0" y="67">zenohd</text><text class="bx-s" x="161.0" y="83">zenoh 라우터 :7447</text><rect class="bx proc" x="32" y="106" width="258" height="84" rx="7"/><text class="bx-t" x="161.0" y="136">omy_ai_wrist_flip (팔 bringup)</text><text class="bx-s" x="161.0" y="152">follower → /joint_states</text><text class="bx-s" x="161.0" y="168">leader → /leader/joint_trajectory</text><rect class="grp" x="16" y="226" width="290" height="318" rx="10"/><text class="grp-t" x="28" y="246">장치</text><rect class="bx dev" x="32" y="258" width="258" height="44" rx="7"/><text class="bx-t" x="161.0" y="276">Manus 글러브</text><text class="bx-s" x="161.0" y="292">동글 USB</text><rect class="bx dev" x="32" y="314" width="258" height="44" rx="7"/><text class="bx-t" x="161.0" y="332">LEAP Hand</text><text class="bx-s" x="161.0" y="348">모터 16개 · /dev/ttyUSB0 · 5V</text><rect class="bx dev" x="32" y="370" width="258" height="52" rx="7"/><text class="bx-t" x="161.0" y="392">Paxini 보드 ×2</text><text class="bx-s" x="161.0" y="408">/dev/ttyACM0·1 · 보드당 센서 4개</text><rect class="bx dev" x="32" y="434" width="258" height="44" rx="7"/><text class="bx-t" x="161.0" y="452">RealSense D405</text><text class="bx-s" x="161.0" y="468">손목 카메라 · USB</text><rect class="bx dev ghost" x="32" y="490" width="258" height="40" rx="7"/><text class="bx-t" x="161.0" y="514">외부 카메라 (예정)</text><rect class="grp" x="340" y="16" width="644" height="528" rx="10"/><text class="grp-t" x="352" y="36">User PC (Ubuntu · ROS 2 Humble + Python venv)</text><rect class="bx ours" x="360" y="48" width="490" height="50" rx="7"/><text class="bx-t" x="605.0" y="69">Control Hub  :8700</text><text class="bx-s" x="605.0" y="85">tmux 창으로 프로세스를 켜고 끄고, 로그와 장치를 본다</text><rect class="bx dev" x="872" y="48" width="96" height="50" rx="7"/><text class="bx-t" x="920.0" y="77">브라우저</text><rect class="bx proc" x="360" y="256" width="190" height="48" rx="7"/><text class="bx-t" x="455.0" y="276">Manus 노드</text><text class="bx-s" x="455.0" y="292">/manus_glove_0 약 120 Hz</text><rect class="bx proc" x="360" y="320" width="190" height="62" rx="7"/><text class="bx-t" x="455.0" y="339">leap_teleop</text><text class="bx-s" x="455.0" y="355">50 Hz 제어 루프</text><text class="bx-s" x="455.0" y="371">--record-udp</text><rect class="bx ours" x="600" y="130" width="250" height="360" rx="7"/><text class="bx-t" x="725.0" y="314"></text><text class="bx-t" x="725" y="152" text-anchor="middle">녹화기 tactile-rec  :8800</text><rect class="bx inner" x="612" y="168" width="130" height="32" rx="7"/><text class="bx-t" x="677.0" y="188">arm_zenoh ×2</text><rect class="bx inner" x="612" y="332" width="130" height="32" rx="7"/><text class="bx-t" x="677.0" y="352">hand_udp (+glove)</text><rect class="bx inner" x="612" y="384" width="130" height="32" rx="7"/><text class="bx-t" x="677.0" y="404">paxini ×2</text><rect class="bx inner" x="612" y="440" width="130" height="32" rx="7"/><text class="bx-t" x="677.0" y="460">realsense</text><text class="bx-t" x="796" y="238" text-anchor="middle">Hub</text><text class="bx-s" x="796" y="256" text-anchor="middle">한 시계로 시각 기록</text><text class="bx-t" x="796" y="290" text-anchor="middle">Recorder</text><text class="bx-s" x="796" y="308" text-anchor="middle">에피소드 기록</text><text class="bx-t" x="796" y="342" text-anchor="middle">웹 UI</text><text class="bx-s" x="796" y="360" text-anchor="middle">상태 · 미리보기</text><rect class="bx store" x="872" y="286" width="96" height="60" rx="7"/><text class="bx-t" x="920.0" y="312">data_root</text><text class="bx-s" x="920.0" y="328">ep_NNNN/</text><polyline class="ar " points="290,71 322,71 322,184 612,184" marker-end="url(#ah1)"/><rect class="lb-bg" x="370" y="166" width="199" height="16" rx="3"/><text class="lb" x="470" y="178" text-anchor="middle">TCP :7447 · zenoh (ROS 없이 구독)</text><polyline class="ar " points="290,280 360,280" marker-end="url(#ah1)"/><rect class="lb-bg" x="311" y="262" width="28" height="16" rx="3"/><text class="lb" x="325" y="274" text-anchor="middle">USB</text><polyline class="ar " points="455,304 455,320" marker-end="url(#ah1)"/><rect class="lb-bg" x="470" y="304" width="61" height="16" rx="3"/><text class="lb" x="500" y="316" text-anchor="middle">ROS 2 토픽</text><polyline class="ar " points="360,345 290,338" marker-end="url(#ah1)"/><rect class="lb-bg" x="291" y="320" width="67" height="16" rx="3"/><text class="lb" x="325" y="332" text-anchor="middle">Dynamixel</text><polyline class="ar " points="550,351 612,349" marker-end="url(#ah1)"/><rect class="lb-bg" x="546" y="306" width="67" height="16" rx="3"/><text class="lb" x="580" y="318" text-anchor="middle">UDP 47800</text><polyline class="ar " points="290,398 612,400" marker-end="url(#ah1)"/><rect class="lb-bg" x="347" y="402" width="206" height="16" rx="3"/><text class="lb" x="450" y="414" text-anchor="middle">USB serial · 약 90 Hz auto-push</text><polyline class="ar " points="290,456 612,456" marker-end="url(#ah1)"/><rect class="lb-bg" x="383" y="460" width="133" height="16" rx="3"/><text class="lb" x="450" y="472" text-anchor="middle">USB · 컬러 프레임 30 fps</text><polyline class="ar " points="850,316 872,316" marker-end="url(#ah1)"/><polyline class="ar " points="850,73 872,73" marker-end="url(#ah1)"/><polyline class="ar " points="826,130 900,98" marker-end="url(#ah1)"/><rect class="lb-bg" x="858" y="110" width="41" height="16" rx="3"/><text class="lb" x="878" y="122" text-anchor="middle">:8800</text><polyline class="ar d" points="455,98 455,256" marker-end="url(#ah1d)"/><rect class="lb-bg" x="411" y="210" width="87" height="16" rx="3"/><text class="lb" x="455" y="222" text-anchor="middle">켜기 · 끄기 · 로그</text><polyline class="ar d" points="690,98 690,130" marker-end="url(#ah1d)"/><polyline class="ar d" points="360,62 290,62" marker-end="url(#ah1d)"/><rect class="lb-bg" x="310" y="42" width="28" height="16" rx="3"/><text class="lb" x="324" y="54" text-anchor="middle">ssh</text></svg><figcaption>그림 1. 전체 구성. 실선은 데이터가 흐르는 길, 파란 점선은 Control Hub 가 프로세스를 켜고 끄는 길이다. 파란 상자가 이 브랜치의 두 프로그램이다.</figcaption></figure>
+
+<h2>세 줄 요약</h2>
+<ol>
+  <li><b>녹화기는 ROS 를 쓰지 않는 Python 프로세스 하나다.</b> 팔은 zenoh 로, 손은 localhost UDP 로, 촉각은 serial 로, 카메라는 USB 로 직접 받는다. 받는 순간 <code>CLOCK_MONOTONIC</code> 으로 시각을 찍는다.</li>
+  <li><b>기록은 원본, 데이터셋은 변환.</b> 에피소드 폴더에는 센서가 보낸 그대로(촉각 90 Hz 전부, 영상은 프레임별 JPEG)가 들어간다. 30 fps 격자에 맞추는 일은 <code>tactile-rec convert</code> 가 하고, 같은 원본에서 설정을 바꿔 다시 뽑을 수 있다.</li>
+  <li><b>Control Hub 는 두 프로그램과 텔레옵, Robot PC 의 프로세스를 한 화면에서 순서대로 켜는 도구다.</b> 녹화기도 hub 가 켜는 프로세스 하나이고, hub 의 "녹화" 메뉴 안에서 녹화기 화면이 그대로 열린다.</li>
+</ol>
+
+<h2>두 프로그램의 관계</h2>
+<table>
+<tr><th></th><th>녹화기</th><th>Control Hub</th></tr>
+<tr><td>하는 일</td><td>센서 수집, 에피소드 기록, 변환</td><td>프로세스 켜기·끄기, 점검, 로그와 사고 기록</td></tr>
+<tr><td>없으면</td><td>데이터가 안 생긴다</td><td>터미널에서 손으로 켜면 된다. 녹화는 그대로 된다</td></tr>
+<tr><td>서로 아는 것</td><td>hub 를 모른다. 스트림 상태가 바뀔 때 로그에 한 줄을 찍을 뿐이다</td><td>녹화기를 프로세스 하나로 켜고, 그 로그 줄을 읽어 장치 칸에 표시하고, :8800 화면을 안에 띄운다</td></tr>
+<tr><td>설정 파일</td><td><code>recorder/config/rig.yaml</code></td><td><code>control_hub/config/hub.yaml</code></td></tr>
+<tr><td>코드 의존</td><td colspan="2">없다. 패키지가 서로를 import 하지 않는다. 접점은 로그 한 줄의 형식과 포트 번호 둘뿐이다</td></tr>
+</table>
+
+<div class="changed"><b>이 문서가 다루는 브랜치</b> <code>feat/control-hub-and-recorder</code>. <code>feat/recorder</code> 위에 리뷰 수정 4묶음을 얹고 <code>feat/control-hub</code> 를 합쳤다. 무엇을 왜 고쳤는지는 각 장의 초록색 상자와 <a href="#review">리뷰 뒤 고친 것</a>에 있다.</div>
+
+<div class="note"><b>검증 범위.</b> 두 프로그램 모두 가짜 장치와 자동 시험으로 확인했다. 실물(팔, LEAP, Paxini, 카메라)에서 확인하지 않은 것은 이 문서에서 <span class="tag field">현장 미검증</span> 으로 표시한다. 확인 순서는 <a href="#field">실물 시험 가이드</a>에 있다.</div>
+<div class="next"><span></span><a href="#arch">전체 구조와 통신 →</a></div>
+</section>
+
+<!-- ============================================================ 구조 -->
+<section class="page" id="arch">
+<h1>전체 구조와 통신</h1>
+<p class="lead">PC 두 대, 프로세스 여섯 종류, 통신 방식 다섯 가지. 무엇이 어디서 돌고 무엇으로 이어지는지.</p>
+<figure><svg class="fig" viewBox="0 0 1000 560" role="img" aria-label="전체 구성: Robot PC, 장치, User PC 의 프로세스와 통신"><title>전체 구성: Robot PC, 장치, User PC 의 프로세스와 통신</title><defs><marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0L10,5L0,10z"/></marker><marker id="ah1d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah d" d="M0,0L10,5L0,10z"/></marker></defs><rect class="grp" x="16" y="16" width="290" height="190" rx="10"/><text class="grp-t" x="28" y="36">Robot PC (OMY 본체 · Docker · ROS 2 Jazzy)</text><rect class="bx proc" x="32" y="48" width="258" height="46" rx="7"/><text class="bx-t" x="161.0" y="67">zenohd</text><text class="bx-s" x="161.0" y="83">zenoh 라우터 :7447</text><rect class="bx proc" x="32" y="106" width="258" height="84" rx="7"/><text class="bx-t" x="161.0" y="136">omy_ai_wrist_flip (팔 bringup)</text><text class="bx-s" x="161.0" y="152">follower → /joint_states</text><text class="bx-s" x="161.0" y="168">leader → /leader/joint_trajectory</text><rect class="grp" x="16" y="226" width="290" height="318" rx="10"/><text class="grp-t" x="28" y="246">장치</text><rect class="bx dev" x="32" y="258" width="258" height="44" rx="7"/><text class="bx-t" x="161.0" y="276">Manus 글러브</text><text class="bx-s" x="161.0" y="292">동글 USB</text><rect class="bx dev" x="32" y="314" width="258" height="44" rx="7"/><text class="bx-t" x="161.0" y="332">LEAP Hand</text><text class="bx-s" x="161.0" y="348">모터 16개 · /dev/ttyUSB0 · 5V</text><rect class="bx dev" x="32" y="370" width="258" height="52" rx="7"/><text class="bx-t" x="161.0" y="392">Paxini 보드 ×2</text><text class="bx-s" x="161.0" y="408">/dev/ttyACM0·1 · 보드당 센서 4개</text><rect class="bx dev" x="32" y="434" width="258" height="44" rx="7"/><text class="bx-t" x="161.0" y="452">RealSense D405</text><text class="bx-s" x="161.0" y="468">손목 카메라 · USB</text><rect class="bx dev ghost" x="32" y="490" width="258" height="40" rx="7"/><text class="bx-t" x="161.0" y="514">외부 카메라 (예정)</text><rect class="grp" x="340" y="16" width="644" height="528" rx="10"/><text class="grp-t" x="352" y="36">User PC (Ubuntu · ROS 2 Humble + Python venv)</text><rect class="bx ours" x="360" y="48" width="490" height="50" rx="7"/><text class="bx-t" x="605.0" y="69">Control Hub  :8700</text><text class="bx-s" x="605.0" y="85">tmux 창으로 프로세스를 켜고 끄고, 로그와 장치를 본다</text><rect class="bx dev" x="872" y="48" width="96" height="50" rx="7"/><text class="bx-t" x="920.0" y="77">브라우저</text><rect class="bx proc" x="360" y="256" width="190" height="48" rx="7"/><text class="bx-t" x="455.0" y="276">Manus 노드</text><text class="bx-s" x="455.0" y="292">/manus_glove_0 약 120 Hz</text><rect class="bx proc" x="360" y="320" width="190" height="62" rx="7"/><text class="bx-t" x="455.0" y="339">leap_teleop</text><text class="bx-s" x="455.0" y="355">50 Hz 제어 루프</text><text class="bx-s" x="455.0" y="371">--record-udp</text><rect class="bx ours" x="600" y="130" width="250" height="360" rx="7"/><text class="bx-t" x="725.0" y="314"></text><text class="bx-t" x="725" y="152" text-anchor="middle">녹화기 tactile-rec  :8800</text><rect class="bx inner" x="612" y="168" width="130" height="32" rx="7"/><text class="bx-t" x="677.0" y="188">arm_zenoh ×2</text><rect class="bx inner" x="612" y="332" width="130" height="32" rx="7"/><text class="bx-t" x="677.0" y="352">hand_udp (+glove)</text><rect class="bx inner" x="612" y="384" width="130" height="32" rx="7"/><text class="bx-t" x="677.0" y="404">paxini ×2</text><rect class="bx inner" x="612" y="440" width="130" height="32" rx="7"/><text class="bx-t" x="677.0" y="460">realsense</text><text class="bx-t" x="796" y="238" text-anchor="middle">Hub</text><text class="bx-s" x="796" y="256" text-anchor="middle">한 시계로 시각 기록</text><text class="bx-t" x="796" y="290" text-anchor="middle">Recorder</text><text class="bx-s" x="796" y="308" text-anchor="middle">에피소드 기록</text><text class="bx-t" x="796" y="342" text-anchor="middle">웹 UI</text><text class="bx-s" x="796" y="360" text-anchor="middle">상태 · 미리보기</text><rect class="bx store" x="872" y="286" width="96" height="60" rx="7"/><text class="bx-t" x="920.0" y="312">data_root</text><text class="bx-s" x="920.0" y="328">ep_NNNN/</text><polyline class="ar " points="290,71 322,71 322,184 612,184" marker-end="url(#ah1)"/><rect class="lb-bg" x="370" y="166" width="199" height="16" rx="3"/><text class="lb" x="470" y="178" text-anchor="middle">TCP :7447 · zenoh (ROS 없이 구독)</text><polyline class="ar " points="290,280 360,280" marker-end="url(#ah1)"/><rect class="lb-bg" x="311" y="262" width="28" height="16" rx="3"/><text class="lb" x="325" y="274" text-anchor="middle">USB</text><polyline class="ar " points="455,304 455,320" marker-end="url(#ah1)"/><rect class="lb-bg" x="470" y="304" width="61" height="16" rx="3"/><text class="lb" x="500" y="316" text-anchor="middle">ROS 2 토픽</text><polyline class="ar " points="360,345 290,338" marker-end="url(#ah1)"/><rect class="lb-bg" x="291" y="320" width="67" height="16" rx="3"/><text class="lb" x="325" y="332" text-anchor="middle">Dynamixel</text><polyline class="ar " points="550,351 612,349" marker-end="url(#ah1)"/><rect class="lb-bg" x="546" y="306" width="67" height="16" rx="3"/><text class="lb" x="580" y="318" text-anchor="middle">UDP 47800</text><polyline class="ar " points="290,398 612,400" marker-end="url(#ah1)"/><rect class="lb-bg" x="347" y="402" width="206" height="16" rx="3"/><text class="lb" x="450" y="414" text-anchor="middle">USB serial · 약 90 Hz auto-push</text><polyline class="ar " points="290,456 612,456" marker-end="url(#ah1)"/><rect class="lb-bg" x="383" y="460" width="133" height="16" rx="3"/><text class="lb" x="450" y="472" text-anchor="middle">USB · 컬러 프레임 30 fps</text><polyline class="ar " points="850,316 872,316" marker-end="url(#ah1)"/><polyline class="ar " points="850,73 872,73" marker-end="url(#ah1)"/><polyline class="ar " points="826,130 900,98" marker-end="url(#ah1)"/><rect class="lb-bg" x="858" y="110" width="41" height="16" rx="3"/><text class="lb" x="878" y="122" text-anchor="middle">:8800</text><polyline class="ar d" points="455,98 455,256" marker-end="url(#ah1d)"/><rect class="lb-bg" x="411" y="210" width="87" height="16" rx="3"/><text class="lb" x="455" y="222" text-anchor="middle">켜기 · 끄기 · 로그</text><polyline class="ar d" points="690,98 690,130" marker-end="url(#ah1d)"/><polyline class="ar d" points="360,62 290,62" marker-end="url(#ah1d)"/><rect class="lb-bg" x="310" y="42" width="28" height="16" rx="3"/><text class="lb" x="324" y="54" text-anchor="middle">ssh</text></svg><figcaption>그림 1 (다시). Robot PC 에는 아무것도 설치하지 않는다. hub 는 ssh 로 들어가 컨테이너 안에서 명령을 실행한다.</figcaption></figure>
+
+<h2>어디서 무엇이 도는가</h2>
+<table>
+<tr><th>프로세스</th><th>위치</th><th>환경</th><th>하는 일</th></tr>
+<tr><td><code>zenohd</code></td><td>Robot PC 컨테이너</td><td>ROS 2 Jazzy, <code>rmw_zenoh</code>, domain 30</td><td>zenoh 라우터 :7447. 팔 토픽이 여기를 지난다</td></tr>
+<tr><td><code>omy_ai_wrist_flip</code></td><td>Robot PC 컨테이너</td><td>같음</td><td>follower(<code>/joint_states</code>) 와 leader(<code>/leader/joint_trajectory</code>). LEAP 90° 장착용</td></tr>
+<tr><td>Manus 노드</td><td>User PC</td><td>ROS 2 Humble (zenoh 끔)</td><td>글러브 동글 → <code>/manus_glove_0</code></td></tr>
+<tr><td><code>leap_teleop</code></td><td>User PC</td><td>Manus 노드와 같은 ROS 환경</td><td>글러브 → 리타게팅 → LEAP 모터. 녹화기에 UDP 로 손 값을 보낸다</td></tr>
+<tr><td>녹화기</td><td>User PC</td><td>ROS 와 무관한 venv</td><td>모든 스트림 수집과 기록, 화면 :8800</td></tr>
+<tr><td>Control Hub</td><td>User PC</td><td>자기 venv + tmux</td><td>위의 전부를 켜고 끈다, 화면 :8700</td></tr>
+</table>
+
+<h2>통신 표</h2>
+<table>
+<tr><th>무엇</th><th>보내는 쪽 → 받는 쪽</th><th>방식</th><th>주기</th><th>시각 정보</th></tr>
+<tr><td>팔 상태</td><td>follower → 녹화기 <code>arm_state</code></td><td>zenoh TCP :7447. <code>zenoh-ros2-sdk</code> 로 ROS 없이 구독 <span class="tag field">현장 미검증</span></td><td>약 100 Hz (측정해서 설정에 넣는다)</td><td><code>header.stamp</code> = Robot PC 벽시계</td></tr>
+<tr><td>팔 명령</td><td>leader → 녹화기 <code>arm_action</code></td><td>같음</td><td>같음</td><td>stamp 가 0 이면 받은 시각만</td></tr>
+<tr><td>손 명령·상태, 글러브</td><td><code>leap_teleop</code> → 녹화기 <code>hand</code>, <code>glove</code></td><td>UDP <code>127.0.0.1:47800</code>, 틱마다 JSON datagram 하나</td><td>50 Hz</td><td><code>t_ns</code> = 같은 PC 의 <code>CLOCK_MONOTONIC</code></td></tr>
+<tr><td>촉각</td><td>Paxini 보드 → 녹화기 <code>tactile_a</code>, <code>tactile_b</code></td><td>USB serial 921600 baud, 보드가 스스로 밀어 준다(auto-push)</td><td>약 90 Hz</td><td>없음. 받은 시각만</td></tr>
+<tr><td>카메라</td><td>D405 → 녹화기 <code>cam_wrist</code></td><td>USB, <code>pyrealsense2</code> 로 직접 연다</td><td>30 fps</td><td>프레임 시각이 호스트 시계 기준일 때만 쓴다</td></tr>
+<tr><td>프로세스 제어</td><td>hub → tmux 창</td><td><code>tmux send-keys C-c</code>, <code>kill-window</code>, 로그는 <code>pipe-pane</code> 파일</td><td>사람이 누를 때</td><td></td></tr>
+<tr><td>Robot PC 명령</td><td>hub 의 tmux 창 → Robot PC</td><td><code>ssh -tt … docker exec -it …</code></td><td></td><td></td></tr>
+<tr><td>녹화기 상태 → hub</td><td>녹화기 stdout → hub 로그 스캐너</td><td>정해진 형식의 텍스트 한 줄</td><td>상태가 바뀔 때</td><td></td></tr>
+<tr><td>화면</td><td>브라우저 ↔ 녹화기 / hub</td><td>HTTP + WebSocket(녹화기), HTTP polling 1 초(hub)</td><td></td><td></td></tr>
+</table>
+
+<div class="why"><b>왜 팔만 zenoh 인가.</b> 팔 토픽은 Robot PC(Jazzy)에만 있고 User PC 는 Humble 이다. 11/12 현장에서 Humble 의 <code>rmw_zenoh</code> 는 Jazzy 토픽을 목록에서는 보지만 데이터는 0개였다. 그래서 녹화기는 ROS 를 거치지 않고 zenoh 라우터에 직접 붙는다. 이 경로가 실물에서 안 되면 <code>streams/arm_zenoh.py</code> 한 파일만 중계 노드 방식으로 바꾸면 된다(나머지 코드는 <code>Stream</code> 인터페이스만 안다).</div>
+
+<h2>포트와 파일 한눈에</h2>
+<table>
+<tr><th>자원</th><th>누가 쓰나</th><th>겹치면</th></tr>
+<tr><td>TCP 7447 (Robot PC)</td><td>zenohd. 녹화기 <code>arm_*</code>, <code>leap_leader</code> 가 접속</td><td>zenohd 를 두 번 켜면 "Address already in use"</td></tr>
+<tr><td>UDP 47800 (localhost)</td><td><code>leap_teleop --record-udp</code> 가 보내고 녹화기 <code>hand</code> 가 받는다</td><td>확인 도구 <code>check hand</code> / <code>check glove</code> 를 녹화기와 같이 켜면 패킷을 나눠 갖는다. hub 가 conflict 로 막는다</td></tr>
+<tr><td><code>/dev/ttyUSB0</code></td><td>LEAP (텔레옵, <code>leap_check</code>, 영점 도구)</td><td>한 번에 하나만. hub conflicts</td></tr>
+<tr><td><code>/dev/ttyACM0·1</code></td><td>Paxini 보드 (녹화기, <code>check tactile_*</code>)</td><td>같음. 번호는 꽂는 순서에 달려 있다 <span class="tag field">현장 미검증</span></td></tr>
+<tr><td>RealSense</td><td>녹화기 또는 ROS 카메라 노드</td><td>둘이 동시에 못 연다. 녹화 때는 ROS 노드를 끈다</td></tr>
+<tr><td>TCP 8800 / 8700</td><td>녹화기 화면 / hub 화면</td><td>기본은 이 PC 에서만 열린다. <code>0.0.0.0</code> 이면 같은 망에서 열리고 로그인이 없다</td></tr>
+</table>
+<div class="next"><a href="#overview">← 개요</a><a href="#tree">폴더 구조 →</a></div>
+</section>
+
+<!-- ============================================================ 폴더 -->
+<section class="page" id="tree">
+<h1>폴더 구조</h1>
+<p class="lead">세 패키지가 한 레포에 나란히 있다. 화살표 주석은 다른 폴더와 이어지는 지점이다.</p>
+<div class="panel tree">SHAPE_UP_Tactile/
+├─ recorder/                         <b>녹화기</b> (패키지 tactile_rec, 명령 tactile-rec)
+│  ├─ config/rig.example.yaml        <span class="c">장치 구성. rig.yaml 로 복사해서 쓴다. rig.fake.yaml 은 가짜 장치</span>
+│  ├─ src/tactile_rec/
+│  │  ├─ cli.py                      <span class="c">record / check / inspect / tap / replay / convert, 종료 신호</span>
+│  │  ├─ config.py                   <span class="c">rig.yaml 읽기와 검증</span>
+│  │  ├─ clock.py  types.py          <span class="c">CLOCK_MONOTONIC, Sample, StreamSpec</span>
+│  │  ├─ stream.py                   <span class="c">Stream, ThreadedStream, Zeroable, health</span>
+│  │  ├─ hub.py                      <span class="c">스트림 모음. 상태 줄 출력 ──▶ control_hub/logscan.py</span>
+│  │  ├─ streams/
+│  │  │  ├─ arm_zenoh.py             <span class="c">◀── Robot PC zenohd :7447</span>
+│  │  │  ├─ hand_udp.py              <span class="c">◀── user_pc/leap_teleop/record_sink.py (UDP 47800)</span>
+│  │  │  ├─ paxini.py                <span class="c">◀── third_party/paxini SDK (serial)</span>
+│  │  │  ├─ realsense.py  fake.py  specs.py
+│  │  ├─ record/
+│  │  │  ├─ session.py               <span class="c">Recorder 상태 기계, preflight, episode.json</span>
+│  │  │  ├─ writer.py                <span class="c">조각 npz, MJPEG</span>
+│  │  │  └─ recover.py               <span class="c">남은 .tmp 를 에피소드로</span>
+│  │  ├─ convert/
+│  │  │  ├─ load.py  align.py        <span class="c">원본 읽기, 격자와 causal 선택</span>
+│  │  │  ├─ episode.py               <span class="c">한 에피소드 → 스텝 배열과 보고서</span>
+│  │  │  └─ dataset.py               <span class="c">LeRobot v2.1 / npz 로 쓰기</span>
+│  │  ├─ features.py  tactile.py     <span class="c">벡터의 단위·순서, Paxini payload 해석 (변환과 화면이 같이 쓴다)</span>
+│  │  ├─ live.py                     <span class="c">최신 관측 (정책 실행용)</span>
+│  │  ├─ tools/                      <span class="c">check, inspect, tap, replay</span>
+│  │  └─ ui/server.py  terminal.py  static/    <span class="c">:8800 ◀── control_hub "녹화" 메뉴가 frame 으로 연다</span>
+│  └─ tests/                         <span class="c">122개 (가짜 장치, 가짜 SDK, 실제 프로세스 종료)</span>
+│
+├─ control_hub/                      <b>Control Hub</b> (명령 control-hub)
+│  ├─ config/hub.example.yaml        <span class="c">버튼·점검·실행표·장치. hub.yaml 로 복사. hub.fake.yaml 은 리허설용</span>
+│  ├─ src/control_hub/
+│  │  ├─ config.py  command.py       <span class="c">YAML 검증, 실행할 한 줄 만들기</span>
+│  │  ├─ tmux.py  supervisor.py      <span class="c">창 만들기·끄기, 상태와 시작 조건</span>
+│  │  ├─ logscan.py                  <span class="c">로그 따라 읽기 ◀── recorder/hub.py 의 상태 줄</span>
+│  │  ├─ checks.py  sysfs.py  discovery.py  leapcheck.py   <span class="c">점검과 장치 탐색</span>
+│  │  ├─ watcher.py  devices.py      <span class="c">변화 → 사건, 장치 칸</span>
+│  │  ├─ session.py  incidents.py    <span class="c">세션 기록, 사고 폴더</span>
+│  │  └─ server.py  cli.py  static/  <span class="c">:8700</span>
+│  └─ tests/                         <span class="c">134개 (그중 34개는 tmux 필요)</span>
+│
+├─ user_pc/                          <b>텔레옵</b> (패키지 leap_teleop)
+│  ├─ scripts/leap_aliases.sh        <span class="c">leap_manus, leap_leader … ◀── hub.yaml 의 cmd 가 이 함수를 부른다</span>
+│  ├─ config/                        <span class="c">모터 영점, 글러브 보정, 리타게팅</span>
+│  └─ src/leap_teleop/
+│     ├─ app.py  cli.py  safety.py   <span class="c">제어 루프, StaleGuard, 종료 신호</span>
+│     ├─ sources/  retarget/  hand/  <span class="c">입력, 리타게팅, LEAP driver</span>
+│     ├─ record_sink.py              <span class="c">──▶ recorder/streams/hand_udp.py</span>
+│     ├─ ros_out.py  diag_log.py     <span class="c">Cyclo 용 ROS 발행(보류), 진단 CSV</span>
+│     └─ tools/                      <span class="c">check_hardware, calibrate_*</span>
+│
+├─ third_party/paxini, manus/        <span class="c">벤더 SDK</span>
+└─ docs/data_preparation/            <span class="c">이 문서, recorder_usage.md, control_hub_usage.md, Cyclo 분석</span></div>
+
+<h2>폴더 사이의 접점</h2>
+<table>
+<tr><th>접점</th><th>보내는 쪽</th><th>받는 쪽</th><th>형식이 정해진 곳</th></tr>
+<tr><td>손 패킷</td><td><code>user_pc/src/leap_teleop/record_sink.py</code></td><td><code>recorder/src/tactile_rec/streams/hand_udp.py</code></td><td>양쪽의 <code>PACKET_VERSION = 1</code>. 녹화기 시험이 실제 sink 로 패킷을 만들어 받는다(<code>tests/test_adapters.py</code>)</td></tr>
+<tr><td>스트림 상태 줄</td><td><code>recorder/src/tactile_rec/hub.py</code> <code>print_status_changes()</code></td><td><code>control_hub/src/control_hub/logscan.py</code> <code>RECORDER_STREAM</code></td><td><code>[tactile-rec] stream &lt;이름&gt;: &lt;상태&gt; (&lt;메시지&gt;)</code></td></tr>
+<tr><td>스트림 이름</td><td><code>recorder/config/rig.yaml</code> 의 <code>streams</code></td><td><code>control_hub/config/hub.yaml</code> 의 <code>devices.*.recorder_stream</code></td><td>이름이 같아야 장치 칸에 연결된다</td></tr>
+<tr><td>녹화기 화면</td><td>녹화기 :8800</td><td>hub 의 <code>checks.recorder_ui</code> 와 "녹화" 메뉴</td><td><code>hub.yaml</code> 의 http 주소</td></tr>
+<tr><td>명령 문자열</td><td><code>user_pc/scripts/leap_aliases.sh</code>, <code>recorder</code> 의 <code>tactile-rec</code></td><td><code>hub.yaml</code> 의 <code>processes.*.cmd</code></td><td>hub 는 명령을 그대로 셸에 넣는다</td></tr>
+<tr><td>Paxini SDK</td><td><code>third_party/paxini</code></td><td><code>recorder/src/tactile_rec/streams/paxini.py</code></td><td>연결할 때만 import 한다(없어도 다른 스트림은 돈다)</td></tr>
+</table>
+<div class="next"><a href="#arch">← 전체 구조</a><a href="#rec">녹화기 →</a></div>
+</section>
+
+<!-- ============================================================ 녹화기 -->
+<section class="page" id="rec">
+<h1>녹화기</h1>
+<p class="lead">센서마다 스레드 하나가 값을 받아 시각을 찍고, 한 객체(Hub)에 모은다. 기록, 화면, 나중의 정책 실행이 모두 같은 Hub 에서 읽는다.</p>
+<figure><svg class="fig" viewBox="0 0 1000 400" role="img" aria-label="녹화기 내부: 장치 어댑터, Stream, Hub, 기록과 화면"><title>녹화기 내부: 장치 어댑터, Stream, Hub, 기록과 화면</title><defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0L10,5L0,10z"/></marker><marker id="ah2d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah d" d="M0,0L10,5L0,10z"/></marker></defs><rect class="grp" x="12" y="12" width="200" height="376" rx="10"/><text class="grp-t" x="24" y="32">장치 어댑터 (streams/)</text><rect class="bx inner" x="26" y="44" width="172" height="52" rx="7"/><text class="bx-t" x="112.0" y="66">arm_zenoh.py</text><text class="bx-s" x="112.0" y="82">SDK 콜백 스레드</text><polyline class="ar " points="198,70 258,70" marker-end="url(#ah2)"/><rect class="bx inner" x="26" y="110" width="172" height="52" rx="7"/><text class="bx-t" x="112.0" y="132">hand_udp.py</text><text class="bx-s" x="112.0" y="148">UDP 수신 스레드</text><polyline class="ar " points="198,136 258,136" marker-end="url(#ah2)"/><rect class="bx inner" x="26" y="176" width="172" height="52" rx="7"/><text class="bx-t" x="112.0" y="198">paxini.py</text><text class="bx-s" x="112.0" y="214">serial 읽기 스레드</text><polyline class="ar " points="198,202 258,202" marker-end="url(#ah2)"/><rect class="bx inner" x="26" y="242" width="172" height="52" rx="7"/><text class="bx-t" x="112.0" y="264">realsense.py</text><text class="bx-s" x="112.0" y="280">프레임 대기 스레드</text><polyline class="ar " points="198,268 258,268" marker-end="url(#ah2)"/><rect class="bx inner" x="26" y="308" width="172" height="52" rx="7"/><text class="bx-t" x="112.0" y="330">fake.py</text><text class="bx-s" x="112.0" y="346">가짜 신호 (시험용)</text><polyline class="ar " points="198,334 258,334" marker-end="url(#ah2)"/><rect class="grp" x="258" y="12" width="220" height="376" rx="10"/><text class="grp-t" x="270" y="32">Stream (stream.py)</text><rect class="bx proc" x="272" y="44" width="192" height="92" rx="7"/><text class="bx-t" x="368.0" y="78">push(data)</text><text class="bx-s" x="368.0" y="94">t_recv_ns = CLOCK_MONOTONIC</text><text class="bx-s" x="368.0" y="110">seq, src_seq, t_src_ns</text><rect class="bx proc" x="272" y="150" width="192" height="76" rx="7"/><text class="bx-t" x="368.0" y="176">ring buffer 2 s</text><text class="bx-s" x="368.0" y="192">pre-roll 과 최신값 조회</text><text class="bx-s" x="368.0" y="208">subscribe(replay_since)</text><rect class="bx proc" x="272" y="240" width="192" height="76" rx="7"/><text class="bx-t" x="368.0" y="266">health()</text><text class="bx-s" x="368.0" y="282">ok · slow · stale · error · off</text><text class="bx-s" x="368.0" y="298">Hz, missed, counters</text><rect class="bx proc" x="272" y="330" width="192" height="44" rx="7"/><text class="bx-t" x="368.0" y="348">Zeroable</text><text class="bx-s" x="368.0" y="364">촉각 영점 요청과 결과</text><rect class="grp" x="524" y="12" width="150" height="376" rx="10"/><text class="grp-t" x="536" y="32">Hub (hub.py)</text><rect class="bx proc" x="538" y="110" width="122" height="60" rx="7"/><text class="bx-t" x="599.0" y="136">streams{}</text><text class="bx-s" x="599.0" y="152">이름 → Stream</text><rect class="bx proc" x="538" y="190" width="122" height="60" rx="7"/><text class="bx-t" x="599.0" y="216">events</text><text class="bx-s" x="599.0" y="232">mark, zero, 끊김</text><polyline class="ar " points="478,140 524,140" marker-end="url(#ah2)"/><rect class="grp" x="718" y="12" width="270" height="376" rx="10"/><text class="grp-t" x="730" y="32">읽는 쪽</text><rect class="bx ours" x="732" y="44" width="242" height="74" rx="7"/><text class="bx-t" x="853.0" y="69">Recorder (record/session.py)</text><text class="bx-s" x="853.0" y="85">idle → recording → review</text><text class="bx-s" x="853.0" y="101">preflight, tick, disk guard</text><rect class="bx ours" x="732" y="132" width="242" height="92" rx="7"/><text class="bx-t" x="853.0" y="158">EpisodeWriter (record/writer.py)</text><text class="bx-s" x="853.0" y="174">숫자: flush_s 마다 parts/*.npz</text><text class="bx-s" x="853.0" y="190">영상: queue → JPEG → .mjpeg</text><text class="bx-s" x="853.0" y="206">정지 때 조각을 하나로</text><rect class="bx proc" x="732" y="238" width="242" height="66" rx="7"/><text class="bx-t" x="853.0" y="259">웹 UI (ui/server.py)</text><text class="bx-s" x="853.0" y="275">WebSocket 상태 5 Hz, MJPEG</text><text class="bx-s" x="853.0" y="291">REST: start/stop/save/zero</text><rect class="bx proc" x="732" y="318" width="242" height="56" rx="7"/><text class="bx-t" x="853.0" y="342">live.py</text><text class="bx-s" x="853.0" y="358">최신 관측 (정책 실행 때 재사용)</text><polyline class="ar " points="674,140 732,82" marker-end="url(#ah2)"/><polyline class="ar " points="674,200 732,270" marker-end="url(#ah2)"/><polyline class="ar " points="674,220 732,346" marker-end="url(#ah2)"/><polyline class="ar " points="853,118 853,132" marker-end="url(#ah2)"/></svg><figcaption>그림 2. 녹화기 내부. 어댑터는 장치마다 다르고, 그 오른쪽은 전부 같은 코드다.</figcaption></figure>
+
+<h2>핵심 생각 네 가지</h2>
+<div class="cards">
+  <div class="card"><h3>시계는 하나</h3><p>모든 샘플에 이 PC 의 <code>CLOCK_MONOTONIC</code> 을 찍는다. 벽시계는 에피소드마다 한 쌍(anchor)만 남긴다. NTP 가 시계를 고쳐도 기록이 뒤틀리지 않는다.</p></div>
+  <div class="card"><h3>원본 그대로</h3><p>촉각은 보드가 보낸 바이트를, 영상은 회전하지 않은 프레임을 저장한다. 해석 규칙이 틀렸어도 다시 찍지 않고 고칠 수 있다.</p></div>
+  <div class="card"><h3>기록과 변환 분리</h3><p>녹화 중에는 받는 일만 한다. 30 fps 격자, 지연 보정, 촉각 고주파 창은 오프라인에서 정한다.</p></div>
+  <div class="card"><h3>조용히 실패하지 않기</h3><p>끊김, 쓰기 실패, 버려진 패킷, 영점 실패가 화면과 <code>episode.json</code> 에 남는다.</p></div>
+</div>
+
+<h2>Stream: 모든 장치의 공통 모양</h2>
+<p>어댑터가 할 일은 값을 손에 넣는 즉시 <code>push()</code> 를 부르는 것뿐이다. 시각 찍기, 2초 버퍼, 빠진 수 세기, 구독자에게 전달은 <code>Stream</code> 이 한다.</p>
+<pre><code># recorder/src/tactile_rec/stream.py (요약)
+def push(self, data, *, t_src_ns=NO_TIME, src_seq=NO_TIME, t_recv_ns=None):
+    if t_recv_ns is None:
+        t_recv_ns = self.clock.now_ns()            # 받은 시각: 이 PC 의 monotonic
+    with self._lock:
+        sample = Sample(t_recv_ns, self._count, data, t_src_ns, src_seq)
+        if src_seq > self._last_src_seq + 1:       # 장치 번호가 건너뛰면 빠진 것으로 센다
+            self._missed += src_seq - self._last_src_seq - 1
+        self._buffer.append(sample)                # 최근 2초를 들고 있는다 (pre-roll)
+        self._error = ""                           # 정상 값이 오면 오류 표시가 풀린다
+        for fn in self._subscribers: fn(sample)    # 녹화 중이면 EpisodeWriter 가 여기 있다</code></pre>
+<table>
+<tr><th>샘플에 붙는 것</th><th>뜻</th></tr>
+<tr><td><code>t_recv_ns</code></td><td>녹화기가 받은 시각 (monotonic ns). 항상 있다</td></tr>
+<tr><td><code>t_src_ns</code></td><td>장치가 준 시각. 없으면 -1. 어느 시계인지는 스트림 사양의 <code>src_clock</code> (<code>mono</code>, <code>host_wall</code>, <code>remote_wall</code>, <code>none</code>)</td></tr>
+<tr><td><code>seq</code> / <code>src_seq</code></td><td>녹화기가 센 번호 / 장치가 센 번호(카메라 프레임 번호, 텔레옵 틱)</td></tr>
+</table>
+
+<h3>상태 판정</h3>
+<table>
+<tr><th>상태</th><th>조건</th><th>화면</th></tr>
+<tr><td><code>ok</code></td><td>최근 2초의 Hz 가 기대값의 80% 이상</td><td>정상</td></tr>
+<tr><td><code>slow</code></td><td>오고는 있지만 80% 미만</td><td>느림. 필수 스트림이면 시작이 막힌다</td></tr>
+<tr><td><code>stale</code></td><td>3주기(최소 0.3초) 넘게 조용함</td><td>끊김. 녹화 중이면 소리와 표시</td></tr>
+<tr><td><code>error</code></td><td>어댑터가 이유를 알렸다 (열기 실패, 읽기 실패, 쓸 수 없는 값만 옴)</td><td>오류와 메시지</td></tr>
+<tr><td><code>off</code></td><td>아직 하나도 못 받음</td><td>없음</td></tr>
+</table>
+<div class="changed"><b>리뷰 뒤 바뀐 것 (37d49f9).</b> 전에는 잘못된 패킷·프레임이 counter 만 올리고 사라져서, 값이 전부 잘못돼도 스트림이 그냥 "없음"으로 보였다. 지금은 정상 값 없이 버려지는 값만 오면 <code>reject()</code> 가 이유를 오류 메시지로 올린다. counter(<code>bad_packets</code>, <code>bad_frames</code>, <code>bad_messages</code>, <code>device_errors</code>, <code>subscriber_errors</code>, <code>clock_mismatch</code>)는 센서 페이지에 실시간으로 나오고 에피소드마다 <code>streams.&lt;이름&gt;.counters</code> 에 저장된다.</div>
+
+<h2>장치 어댑터</h2>
+<details><summary>arm_zenoh.py <span class="sum-note">팔 상태와 팔 명령</span> <span class="tag field">현장 미검증</span></summary><div class="body">
+<p><code>zenoh-ros2-sdk</code> 의 <code>ROS2Subscriber</code> 로 Robot PC 라우터에 직접 붙는다. 메시지는 SDK 스레드에서 콜백으로 온다.</p>
+<ul>
+<li><code>JointState</code>: 설정한 관절 이름 순서로 다시 줄 세운다. 설정한 관절이 메시지에 없으면 그 메시지를 버리고 오류로 올린다. NaN 을 관절각으로 기록하지 않기 위해서다.</li>
+<li><code>JointTrajectory</code>: 첫 point 를 쓴다. 값 7개 중 앞 6개가 팔, 마지막이 leader 트리거다.</li>
+<li><code>header.stamp</code> 가 0 이면 원천 시각 없음으로 둔다.</li>
+<li>action 의 joint6 에는 wrist_flip 의 π/2 offset 이 그대로 들어 있다. follower 상태도 같은 자리에 있으므로 state 와 action 이 일치한다.</li>
+</ul></div></details>
+<details><summary>hand_udp.py <span class="sum-note">LEAP 명령·상태와 글러브</span></summary><div class="body">
+<p>텔레옵이 틱마다 보내는 JSON 하나를 받아 <code>hand</code> 스트림(그리고 글러브 값이 새로 왔을 때 <code>glove</code> 스트림)에 넣는다.</p>
+<ul>
+<li>패킷의 <code>t_ns</code> 가 받은 시각보다 미래이거나 1초 넘게 과거면 다른 시계로 보고 버린다(<code>clock_mismatch</code>). 다른 PC 에서 보낸 패킷의 시각을 믿지 않기 위해서다.</li>
+<li>글러브 블록이 깨져도 손 샘플은 살린다(<code>bad_glove</code>).</li>
+<li><code>mode</code> 는 0 live, 1 hold, 2 release 로 저장한다.</li>
+</ul></div></details>
+<details><summary>paxini.py <span class="sum-note">촉각 보드 하나가 스트림 하나</span> <span class="tag field">현장 미검증</span></summary><div class="body">
+<p>연결할 때 보드에서 활성 모듈과 점 개수를 읽어 배치(layout)를 만들고, 설정의 <code>places</code> 와 다르면 스트림을 오류로 세운다. 센서가 다른 커넥터에 꽂혔을 때 엉뚱한 손가락으로 기록되지 않게 하려는 것이다.</p>
+<ul>
+<li>프레임의 payload 바이트를 그대로 저장한다. 크기가 배치와 다르면 버리고 센다.</li>
+<li>보드가 보고한 <code>error_code</code> 도 프레임마다 저장하고, 0 이 아닌 수를 <code>device_errors</code> 로 센다.</li>
+<li>영점 보정은 읽기 스레드가 프레임 사이에 한다: auto-push 멈춤 → <code>calibrate()</code> → 다시 켬.</li>
+</ul>
+<div class="changed"><b>리뷰 뒤 바뀐 것 (37d49f9).</b> 영점은 요청만 하고 결과를 알 수 없었다. 지금은 <code>record.zero_timeout_s</code>(기본 3초)까지 기다려 보드별 완료/실패와 이유를 돌려주고, 에피소드마다 그때의 영점 결과와 시각을 <code>tactile_zero</code> 에 적는다. 영점이 pre-roll 안에 있으면 그 보드는 영점 이후 샘플부터 기록한다(그 전은 기준이 다르다).</div>
+</div></details>
+<details><summary>realsense.py <span class="sum-note">카메라</span> <span class="tag field">현장 미검증</span></summary><div class="body">
+<ul>
+<li>컬러 스트림만 연다. 프레임은 회전하지 않고 저장하고, <code>rotation_deg</code> 는 미리보기와 변환에서만 적용한다.</li>
+<li>프레임 시각의 domain 이 system/global(호스트 시계)일 때만 원천 시각으로 쓴다. hardware counter 면 쓰지 않는다.</li>
+<li><code>exposure_us</code> 가 0 이 아니면 노출을 고정한다(프레임 간격과 motion blur 를 일정하게).</li>
+</ul>
+<div class="changed"><b>리뷰 뒤 바뀐 것 (c37fff4).</b> <code>serial</code> 이 비면 먼저 잡히는 카메라를 연다. 외부 카메라 자리에 손목 카메라가 들어갈 수 있었다. 이제 RealSense 가 둘 이상이면 모든 카메라에 serial 이 있어야 설정이 읽힌다. 예시 설정의 <code>cam_ext</code> 는 주석으로 뒀다.</div>
+</div></details>
+<details><summary>fake.py <span class="sum-note">실물 없이 전체를 돌리는 가짜 신호</span></summary><div class="body">
+<p>4초마다 촉각 힘, 모터 전류, 카메라 밝기가 같은 순간에 튄다("톡 치기"). 변환 뒤에 세 신호가 같은 스텝에 있는지로 시간 맞추기 전체를 시험한다(<code>tests/test_convert.py</code>).</p></div></details>
+
+<h2>녹화 상태와 에피소드</h2>
+<figure><svg class="fig" viewBox="0 0 830 290" role="img" aria-label="녹화기 상태와 에피소드 폴더"><title>녹화기 상태와 에피소드 폴더</title><defs><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0L10,5L0,10z"/></marker><marker id="ah3d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah d" d="M0,0L10,5L0,10z"/></marker></defs><rect class="bx proc" x="30" y="70" width="150" height="60" rx="7"/><text class="bx-t" x="105.0" y="96">대기 idle</text><text class="bx-s" x="105.0" y="112">preflight 점검</text><rect class="bx ours" x="330" y="70" width="170" height="60" rx="7"/><text class="bx-t" x="415.0" y="96">녹화 중 recording</text><text class="bx-s" x="415.0" y="112">flush_s 마다 디스크에</text><rect class="bx proc" x="650" y="70" width="150" height="60" rx="7"/><text class="bx-t" x="725.0" y="96">검토 review</text><text class="bx-s" x="725.0" y="112">요약과 주의 표시</text><rect class="bx store" x="330" y="200" width="170" height="56" rx="7"/><text class="bx-t" x="415.0" y="224">ep_NNNN.tmp/</text><text class="bx-s" x="415.0" y="240">버리기 전에는 안 지운다</text><rect class="bx store" x="650" y="200" width="150" height="56" rx="7"/><text class="bx-t" x="725.0" y="224">ep_NNNN/</text><text class="bx-s" x="725.0" y="240">result: success|failure</text><polyline class="ar " points="180,92 330,92" marker-end="url(#ah3)"/><rect class="lb-bg" x="202" y="74" width="107" height="16" rx="3"/><text class="lb" x="255" y="86" text-anchor="middle">Space · start()</text><polyline class="ar " points="500,92 650,92" marker-end="url(#ah3)"/><rect class="lb-bg" x="525" y="74" width="100" height="16" rx="3"/><text class="lb" x="575" y="86" text-anchor="middle">Space · stop()</text><polyline class="ar d" points="650,118 500,118" marker-end="url(#ah3d)"/><rect class="lb-bg" x="492" y="130" width="166" height="16" rx="3"/><text class="lb" x="575" y="142" text-anchor="middle">시간 제한 · 디스크 부족 → 자동 stop</text><polyline class="ar " points="415,130 415,200" marker-end="url(#ah3)"/><rect class="lb-bg" x="427" y="158" width="21" height="16" rx="3"/><text class="lb" x="438" y="170" text-anchor="middle">기록</text><polyline class="ar " points="725,130 725,200" marker-end="url(#ah3)"/><rect class="lb-bg" x="730" y="158" width="100" height="16" rx="3"/><text class="lb" x="780" y="170" text-anchor="middle">S / F · save()</text><polyline class="ar " points="500,228 650,228" marker-end="url(#ah3)"/><rect class="lb-bg" x="551" y="210" width="48" height="16" rx="3"/><text class="lb" x="575" y="222" text-anchor="middle">이름 바꾸기</text><polyline class="ar " points="725,70 725,30 105,30 105,70" marker-end="url(#ah3)"/><rect class="lb-bg" x="352" y="12" width="127" height="16" rx="3"/><text class="lb" x="415" y="24" text-anchor="middle">저장 또는 D(버리기) 뒤 대기로</text><polyline class="ar d" points="330,240 200,240" marker-end="url(#ah3d)"/><rect class="lb-bg" x="87" y="264" width="206" height="16" rx="3"/><text class="lb" x="190" y="276" text-anchor="middle">프로그램 종료 · 쓰기 실패 · 비정상 종료 → 남는다</text></svg><figcaption>그림 3. 상태는 셋뿐이다. 에피소드는 <code>ep_NNNN.tmp</code> 에 쓰이고, 저장할 때 이름만 바뀐다.</figcaption></figure>
+<table>
+<tr><th>단계</th><th>일어나는 일</th></tr>
+<tr><td>시작 전 점검 <code>preflight()</code></td><td>필수 스트림이 모두 <code>ok</code> 인가, 텔레옵이 <code>live</code> 인가, 디스크가 <code>min_free_gb</code> 이상인가. 걸리면 이유를 보여 주고 시작하지 않는다(강제 시작은 <code>forced_start</code> 로 표시된다)</td></tr>
+<tr><td><code>start()</code></td><td>(monotonic, 벽시계) anchor 를 읽고, 각 스트림의 버퍼에서 <code>preroll_s</code> 초 전부터의 샘플과 이후의 샘플을 틈 없이 넘겨받는다</td></tr>
+<tr><td>녹화 중 <code>tick()</code> 10 Hz</td><td>시간 제한, 끊김 감시(소리와 <code>dropouts</code>), 디스크 감시</td></tr>
+<tr><td><code>stop()</code></td><td>조각을 합치고 <code>episode.json</code> 을 쓴다. 요약과 주의가 검토 화면에 뜬다</td></tr>
+<tr><td><code>save(성공|실패)</code></td><td><code>result</code> 를 적고 <code>.tmp</code> 를 떼어 낸다. <code>.tmp</code> 가 없는 폴더는 항상 완전하다</td></tr>
+</table>
+
+<h3>디스크에 남는 것</h3>
+<pre><code>&lt;data_root&gt;/&lt;task&gt;/&lt;YYYY-MM-DD_HHMM_operator&gt;/ep_0001/
+    episode.json        태스크 문장, anchor, 시작·끝, result, flags, tactile_zero,
+                        스트림별 사양 · 통계(stats) · 버린 값 수(counters)
+    events.jsonl        mark, 촉각 영점, 끊김과 복구, disk_low
+    arm_state.npz  arm_action.npz  hand.npz  glove.npz  tactile_a.npz  tactile_b.npz
+                        공통 열: t_recv_ns, t_src_ns, seq, src_seq  + 스트림의 값
+    cam_wrist.mjpeg     JPEG 를 이어 붙인 파일 (품질 95, 회전 전)
+    cam_wrist.npz       프레임마다 시각 + 파일 안의 offset, size
+  ep_0002.tmp/          저장하지 않은 것. parts/ 와 recording.json 이 있으면 끊긴 것</code></pre>
+
+<h3>조각 쓰기와 복구</h3>
+<figure><svg class="fig" viewBox="0 0 1000 170" role="img" aria-label="조각 쓰기: 녹화 중 flush_s 마다 디스크에 쓰고 정지할 때 합친다"><title>조각 쓰기: 녹화 중 flush_s 마다 디스크에 쓰고 정지할 때 합친다</title><defs><marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0L10,5L0,10z"/></marker><marker id="ah4d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah d" d="M0,0L10,5L0,10z"/></marker></defs><line class="axis" x1="40" y1="60" x2="960" y2="60"/><text class="bx-s" x="40" y="30" text-anchor="start">pre-roll</text><rect class="bx inner" x="40" y="46" width="70" height="28" rx="4"/><rect class="bx ours" x="110" y="46" width="186" height="28" rx="4"/><text class="bx-s" x="203" y="65" text-anchor="middle">part000000.npz</text><text class="lb" x="296" y="96" text-anchor="middle">flush 1</text><rect class="bx ours" x="300" y="46" width="186" height="28" rx="4"/><text class="bx-s" x="393" y="65" text-anchor="middle">part000001.npz</text><text class="lb" x="486" y="96" text-anchor="middle">flush 2</text><rect class="bx ours" x="490" y="46" width="186" height="28" rx="4"/><text class="bx-s" x="583" y="65" text-anchor="middle">part000002.npz</text><text class="lb" x="676" y="96" text-anchor="middle">flush 3</text><rect class="bx ours" x="680" y="46" width="186" height="28" rx="4"/><text class="bx-s" x="773" y="65" text-anchor="middle">part000003.npz</text><text class="lb" x="866" y="96" text-anchor="middle">flush 4</text><rect class="bx ghost" x="870" y="46" width="80" height="28" rx="4"/><text class="bx-s" x="910" y="65" text-anchor="middle">메모리</text><line class="grid" x1="950" y1="30" x2="950" y2="130"/><text class="bx-s" x="950" y="146" text-anchor="end">kill -9 여기서: 마지막 조각까지 남는다 (최대 flush_s 손실)</text><text class="lb" x="110" y="30" text-anchor="start">start()</text><text class="bx-s" x="110" y="130" text-anchor="start">recording.json + events.jsonl 도 flush 마다 갱신 → 복구에 필요한 것이 항상 디스크에 있다</text></svg><figcaption>그림 4. 숫자 스트림은 <code>record.flush_s</code>(기본 5초)마다 <code>parts/&lt;스트림&gt;.partNNNNNN.npz</code> 로 내려간다. 파일은 임시 이름으로 쓰고 fsync 한 뒤 이름을 바꾸므로 반쯤 쓰인 조각은 생기지 않는다.</figcaption></figure>
+<div class="changed"><b>리뷰 뒤 바뀐 것 (6de80f1). 이 묶음이 가장 크다.</b>
+<ul>
+<li><b>전:</b> 숫자 스트림을 메모리에 모았다가 정지할 때 한 번 썼다. 프로그램이 죽으면 에피소드 전체를 잃었고, 녹화 중에 끄면 에피소드를 버렸고, 쓰기 오류가 나면 폴더를 지웠다.</li>
+<li><b>후:</b> 녹화 중에 조각으로 쓴다. 끄면 에피소드를 멈추고 <code>.tmp</code> 로 남긴다. 스트림 하나를 못 써도 나머지는 남기고 <code>flags.write_errors</code> 에 적는다. <code>.tmp</code> 는 <kbd>D</kbd>(버리기)로만 지워진다.</li>
+<li><b>복구:</b> 남은 <code>.tmp</code> 는 에피소드 페이지에 "미저장"으로 뜨고, 성공/실패로 저장하면 조각을 합쳐 <code>ep_NNNN</code> 이 된다. 끊긴 것에는 <code>flags.recovered</code> 가 붙는다(<code>record/recover.py</code>).</li>
+<li><b>디스크 감시:</b> 녹화 중 여유가 <code>min_free_gb</code> 아래로 가면 스스로 멈춘다.</li>
+<li><b>실측:</b> 가짜 장치로 12.5초 녹화 중 <code>kill -9</code> → 10.06초(조각 2개)가 복구됐고 <code>seq</code> 가 연속이었다. Ctrl+C 는 12.10초 전부가 남았다.</li>
+</ul></div>
+<div class="changed"><b>종료 신호 (eaacb33).</b> <code>kill</code>, 터미널 닫기, tmux 창 닫기(hub 의 강제 종료)가 보내는 SIGTERM / SIGHUP 을 Ctrl+C 와 같은 길로 보낸다. 카메라 미리보기 탭이 열려 있으면 웹 서버가 끝나지 않던 문제는 <code>ui.shutdown_timeout_s</code>(기본 2초)로 막았다.</div>
+
+<h3>영상 기록</h3>
+<p>카메라마다 스레드 하나가 queue(120프레임)에서 프레임을 꺼내 JPEG 로 압축해 <code>.mjpeg</code> 에 이어 쓴다. 디스크나 CPU 가 못 따라가 queue 가 차면 프레임을 버리고 <code>dropped_write</code> 로 센다. 시각은 캡처 때 이미 찍혀 있으므로 압축이 밀려도 시각은 맞다. User PC 에 GPU 가 없어서 H.264 대신 프레임별 JPEG 를 택했다(프레임 단위로 바로 읽을 수 있고, 한 프레임이 깨져도 나머지가 산다).</p>
+
+<h2>화면과 명령</h2>
+<table>
+<tr><th>페이지</th><th>내용</th></tr>
+<tr><td>녹화</td><td>카메라 미리보기, 촉각 맵(Paxini 뷰어 방식), 손 관절 막대, 스트림 표, 큰 시작/정지 버튼. 키: <kbd>Space</kbd> 시작·정지, <kbd>M</kbd> 표시, <kbd>Z</kbd> 영점, <kbd>S</kbd>/<kbd>F</kbd> 저장, <kbd>D</kbd> 버리기</td></tr>
+<tr><td>에피소드</td><td>저장된 것과 미저장 목록, 라벨 바꾸기, 삭제, 변환 명령 안내</td></tr>
+<tr><td>센서</td><td>스트림별 Hz 추이, 받은 수, 빠진 수, 버린 것, 영점 결과, 펌웨어와 모듈 배치</td></tr>
+<tr><td>설정</td><td>태스크, 문장, 수집자(대기 중에만), 읽은 설정 파일</td></tr>
+</table>
+<table>
+<tr><th>명령</th><th>하는 일</th></tr>
+<tr><td><code>tactile-rec record</code></td><td>녹화기 실행. <code>--ui web|terminal|none</code>, <code>--auto 초</code> 로 화면 없이 자동 녹화</td></tr>
+<tr><td><code>tactile-rec check &lt;스트림&gt;</code></td><td>스트림 하나만 몇 초 열어 Hz, 간격, 빠진 수, 마지막 값을 본다</td></tr>
+<tr><td><code>tactile-rec inspect &lt;경로&gt;</code></td><td>에피소드별 스트림 개수, Hz, 최대 공백</td></tr>
+<tr><td><code>tactile-rec tap &lt;에피소드&gt;</code></td><td>사건(톡 치기, 쥐기)이 스트림마다 언제 보이는지 재서 시간 차이를 낸다</td></tr>
+<tr><td><code>tactile-rec replay &lt;에피소드&gt;</code></td><td>Rerun 뷰어로 원본 재생</td></tr>
+<tr><td><code>tactile-rec convert</code></td><td>원본 → 데이터셋 (<a href="#conv">변환기</a>)</td></tr>
+</table>
+<div class="next"><a href="#tree">← 폴더 구조</a><a href="#time">시간 맞추기 →</a></div>
+</section>
+
+<!-- ============================================================ 시간 -->
+<section class="page" id="time">
+<h1>시간 맞추기 (이론)</h1>
+<p class="lead">주기도 시계도 다른 다섯 센서를 30 fps 한 줄로 세우는 규칙. 직관, 식, 숫자 순서로 적는다.</p>
+
+<h2>1. 문제</h2>
+<p>데이터셋의 한 행은 "어느 한 순간에 로봇이 본 것과 한 것"이어야 한다. 그런데 센서는 제각각이다.</p>
+<table>
+<tr><th>스트림</th><th>주기</th><th>장치가 주는 시각</th><th>받을 때의 문제</th></tr>
+<tr><td>팔</td><td>약 100 Hz</td><td>Robot PC 벽시계 (다른 PC)</td><td>네트워크 지연, 두 PC 시계의 차이를 모름</td></tr>
+<tr><td>손</td><td>50 Hz</td><td>같은 PC 의 monotonic</td><td>거의 없음</td></tr>
+<tr><td>촉각</td><td>약 90 Hz</td><td>없음</td><td>USB 가 여러 샘플을 한꺼번에 넘긴다(bunching)</td></tr>
+<tr><td>카메라</td><td>30 fps</td><td>호스트 벽시계 또는 hardware counter</td><td>노출·전송·디코딩 지연(수십 ms)</td></tr>
+</table>
+
+<h2>2. 규칙: causal, 보간 없음</h2>
+<p><b>직관.</b> 로봇이 실제로 움직일 때 정책은 "지금까지 도착한 값"만 본다. 학습 데이터도 그래야 한다. 미래 값을 쓰거나 앞뒤를 보간하면 실행 때 없는 정보가 섞인다.</p>
+<p><b>식.</b> 격자 시각을 g<sub>k</sub> = t<sub>start</sub> + k / fps 라 하면, 스트림 s 의 k 번째 값은</p>
+<pre><code>i(k) = max { i : t_s[i] ≤ g_k }        # 그 시각 이전의 가장 최근 샘플
+x_s[k] = sample_s[i(k)]
+staleness_s[k] = g_k − t_s[i(k)]        # 그 값이 얼마나 오래됐나</code></pre>
+<p>코드에서는 <code>np.searchsorted(times, grid, side="right") - 1</code> 한 줄이다(<code>convert/align.py</code> <code>pick_latest</code>).</p>
+<figure><svg class="fig" viewBox="0 0 1000 262" role="img" aria-label="시간 격자와 causal 선택: 각 스텝은 그 시각 이전의 가장 최근 샘플을 쓴다"><title>시간 격자와 causal 선택: 각 스텝은 그 시각 이전의 가장 최근 샘플을 쓴다</title><defs><marker id="ah5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0L10,5L0,10z"/></marker><marker id="ah5d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah d" d="M0,0L10,5L0,10z"/></marker></defs><line class="grid" x1="210.0" y1="34" x2="210.0" y2="222"/><text class="lb" x="210.0" y="26" text-anchor="middle">step 0</text><text class="bx-s" x="210.0" y="244" text-anchor="middle">0 ms</text><line class="grid" x1="353.3" y1="34" x2="353.3" y2="222"/><text class="lb" x="353.3333319" y="26" text-anchor="middle">step 1</text><text class="bx-s" x="353.3333319" y="244" text-anchor="middle">33 ms</text><line class="grid" x1="496.7" y1="34" x2="496.7" y2="222"/><text class="lb" x="496.66666380000004" y="26" text-anchor="middle">step 2</text><text class="bx-s" x="496.66666380000004" y="244" text-anchor="middle">67 ms</text><line class="grid" x1="640.0" y1="34" x2="640.0" y2="222"/><text class="lb" x="640.0" y="26" text-anchor="middle">step 3</text><text class="bx-s" x="640.0" y="244" text-anchor="middle">100 ms</text><line class="grid" x1="783.3" y1="34" x2="783.3" y2="222"/><text class="lb" x="783.3333319000001" y="26" text-anchor="middle">step 4</text><text class="bx-s" x="783.3333319000001" y="244" text-anchor="middle">133 ms</text><line class="grid" x1="926.7" y1="34" x2="926.7" y2="222"/><text class="lb" x="926.6666637999999" y="26" text-anchor="middle">step 5</text><text class="bx-s" x="926.6666637999999" y="244" text-anchor="middle">167 ms</text><text class="bx-t" x="16" y="82" text-anchor="start">hand 50 Hz (src 시각)</text><line class="axis" x1="180" y1="78" x2="970" y2="78"/><circle class="smp" cx="240.1" cy="78" r="5"/><circle class="smp on" cx="326.1" cy="78" r="5"/><circle class="smp on" cx="412.1" cy="78" r="5"/><circle class="smp" cx="498.1" cy="78" r="5"/><circle class="smp on" cx="584.1" cy="78" r="5"/><circle class="smp" cx="670.1" cy="78" r="5"/><circle class="smp on" cx="756.1" cy="78" r="5"/><circle class="smp on" cx="842.1" cy="78" r="5"/><circle class="smp" cx="928.1" cy="78" r="5"/><path class="pick" d="M353.3,64 L326.1,64 L326.1,71"/><path class="pick" d="M496.7,64 L412.1,64 L412.1,71"/><path class="pick" d="M640.0,64 L584.1,64 L584.1,71"/><path class="pick" d="M783.3,64 L756.1,64 L756.1,71"/><path class="pick" d="M926.7,64 L842.1,64 L842.1,71"/><text class="bx-t" x="16" y="142" text-anchor="start">tactile 90 Hz (respread)</text><line class="axis" x1="180" y1="138" x2="970" y2="138"/><circle class="smp" cx="227.2" cy="138" r="5"/><circle class="smp" cx="274.9" cy="138" r="5"/><circle class="smp on" cx="322.7" cy="138" r="5"/><circle class="smp" cx="370.4" cy="138" r="5"/><circle class="smp" cx="418.1" cy="138" r="5"/><circle class="smp on" cx="465.8" cy="138" r="5"/><circle class="smp" cx="513.6" cy="138" r="5"/><circle class="smp" cx="561.3" cy="138" r="5"/><circle class="smp on" cx="609.0" cy="138" r="5"/><circle class="smp" cx="656.8" cy="138" r="5"/><circle class="smp" cx="704.5" cy="138" r="5"/><circle class="smp on" cx="752.2" cy="138" r="5"/><circle class="smp" cx="800.0" cy="138" r="5"/><circle class="smp" cx="847.7" cy="138" r="5"/><circle class="smp on" cx="895.4" cy="138" r="5"/><circle class="smp" cx="943.1" cy="138" r="5"/><path class="pick" d="M353.3,124 L322.7,124 L322.7,131"/><path class="pick" d="M496.7,124 L465.8,124 L465.8,131"/><path class="pick" d="M640.0,124 L609.0,124 L609.0,131"/><path class="pick" d="M783.3,124 L752.2,124 L752.2,131"/><path class="pick" d="M926.7,124 L895.4,124 L895.4,131"/><text class="bx-t" x="16" y="202" text-anchor="start">camera 30 fps (recv)</text><line class="axis" x1="180" y1="198" x2="970" y2="198"/><circle class="smp on" cx="300.3" cy="198" r="5"/><circle class="smp on" cx="443.5" cy="198" r="5"/><circle class="smp on" cx="586.7" cy="198" r="5"/><circle class="smp on" cx="729.9" cy="198" r="5"/><circle class="smp on" cx="873.1" cy="198" r="5"/><circle class="smp" cx="1016.2" cy="198" r="5"/><path class="pick" d="M353.3,184 L300.3,184 L300.3,191"/><path class="pick" d="M496.7,184 L443.5,184 L443.5,191"/><path class="pick" d="M640.0,184 L586.7,184 L586.7,191"/><path class="pick" d="M783.3,184 L729.9,184 L729.9,191"/><path class="pick" d="M926.7,184 L873.1,184 L873.1,191"/></svg><figcaption>그림 5. 30 fps 격자(파란 점선)와 세 스트림. 채워진 점이 선택된 샘플이고, 꺾인 선이 "이 스텝은 이 샘플을 쓴다"는 뜻이다. 실제 <code>align.py</code> 함수로 계산해 그렸다.</figcaption></figure>
+<p><b>숫자 예.</b> 격자가 33.3 ms 간격이고 손이 20 ms 간격이면 값의 나이는 0~20 ms 사이를 오간다. 촉각(11 ms 간격)은 0~11 ms. 어느 스트림이든 나이가 <code>dataset.max_staleness_ms</code>(기본 150 ms)를 넘는 스텝이 있으면 그 에피소드는 문제로 표시되고 기본으로 제외된다.</p>
+
+<h2>3. 스트림마다 어떤 시각으로 줄을 세우나</h2>
+<p><code>dataset.time</code> 으로 스트림별로 고른다. 적지 않으면 <code>recv</code> 다.</p>
+<table>
+<tr><th>모드</th><th>쓰는 시각</th><th>맞는 스트림</th></tr>
+<tr><td><code>recv</code></td><td>녹화기가 받은 시각</td><td>기본. 카메라, 팔</td></tr>
+<tr><td><code>src</code></td><td>장치의 시각을 녹화기 시계로 옮긴 것</td><td>손(같은 시계라 그대로 쓴다)</td></tr>
+<tr><td><code>respread</code></td><td>받은 시각에서 USB bunching 을 걷어 낸 것</td><td>촉각</td></tr>
+</table>
+<details><summary>src: 장치 시각을 녹화기 시계로 옮기는 세 가지 경우</summary><div class="body">
+<table>
+<tr><th><code>src_clock</code></th><th>옮기는 법</th><th>남는 오차</th></tr>
+<tr><td><code>mono</code> (같은 PC 의 다른 프로세스)</td><td>그대로 쓴다</td><td>없음</td></tr>
+<tr><td><code>host_wall</code> (이 PC 의 벽시계)</td><td>에피소드 anchor 로 이동: t + (mono − wall)</td><td>녹화 중 NTP 가 시계를 고친 만큼</td></tr>
+<tr><td><code>remote_wall</code> (다른 PC)</td><td>가장 덜 늦은 샘플이 받은 시각에 오도록 이동: offset = min(t_recv − t_src)</td><td>에피소드에서 가장 짧았던 전송 지연만큼의 일정한 치우침. 실측 뒤 <code>latency_ms</code> 로 뺀다</td></tr>
+</table>
+<p>세 번째가 팔에 해당한다. 두 PC 의 시계를 맞추지(chrony) 않아도 되는 대신, 최소 지연만큼은 모른다. USB 랜에서 수 ms 로 예상한다 <span class="tag field">현장 미검증</span>.</p></div></details>
+<details open><summary>respread: USB bunching 을 되돌리기</summary><div class="body">
+<p><b>직관.</b> 보드는 11 ms 마다 하나씩 만드는데 USB 는 33 ms 에 셋을 한꺼번에 준다. 받은 시각만 보면 셋이 같은 순간에 일어난 것 같다. 하지만 i 번째 샘플은 i+1 번째보다 <em>적어도</em> 한 주기 전에 만들어졌다.</p>
+<p><b>식.</b> 뒤에서부터</p>
+<pre><code>t[i] = min( recv[i],  t[i+1] − period )</code></pre>
+<p>주기는 burst 의 끝 시각 간격을 burst 크기로 나눈 값들의 40 백분위로 추정한다(프레임이 빠진 구간은 값이 길게 나오므로 중앙값보다 조금 아래를 쓴다).</p>
+<figure><svg class="fig" viewBox="0 0 1000 150" role="img" aria-label="respread: 한꺼번에 도착한 촉각 샘플을 한 주기 간격으로 되돌린다"><title>respread: 한꺼번에 도착한 촉각 샘플을 한 주기 간격으로 되돌린다</title><defs><marker id="ah6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0L10,5L0,10z"/></marker><marker id="ah6d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah d" d="M0,0L10,5L0,10z"/></marker></defs><text class="bx-t" x="16" y="48" text-anchor="start">받은 시각 t_recv</text><line class="axis" x1="190" y1="44" x2="970" y2="44"/><circle class="smp on" cx="272.0" cy="44" r="5"/><circle class="smp on" cx="274.5" cy="44" r="5"/><circle class="smp on" cx="277.0" cy="44" r="5"/><circle class="smp on" cx="478.5" cy="44" r="5"/><circle class="smp on" cx="480.9" cy="44" r="5"/><circle class="smp on" cx="483.4" cy="44" r="5"/><circle class="smp on" cx="684.9" cy="44" r="5"/><circle class="smp on" cx="687.4" cy="44" r="5"/><circle class="smp on" cx="689.9" cy="44" r="5"/><circle class="smp on" cx="891.4" cy="44" r="5"/><circle class="smp on" cx="893.9" cy="44" r="5"/><circle class="smp on" cx="896.3" cy="44" r="5"/><text class="bx-t" x="16" y="108" text-anchor="start">respread 뒤</text><line class="axis" x1="190" y1="104" x2="970" y2="104"/><circle class="smp on" cx="139.3" cy="104" r="5"/><circle class="smp on" cx="208.1" cy="104" r="5"/><circle class="smp on" cx="277.0" cy="104" r="5"/><circle class="smp on" cx="345.8" cy="104" r="5"/><circle class="smp on" cx="414.6" cy="104" r="5"/><circle class="smp on" cx="483.4" cy="104" r="5"/><circle class="smp on" cx="552.2" cy="104" r="5"/><circle class="smp on" cx="621.1" cy="104" r="5"/><circle class="smp on" cx="689.9" cy="104" r="5"/><circle class="smp on" cx="758.7" cy="104" r="5"/><circle class="smp on" cx="827.5" cy="104" r="5"/><circle class="smp on" cx="896.3" cy="104" r="5"/><line class="pick" x1="272.0" y1="50" x2="139.3" y2="98"/><line class="pick" x1="274.5" y1="50" x2="208.1" y2="98"/><line class="pick" x1="277.0" y1="50" x2="277.0" y2="98"/><line class="pick" x1="478.5" y1="50" x2="345.8" y2="98"/><line class="pick" x1="480.9" y1="50" x2="414.6" y2="98"/><line class="pick" x1="483.4" y1="50" x2="483.4" y2="98"/><line class="pick" x1="684.9" y1="50" x2="552.2" y2="98"/><line class="pick" x1="687.4" y1="50" x2="621.1" y2="98"/><line class="pick" x1="689.9" y1="50" x2="689.9" y2="98"/><line class="pick" x1="891.4" y1="50" x2="758.7" y2="98"/><line class="pick" x1="893.9" y1="50" x2="827.5" y2="98"/><text class="bx-s" x="892.0" y="128" text-anchor="start">앞으로만 당긴다. 받은 시각보다 늦어지는 일은 없다</text></svg><figcaption>그림 6. 위: 받은 시각. 셋씩 뭉쳐 있다. 아래: respread 뒤. burst 의 마지막 샘플은 그대로 두고 앞의 것들을 한 주기씩 당겼다.</figcaption></figure>
+<p><b>왜 안전한가.</b> 이 규칙은 샘플을 받은 시각보다 <em>앞으로만</em> 옮기고, 실제 만들어진 시각보다 앞으로는 가지 않는다. 프레임이 빠졌으면 실제 간격이 한 주기보다 길 뿐이라 경계가 느슨해질 뿐이다. 그래서 어떤 스텝도 자기 미래의 촉각 값을 보지 않는다.</p></div></details>
+
+<h2>4. 지연 보정</h2>
+<p><code>dataset.latency_ms: {cam_wrist: 35}</code> 처럼 적으면 그 스트림의 모든 시각에서 35 ms 를 뺀다. 값은 추측하지 않고 <code>tactile-rec tap</code> 으로 잰다: 손끝으로 책상을 톡 치면 촉각 힘과 모터 전류가 같은 순간에 튀어야 하고, 손을 쥐면 손 위치와 카메라 움직임이 같은 순간이어야 한다.</p>
+<div class="note"><b>보정하지 않는 것.</b> 명령 → 위치(모터가 따라가는 시간), 글러브 → 명령(리타게팅)은 물리적으로 실제 있는 지연이다. 이것을 0으로 만들면 데이터가 거짓말을 한다.</div>
+
+<h2>5. 고주파 촉각 창</h2>
+<p>30 fps 한 스텝 안에 촉각은 3번 온다. <code>dataset.tactile_hr: 3</code> 이면 스텝마다 그 스텝 시각과 그 앞 1/3, 2/3 스텝 시각의 값을 함께 넣는다(<code>observation.tactile.resultant_hr</code>). 마지막 값이 스텝 시각의 값이라 여기에도 미래 값은 없다.</p>
+<p>이 규칙이 어디서 왔고 무엇과 다른지는 <a href="#biblio">참고 자료</a>에, 4절의 지연값을 실제로 재는 방법은 <a href="#latency">지연 실측 실험</a>에 있다.</p>
+<div class="next"><a href="#rec">← 녹화기</a><a href="#latency">지연 실측 실험 →</a></div>
+</section>
+
+<!-- ============================================================ 지연 실측 -->
+<section class="page" id="latency">
+<h1>지연 실측 실험 (논문용)</h1>
+<p class="lead">스트림마다 "일이 일어난 순간 → 녹화기가 받은 순간"과 "명령 → 실제 움직임"을 재서 표로 남긴다. UMI(Chi et al., RSS 2024) 부록 A 의 방법을 우리 장치에 옮긴 계획이다. <span class="tag new">11/17 추가</span> <span class="tag field">계획. 아직 실행 안 함</span></p>
+
+<h2>왜 해야 하나</h2>
+<div class="why"><b>UMI 보다 우리가 더 필요하다.</b> UMI 는 손에 든 GoPro 하나가 영상·IMU·그리퍼 폭을 같이 찍어서, 수집한 데이터 안의 스트림끼리는 지연이 0이다(논문 §IV "Hardware-specific latency"). 그래서 지연은 로봇에서 실행할 때만 맞춘다. 우리는 데이터 자체를 실물 로봇의 분산된 장치(다른 PC 의 팔, USB 촉각, USB 카메라)로 모은다. <b>지연이 녹화 데이터에 이미 들어 있고, 실행 때도 다시 생긴다.</b></div>
+<ul>
+<li><b>효과가 크다.</b> UMI 는 같은 정책에서 지연 맞추기만 끄자(측정값을 0으로) 동작이 떨리고, 던지기 성공이 105/120 = 87.5% 에서 69/120 = 57.5% 로 떨어졌다(§V-B, Fig. 8).</li>
+<li><b>촉각 논문의 근거가 된다.</b> "접촉 순간"을 영상·손 위치와 맞춘다고 주장하려면 그 정렬 오차가 몇 ms 인지 수치가 있어야 한다. 30 fps 한 스텝이 33.3 ms 이므로, 카메라 지연이 그 정도면 촉각과 영상이 한 스텝 어긋난다.</li>
+<li><b>지금은 비어 있다.</b> <code>dataset.latency_ms</code> 는 <code>{}</code> 이고, 팔 <code>remote_wall</code> 변환은 "가장 짧았던 전송 지연"을 0으로 둔다(<a href="#time">시간 맞추기</a> 3절). 이 둘을 채우는 실험이다.</li>
+</ul>
+
+<h2>두 종류의 지연</h2>
+<table>
+<tr><th>종류</th><th>뜻</th><th>데이터에서</th><th>실행에서</th></tr>
+<tr><td><b>관측 지연</b> l<sub>obs</sub></td><td>일이 일어난 순간 → 녹화기가 받은 순간 (노출·전송·디코딩·USB)</td><td>뺀다 (<code>latency_ms</code>). 측정 장치가 만든 거짓 지연이다</td><td>같은 값으로 스트림을 맞춘다 (아래 "실행 쪽 주의")</td></tr>
+<tr><td><b>실행 지연</b> l<sub>exec</sub></td><td>명령을 보낸 순간 → 실제로 그 위치에 간 순간</td><td>빼지 않는다. 물리적으로 실제 있는 지연이다</td><td>action chunk 의 앞부분을 버리거나 미리 보내는 근거 (UMI PD1.2)</td></tr>
+</table>
+
+<h2>측정 항목과 방법</h2>
+<table>
+<tr><th>#</th><th>무엇</th><th>UMI 의 방법 (부록 A)</th><th>우리 방법</th><th>도구</th></tr>
+<tr><td>L1</td><td>카메라 관측 지연</td><td>A1. 모니터에 현재 시각을 QR 로 띄우고 카메라로 찍는다. l<sub>camera</sub> = t<sub>recv</sub> − t<sub>display</sub> − l<sub>display</sub></td><td>User PC 모니터에 <code>CLOCK_MONOTONIC</code> 을 QR 로 띄우고 D405 로 찍어 녹화한다. 녹화기와 같은 시계라 바로 뺄 수 있다. l<sub>display</sub> 는 모니터 갱신 주기(60 Hz 면 최대 16.7 ms)와 패널 지연이라 따로 잡는다</td><td><span class="tag risk">없음</span> QR 표시 + 분석 스크립트</td></tr>
+<tr><td>L2</td><td>팔 관측 지연</td><td>A2. 로봇이 전역 시각을 주면 t<sub>recv</sub> − t<sub>robot</sub>. 아니면 ping 왕복의 절반</td><td>(a) <code>ping 10.42.0.241</code> 왕복의 절반으로 근사. (b) chrony 로 두 PC 시계를 맞추면 <code>header.stamp</code> 로 직접 잰다. 이 값이 <code>remote_wall</code> 이 0으로 둔 상수다</td><td>(a) ping. (b) <code>check arm_state</code> 의 <code>delay_ms</code></td></tr>
+<tr><td>L3</td><td>손 관측 지연</td><td>-</td><td>같은 PC UDP 라 <code>check hand</code> 의 <code>delay_ms</code> (약 1 ms 예상). 모터 피드백을 읽는 데 걸리는 시간은 따로다 <span class="tag field">미검증</span></td><td><code>tactile-rec check hand</code></td></tr>
+<tr><td>L4</td><td>촉각 관측 지연</td><td>-</td><td>장치 시각이 없어 절대값은 못 잰다. 손끝으로 책상을 쳐서 촉각 힘 · 모터 전류 · 카메라(닿는 프레임)의 상대 차이를 잰다. 카메라를 L1 로 재면 그걸 기준으로 촉각의 절대값을 얻는다</td><td><code>tactile-rec tap</code> (있음, 실물 6단계)</td></tr>
+<tr><td>E1</td><td>손 실행 지연</td><td>A3. 그리퍼에 사인파 위치 명령을 주고 명령과 측정 폭을 cross-correlation 해서 l<sub>e2e</sub> 를 구한 뒤 l<sub>action</sub> = l<sub>e2e</sub> − l<sub>obs</sub></td><td>패킷의 <code>sent</code> 와 <code>pos</code> 를 cross-correlation. 이미 매 틱 기록된다. 사인파 명령 대신 텔레옵 에피소드에서도 구할 수 있다</td><td><span class="tag risk">없음</span> 분석 스크립트</td></tr>
+<tr><td>E2</td><td>팔 실행 지연</td><td>A4. 안전 때문에 사람이 텔레옵으로 목표 자세를 만들고, 목표와 실제 자세의 최적 정렬</td><td>leader(<code>arm_action</code>) 와 follower(<code>arm_state</code>) 의 cross-correlation. 우리 수집 방식이 바로 이 형태다. 두 스트림이 같은 PC 를 지나 오므로 관측 지연이 같다고 보면 차이가 실행 지연이다 <span class="tag field">가정</span></td><td><span class="tag risk">없음</span> 분석 스크립트 (E1 과 같은 함수)</td></tr>
+</table>
+
+<div class="note"><b>지금 있는 도구의 한계.</b> <code>tactile-rec tap</code> 은 사건이 시작되는 순간(onset)을 스트림마다 찾아 <em>서로의</em> 차이만 낸다. 그래서 카메라 하나의 절대 지연(L1)이나 명령 → 위치의 실행 지연(E1, E2)은 나오지 않는다. 표의 <span class="tag risk">없음</span> 세 가지가 새로 만들어야 하는 것이다. 코드는 아직 쓰지 않았다.</div>
+
+<h2>실험 순서 (제안)</h2>
+<ol class="steps">
+<li><b>L2 팔.</b> 1분 동안 ping 해서 왕복의 중앙값과 p95 를 적는다. 가능하면 chrony 로 맞춘 뒤 <code>check arm_state</code> 의 <code>delay_ms</code> 와 비교한다.</li>
+<li><b>L3 손.</b> <code>check hand</code> 30초.</li>
+<li class="human"><b>L1 카메라.</b> 녹화 설정(해상도, fps, <code>exposure_us</code>)을 데이터 수집 때와 같게 두고, 모니터의 QR 을 60초 이상 찍는다. 프레임마다 l<sub>camera</sub> 를 구해 중앙값, p95, spread 를 적는다. 노출을 바꾸면 지연도 바뀌므로 설정마다 따로 잰다.</li>
+<li class="human"><b>L4 촉각.</b> 실물 시험 6단계의 톡 치기. 카메라에 손끝이 보이게 둔다.</li>
+<li class="human"><b>E1 · E2 실행.</b> 텔레옵으로 손을 천천히 쥐었다 폈다, 팔을 좌우로 흔드는 30초짜리 에피소드를 각 3개 찍는다.</li>
+<li><b>닫힘 검사.</b> 잰 값을 <code>latency_ms</code> 에 넣고 다시 변환한 뒤 <code>tap</code> 을 돌린다. "같은 순간이어야 하는 쌍"의 차이가 0 근처로 줄어야 한다. 줄지 않으면 측정이나 보정 방향이 틀린 것이다.</li>
+<li><b>재현성.</b> 다른 날 한 번 더 잰다. 값이 바뀌면 USB 포트, 케이블, 부하를 같이 적는다.</li>
+</ol>
+
+<h2>논문에 남길 표</h2>
+<table>
+<tr><th>스트림</th><th>종류</th><th>방법</th><th>중앙값 (ms)</th><th>p95 (ms)</th><th>spread (ms)</th><th>N</th></tr>
+<tr><td>cam_wrist (D405)</td><td>l<sub>obs</sub></td><td>QR (L1)</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td>arm_state / arm_action</td><td>l<sub>obs</sub></td><td>½ RTT 또는 stamp (L2)</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td>hand</td><td>l<sub>obs</sub></td><td>UDP delay (L3)</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td>tactile_a / tactile_b</td><td>l<sub>obs</sub></td><td>tap vs 카메라 (L4)</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td>LEAP</td><td>l<sub>exec</sub></td><td>sent ↔ pos xcorr (E1)</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td>OMY</td><td>l<sub>exec</sub></td><td>leader ↔ follower xcorr (E2)</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+</table>
+<p>값은 재는 대로 <code>docs/results/YYYY-MM-DD-latency.md</code> 에 조건(커밋, rig.yaml, USB 포트, 노출)과 함께 적고, 이 표에는 그 결과를 인용한다. 시간과 학습 자원이 있으면 UMI 처럼 <b>보정 있음/없음으로 학습한 정책을 비교</b>하는 ablation 이 가장 강한 근거가 된다(비용이 커서 선택).</p>
+
+<div class="note"><b>실행 쪽 주의 (확인 필요).</b> 데이터에서 카메라를 35 ms 당겨 맞췄다면, 실행 때도 같은 기준으로 맞춰야 학습과 실행이 같다. UMI 는 실행 때 가장 늦은 스트림(카메라)의 캡처 시각에 맞춰 나머지를 고른다(PD1.1). 우리 <code>tactile_rec/live.py</code> 의 <code>observe()</code> 는 지금 각 스트림의 최신 값을 그대로 쓰고 <code>latency_ms</code> 를 보지 않는다. 지연을 데이터에 적용하기로 하면 이 부분도 같이 바꿔야 한다.</div>
+<div class="next"><a href="#time">← 시간 맞추기</a><a href="#conv">변환기 →</a></div>
+</section>
+
+<!-- ============================================================ 변환기 -->
+<section class="page" id="conv">
+<h1>변환기</h1>
+<p class="lead"><code>tactile-rec convert</code>: 원본 에피소드 폴더 → LeRobot v2.1 데이터셋(또는 확인용 npz). 학습 서버의 openpi 환경에서 돌린다.</p>
+
+<h2>한 에피소드가 지나는 길</h2>
+<ol class="steps">
+<li><b>읽기</b> <code>convert/load.py</code> <code>Episode</code>: <code>episode.json</code> 과 스트림별 npz, 영상 index.</li>
+<li><b>스트림별 시각 정하기</b> <code>align.stream_times</code>: <code>dataset.time</code> 의 모드, <code>latency_ms</code>, 그리고 뒤로 가는 시각을 눌러 단조 증가로 만든다.</li>
+<li><b>격자 만들기</b>: 시작 = max(녹화 시작 시각, 모든 스트림의 첫 샘플, 손의 첫 위치 피드백). 끝 = <code>end_ns</code>. 간격 1/fps. 시작이 밀린 만큼은 보고서의 <code>skipped_start_ms</code>.</li>
+<li><b>고르기</b>: 스트림마다 <code>pick_latest</code>. 손은 state 용(위치 피드백이 있는 행만)과 action 용을 따로 고른다.</li>
+<li><b>벡터 만들기</b> <code>features.py</code>: 단위와 순서를 여기 한 곳에서 정한다. 화면의 실시간 값도 같은 함수를 쓴다.</li>
+<li><b>영상</b>: 스텝마다 그 시각 이전의 마지막 프레임 index. 같은 프레임이 반복된 수는 <code>frames_reused</code>.</li>
+<li><b>보고서</b>: 스트림별 가장 오래된 값, 문제 목록, <code>ok</code>.</li>
+<li><b>쓰기</b> <code>convert/dataset.py</code>: <code>LeRobotV21Writer</code>(<code>create</code> → <code>add_frame</code> → <code>save_episode</code>) 또는 <code>NpzWriter</code>.</li>
+</ol>
+
+<h2>데이터셋의 키</h2>
+<table>
+<tr><th>키</th><th>차원</th><th>내용과 단위</th></tr>
+<tr><td><code>observation.state</code></td><td class="num">22</td><td>팔 6 (rad, follower) + 손 16 (rad, LEAP 측정 위치)</td></tr>
+<tr><td><code>action</code></td><td class="num">22</td><td>팔 6 (rad, leader 명령, offset 포함) + 손 16 (rad, <code>dataset.hand_action</code> 이 고른 열)</td></tr>
+<tr><td><code>observation.hand_current</code></td><td class="num">16</td><td>모터 전류 mA</td></tr>
+<tr><td><code>observation.tactile.resultant</code></td><td class="num">센서 수 × 3</td><td>센서별 합력 Fx, Fy, Fz (N). 순서는 <code>tactile_order</code></td></tr>
+<tr><td><code>observation.tactile.distributed</code></td><td class="num">점 수 × 3</td><td>점별 힘 (N). 끝 52점, 마디 25점</td></tr>
+<tr><td><code>observation.tactile.resultant_hr</code></td><td class="num">tactile_hr × 센서 수 × 3</td><td>한 스텝 안의 고주파 창</td></tr>
+<tr><td><code>observation.images.&lt;카메라&gt;</code></td><td class="num">H × W × 3</td><td>바로 세운 RGB (<code>rotation_deg</code> 적용)</td></tr>
+<tr><td><code>task</code></td><td></td><td>에피소드의 태스크 문장</td></tr>
+</table>
+<p>센서가 8개(손가락 4 × 끝·마디)면 resultant 는 24차원, distributed 는 (4×52 + 4×25)×3 = 924차원이다.</p>
+
+<div class="changed"><b>리뷰 뒤 바뀐 것 (37d49f9).</b>
+<ul>
+<li><b>손 <code>mode</code>:</b> 전에는 변환기가 보지 않았다. 텔레옵이 손을 놓은(<code>release</code>) 동안의 값도 사람의 action 인 것처럼 들어갔다. 지금은 release 나 알 수 없는 mode 스텝이 있으면 문제로 표시해 기본 제외하고, hold 스텝은 <code>streams.hand.mode_steps</code> 에 수만 적는다.</li>
+<li><b><code>hand_action</code>:</b> 기본값이 브랜치마다 달랐다(<code>sent</code> / <code>cmd</code>). 기본값을 없애 반드시 적게 했다.</li>
+<li><b>설정의 출처:</b> 변환은 녹화 때가 아니라 <code>--config</code> 로 준 파일의 <code>dataset</code> 을 쓴다. 보고서에 그 파일 경로(<code>config</code>)와 쓴 값 전체(<code>dataset</code>)가 남는다.</li>
+<li><b>새 flag:</b> <code>write_errors</code>, <code>recovered</code> 도 문제로 올라간다.</li>
+</ul></div>
+
+<h2>기본으로 제외되는 에피소드</h2>
+<table>
+<tr><th>이유</th><th>출처</th><th>포함시키려면</th></tr>
+<tr><td>라벨이 실패</td><td><code>result</code></td><td><code>--include-failed</code></td></tr>
+<tr><td>어떤 값이 150 ms 넘게 오래됨</td><td>변환 중 계산</td><td rowspan="6"><code>--include-flagged</code></td></tr>
+<tr><td>녹화 중 끊김</td><td><code>flags.dropouts</code></td></tr>
+<tr><td>점검 실패 상태에서 강제 시작</td><td><code>flags.forced_start</code></td></tr>
+<tr><td>스트림을 다 쓰지 못함</td><td><code>flags.write_errors</code></td></tr>
+<tr><td>비정상 종료 뒤 복구</td><td><code>flags.recovered</code></td></tr>
+<tr><td>텔레옵이 손을 놓은 스텝</td><td>손 <code>mode</code></td></tr>
+<tr><td>장착이 다른 에피소드가 섞임</td><td><code>mount</code></td><td>안 된다. 변환 전체가 멈춘다</td></tr>
+</table>
+<p>제외는 그 에피소드만 건너뛰고 나머지는 계속한다. 이유는 출력 옆의 <code>&lt;이름&gt;.conversion_report.json</code> 에 남는다.</p>
+<div class="note"><span class="tag field">현장 미검증</span> 실제 <code>lerobot</code> 로 쓰는 경로는 stand-in 클래스로만 시험했다. openpi 환경에서 <code>pytest tests/test_convert.py</code> 를 돌리면 실제 라이브러리로 한 에피소드를 써 보는 smoke test 가 실행된다(다른 곳에서는 skip). pi0.5 입력에 우리 키를 연결하는 openpi 데이터 설정은 아직 없다.</div>
+<div class="next"><a href="#latency">← 지연 실측 실험</a><a href="#teleop">텔레옵과의 연결 →</a></div>
+</section>
+
+<!-- ============================================================ 텔레옵 -->
+<section class="page" id="teleop">
+<h1>텔레옵과의 연결</h1>
+<p class="lead"><code>leap_teleop</code> 은 손을 움직이는 프로그램이고 녹화와 무관하게 돈다. 녹화기는 그 옆에서 듣기만 한다.</p>
+
+<h2>제어 루프와 기록 출력</h2>
+<pre><code># user_pc/src/leap_teleop/app.py (요약): 50 Hz
+reading  = source.poll(now)                    # 글러브 / leader 트리거 / 키보드
+command  = retarget(reading)                   # 16관절 목표 (도)
+resolved = guard.resolve(now, command, time)   # StaleGuard: live / hold / release
+driver.command(resolved)                       # 관절 범위 clip + 속도 제한 뒤 모터에 쓴다
+publisher.publish(resolved, feedback, guard.mode, reading)   # 기록 전용. 실패해도 손은 계속 돈다</code></pre>
+<p><code>--record-udp</code> 를 주면 publisher 가 <code>UdpRecordSink</code> 가 된다. localhost UDP 는 받는 쪽이 없어도 막히지 않고, <code>publish()</code> 는 모든 예외를 삼킨다. 기록 때문에 손이 멈추는 일은 없다.</p>
+
+<h3>패킷 (version 1)</h3>
+<pre><code>{"v": 1, "seq": 1234, "t_ns": 8123456789012, "mode": "live",
+ "cmd":  [16개, 도],     # StaleGuard 를 지난 목표
+ "sent": [16개, 도],     # clip + 속도 제한 뒤 실제로 모터에 쓴 값
+ "pos": [...], "vel": [...], "cur": [...],     # 모터 피드백: 도, 도/초, mA (없으면 null)
+ "glove": {"t_ns": ..., "ergo": [20개], "nodes": [[x,y,z,qx,qy,qz,qw], ...], "node_names": [...]}}</code></pre>
+<table>
+<tr><th>값</th><th>뜻</th><th>데이터셋에서</th></tr>
+<tr><td><code>cmd</code></td><td>리타게팅 결과에 stale guard 를 적용한 목표</td><td><code>hand_action: cmd</code> 일 때 action</td></tr>
+<tr><td><code>sent</code></td><td>관절 범위와 속도 제한까지 지난, 모터가 받은 목표</td><td><code>hand_action: sent</code> 일 때 action (예시 설정의 값)</td></tr>
+<tr><td><code>pos</code></td><td>모터가 실제로 있는 위치</td><td>state</td></tr>
+<tr><td><code>mode</code></td><td>live / hold / release</td><td>시작 전 점검과 변환의 제외 기준</td></tr>
+<tr><td><code>glove</code></td><td>글러브 원값</td><td>데이터셋에는 안 들어가고 원본에만 남는다(리타게팅을 바꿔 다시 계산할 때 쓴다)</td></tr>
+</table>
+
+<h2>StaleGuard 와 녹화</h2>
+<table>
+<tr><th>mode</th><th>조건</th><th>손</th><th>녹화기</th></tr>
+<tr><td>waiting</td><td>입력이 아직 없다</td><td>safe pose</td><td>패킷의 mode 가 live 가 아니므로 시작이 막힌다</td></tr>
+<tr><td>live</td><td>입력 나이 ≤ 0.5초</td><td>명령대로</td><td>정상</td></tr>
+<tr><td>hold</td><td>0.5초 &lt; 나이 ≤ 3초</td><td>마지막 값 유지</td><td>기록은 계속. 변환 보고서에 스텝 수</td></tr>
+<tr><td>release</td><td>나이 &gt; 3초</td><td>safe pose 로 이동</td><td>기록은 계속. 변환에서 그 에피소드 제외</td></tr>
+</table>
+
+<div class="changed"><b>리뷰 뒤 바뀐 것.</b>
+<ul>
+<li><b>Torque OFF 경로 (eaacb33):</b> Torque OFF 는 루프의 <code>finally</code> → <code>driver.close()</code> 에서 나간다. Ctrl+C 에서만 이 길을 탔고, <code>kill</code> 이나 tmux 창 닫기(SIGHUP)는 그냥 죽어서 Dynamixel bus watchdog(500 ms)에만 기댔다. 이제 SIGTERM / SIGHUP 도 같은 길로 간다. <span class="tag field">현장 미검증</span> (가짜 driver 로만 확인)</li>
+<li><b>보내기 실패 (37d49f9):</b> <code>send_errors</code> 가 조용히 올라가기만 했다. 실패가 시작될 때와 풀릴 때 stderr 에 한 줄씩 나온다.</li>
+<li><b>기본 action (d44a952, 리뷰 전):</b> 손 action 을 <code>sent</code> 로 정했다. 모터가 실제로 받은 값이 정책이 내야 할 값이기 때문이다.</li>
+</ul></div>
+<div class="next"><a href="#conv">← 변환기</a><a href="#hub">Control Hub →</a></div>
+</section>
+
+<!-- ============================================================ hub -->
+<section class="page" id="hub">
+<h1>Control Hub</h1>
+<p class="lead">가이드의 명령을 YAML 한 파일에 옮겨 적고, 브라우저에서 순서대로 켜고 끈다. hub 가 죽어도 로봇은 계속 돈다.</p>
+<figure><svg class="fig" viewBox="0 0 1000 400" role="img" aria-label="Control Hub 내부: 설정, tmux, 로그, 점검, 기록, 화면"><title>Control Hub 내부: 설정, tmux, 로그, 점검, 기록, 화면</title><defs><marker id="ah7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0L10,5L0,10z"/></marker><marker id="ah7d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah d" d="M0,0L10,5L0,10z"/></marker></defs><rect class="bx store" x="16" y="30" width="150" height="64" rx="7"/><text class="bx-t" x="91.0" y="50">hub.yaml</text><text class="bx-s" x="91.0" y="66">processes, checks,</text><text class="bx-s" x="91.0" y="82">profiles, devices</text><rect class="bx proc" x="16" y="150" width="150" height="56" rx="7"/><text class="bx-t" x="91.0" y="174">config.py</text><text class="bx-s" x="91.0" y="190">검증, 위치를 알려 줌</text><polyline class="ar " points="91,94 91,150" marker-end="url(#ah7)"/><rect class="bx proc" x="220" y="30" width="180" height="64" rx="7"/><text class="bx-t" x="310.0" y="50">command.py</text><text class="bx-s" x="310.0" y="66">env 줄 &amp;&amp; cmd + flags</text><text class="bx-s" x="310.0" y="82">ssh -tt / docker exec</text><rect class="bx ours" x="220" y="150" width="180" height="76" rx="7"/><text class="bx-t" x="310.0" y="176">supervisor.py</text><text class="bx-s" x="310.0" y="192">켜기, 끄기, 상태</text><text class="bx-s" x="310.0" y="208">requires, conflicts, confirm</text><polyline class="ar " points="166,178 220,178" marker-end="url(#ah7)"/><polyline class="ar " points="310,150 310,94" marker-end="url(#ah7)"/><rect class="bx proc" x="460" y="30" width="190" height="64" rx="7"/><text class="bx-t" x="555.0" y="50">tmux.py</text><text class="bx-s" x="555.0" y="66">소켓 shapeup, 세션 hub</text><text class="bx-s" x="555.0" y="82">프로세스당 창 하나</text><polyline class="ar " points="400,62 460,62" marker-end="url(#ah7)"/><rect class="bx dev" x="710" y="30" width="270" height="64" rx="7"/><text class="bx-t" x="845.0" y="50">프로세스 (tmux 창)</text><text class="bx-s" x="845.0" y="66">zenohd, arm, manus, leap_manus,</text><text class="bx-s" x="845.0" y="82">recorder, 확인 도구 …</text><polyline class="ar " points="650,62 710,62" marker-end="url(#ah7)"/><rect class="lb-bg" x="617" y="10" width="127" height="16" rx="3"/><text class="lb" x="680" y="22" text-anchor="middle">창 만들기 · C-c · kill</text><rect class="bx store" x="710" y="150" width="270" height="56" rx="7"/><text class="bx-t" x="845.0" y="174">로그 파일</text><text class="bx-s" x="845.0" y="190">~/.local/state/control_hub/logs/</text><polyline class="ar " points="845,94 845,150" marker-end="url(#ah7)"/><rect class="lb-bg" x="848" y="114" width="67" height="16" rx="3"/><text class="lb" x="882" y="126" text-anchor="middle">pipe-pane</text><rect class="bx proc" x="460" y="150" width="190" height="76" rx="7"/><text class="bx-t" x="555.0" y="176">logscan.py</text><text class="bx-s" x="555.0" y="192">ready 문구, hint, 장치 event</text><text class="bx-s" x="555.0" y="208">녹화기 stream 상태 줄</text><polyline class="ar " points="710,178 650,178" marker-end="url(#ah7)"/><polyline class="ar " points="460,188 400,188" marker-end="url(#ah7)"/><rect class="bx ours" x="220" y="280" width="180" height="76" rx="7"/><text class="bx-t" x="310.0" y="306">watcher.py</text><text class="bx-s" x="310.0" y="322">1 초마다 바뀐 것 →</text><text class="bx-s" x="310.0" y="338">사건(Event)</text><polyline class="ar " points="310,226 310,280" marker-end="url(#ah7)"/><rect class="bx proc" x="16" y="280" width="150" height="76" rx="7"/><text class="bx-t" x="91.0" y="306">checks.py · sysfs.py</text><text class="bx-s" x="91.0" y="322">ping, tcp, usb, serial,</text><text class="bx-s" x="91.0" y="338">http, ssh …</text><polyline class="ar " points="166,318 220,318" marker-end="url(#ah7)"/><rect class="bx proc" x="460" y="280" width="190" height="76" rx="7"/><text class="bx-t" x="555.0" y="306">devices.py</text><text class="bx-s" x="555.0" y="322">장치 칸의 색과 한 줄 요약</text><text class="bx-s" x="555.0" y="338">(점검 + 프로세스 + 사건)</text><polyline class="ar " points="400,318 460,318" marker-end="url(#ah7)"/><rect class="bx store" x="710" y="250" width="270" height="56" rx="7"/><text class="bx-t" x="845.0" y="274">session.py · incidents.py</text><text class="bx-s" x="845.0" y="290">sessions/&lt;시각&gt;/events.jsonl, incidents/</text><polyline class="ar " points="400,300 710,278" marker-end="url(#ah7)"/><rect class="bx ours" x="710" y="330" width="270" height="56" rx="7"/><text class="bx-t" x="845.0" y="354">server.py + static/</text><text class="bx-s" x="845.0" y="370">/api/state 1 초 polling, id 만 받는다</text><polyline class="ar " points="650,340 710,352" marker-end="url(#ah7)"/></svg><figcaption>그림 7. hub 내부. 프로세스는 tmux 창에서 돌고 hub 는 창을 만들고, Ctrl+C 를 보내고, 로그 파일을 읽는다.</figcaption></figure>
+
+<h2>왜 tmux 인가</h2>
+<ul>
+<li><b>hub 와 프로세스의 수명을 뗀다.</b> hub 를 고치느라 재시작해도 팔과 손은 계속 돈다. 다시 띄우면 도는 창을 그대로 알아본다.</li>
+<li><b>언제든 터미널로 돌아간다.</b> <code>tmux -L shapeup attach -t hub</code> 로 같은 창에 들어가 직접 볼 수 있다.</li>
+<li><b>끄는 방식이 가이드와 같다.</b> "끄기"는 그 창에 Ctrl+C 를 보낸다. <code>leap_*</code> 는 그때 Torque OFF 를 한다.</li>
+<li><b>Robot PC 에 아무것도 설치하지 않는다.</b> 원격 프로세스도 User PC 의 창에서 ssh 로 돈다.</li>
+</ul>
+
+<h2>버튼 하나가 실행되기까지</h2>
+<ol class="steps">
+<li>브라우저가 <code>POST /api/process/&lt;id&gt;/start</code> 를 보낸다. 보내는 것은 id 와 고른 옵션(flag id), 체크한 확인 항목뿐이다. <b>명령 문자열은 받지 않는다.</b></li>
+<li><code>supervisor.py</code> 가 막을 이유를 본다: <code>requires</code>(먼저 떠 있어야 하는 프로세스나 점검), <code>conflicts</code>(같이 켜면 안 되는 것), <code>confirm_start</code>(사람이 체크해야 하는 것).</li>
+<li><code>command.py</code> 가 한 줄을 만든다: <code>env</code> 의 줄들 <code>&amp;&amp;</code> <code>cmd</code> + 고른 flag 의 인자. 원격이면 <code>ssh -tt</code>, 컨테이너면 그 안에서 <code>docker exec -it</code>.</li>
+<li><code>tmux.py</code> 가 그 줄을 스크립트 파일로 써서 새 창에서 실행하고, 출력을 로그 파일로 보낸다.</li>
+<li><code>logscan.py</code> 가 로그를 따라 읽으며 <code>ready</code> 문구, hint, 장치 event 를 찾는다. 준비 조건을 보면 "준비됨"이 된다.</li>
+</ol>
+<pre><code># control_hub/src/control_hub/command.py (요약)
+lines   = envs[proc.env]                       # 예: source /opt/ros/jazzy/setup.bash, export ...
+script  = " &amp;&amp; ".join([*lines, proc.cmd + flags])
+if local:      return f"bash -c {quote(script)}"
+if container:  remote = f"docker exec -it {container} bash -c {quote(script)}"
+return f"ssh -tt -o ConnectTimeout=5 ... {host} {quote(remote)}"   # -tt: Ctrl+C 가 원격까지 가도록</code></pre>
+
+<figure><svg class="fig" viewBox="0 0 810 270" role="img" aria-label="Control Hub 의 프로세스 상태"><title>Control Hub 의 프로세스 상태</title><defs><marker id="ah8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0L10,5L0,10z"/></marker><marker id="ah8d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah d" d="M0,0L10,5L0,10z"/></marker></defs><rect class="bx proc" x="20" y="80" width="110" height="50" rx="7"/><text class="bx-t" x="75.0" y="101">꺼짐</text><text class="bx-s" x="75.0" y="117">off</text><rect class="bx proc" x="220" y="80" width="130" height="50" rx="7"/><text class="bx-t" x="285.0" y="101">켜는 중</text><text class="bx-s" x="285.0" y="117">starting</text><rect class="bx ours" x="440" y="80" width="130" height="50" rx="7"/><text class="bx-t" x="505.0" y="101">준비됨</text><text class="bx-s" x="505.0" y="117">ready</text><rect class="bx proc" x="660" y="80" width="130" height="50" rx="7"/><text class="bx-t" x="725.0" y="101">끄는 중</text><text class="bx-s" x="725.0" y="117">stopping</text><rect class="bx store" x="330" y="200" width="130" height="50" rx="7"/><text class="bx-t" x="395.0" y="221">끝남</text><text class="bx-s" x="395.0" y="237">done (도구, exit 0)</text><rect class="bx store" x="550" y="200" width="130" height="50" rx="7"/><text class="bx-t" x="615.0" y="221">오류</text><text class="bx-s" x="615.0" y="237">failed</text><polyline class="ar " points="130,105 220,105" marker-end="url(#ah8)"/><rect class="lb-bg" x="164" y="87" width="21" height="16" rx="3"/><text class="lb" x="175" y="99" text-anchor="middle">켜기</text><polyline class="ar " points="350,105 440,105" marker-end="url(#ah8)"/><rect class="lb-bg" x="365" y="87" width="61" height="16" rx="3"/><text class="lb" x="395" y="99" text-anchor="middle">ready 조건</text><polyline class="ar " points="570,105 660,105" marker-end="url(#ah8)"/><rect class="lb-bg" x="575" y="87" width="81" height="16" rx="3"/><text class="lb" x="615" y="99" text-anchor="middle">끄기 = Ctrl+C</text><polyline class="ar " points="725,80 725,40 75,40 75,80" marker-end="url(#ah8)"/><rect class="lb-bg" x="264" y="22" width="272" height="16" rx="3"/><text class="lb" x="400" y="34" text-anchor="middle">창이 닫힘 (stop_grace_s 안에 안 끝나면 &#x27;강제 종료&#x27; 버튼)</text><polyline class="ar d" points="285,130 370,200" marker-end="url(#ah8d)"/><rect class="lb-bg" x="266" y="160" width="48" height="16" rx="3"/><text class="lb" x="290" y="172" text-anchor="middle">스스로 끝남</text><polyline class="ar d" points="505,130 600,200" marker-end="url(#ah8d)"/><rect class="lb-bg" x="573" y="150" width="54" height="16" rx="3"/><text class="lb" x="600" y="162" text-anchor="middle">예상 밖 종료</text></svg><figcaption>그림 8. 프로세스 상태. "켜는 중"은 떴지만 준비 조건을 아직 못 본 것이다. 프로세스는 돌고 있다.</figcaption></figure>
+
+<h2>설정 파일의 구성 요소</h2>
+<table>
+<tr><th>키</th><th>뜻</th></tr>
+<tr><td><code>hosts</code></td><td>이름 → ssh 주소와 컨테이너. 예: <code>robot_container: {ssh: root@10.42.0.241, container: open_manipulator}</code></td></tr>
+<tr><td><code>envs</code></td><td>이름 → 명령 앞에 실행할 셸 줄들 (ROS source, venv 활성화)</td></tr>
+<tr><td><code>processes</code></td><td>버튼 하나. <code>cmd</code>, <code>host</code>, <code>env</code>, <code>kind</code>(service / tool), <code>flags</code>, <code>requires</code>, <code>conflicts</code>, <code>ready</code>, <code>confirm_start</code> / <code>confirm_stop</code>, <code>stop_grace_s</code>, <code>hints</code>, <code>input</code></td></tr>
+<tr><td><code>checks</code></td><td>오른쪽 띠의 점검. ping, tcp, ssh, usb, serial, http, file, process, no_process, command</td></tr>
+<tr><td><code>profiles</code></td><td>실행표. 프로세스 id 와 사람이 하는 단계(<code>{note: …}</code>)의 순서</td></tr>
+<tr><td><code>devices</code></td><td>홈 화면의 장치 칸. 묶을 점검, 프로세스, 도구, 로그 event 규칙, <code>recorder_stream</code></td></tr>
+<tr><td><code>hints</code></td><td>로그 줄 정규식 → 조치 문구. <code>ignore: true</code> 면 그 줄을 무시한다</td></tr>
+</table>
+<p>명령이 바뀌면 <code>hub.yaml</code> 만 고치고 화면의 "설정 다시 읽기"를 누른다. 파일이 틀렸으면 어디가 틀렸는지 나오고 이전 설정이 유지된다. 도는 프로세스는 건드리지 않는다.</p>
+
+<h2>지켜보기: 점검, 사건, 사고 폴더</h2>
+<table>
+<tr><th>무엇</th><th>주기</th><th>남는 곳</th></tr>
+<tr><td>점검(<code>checks.py</code>)</td><td><code>check_interval_s</code> (예시 4초)</td><td>오른쪽 띠, 장치 칸</td></tr>
+<tr><td>변화 감시(<code>watcher.py</code>)</td><td>1초. 브라우저가 닫혀 있어도 돈다</td><td><code>sessions/&lt;시각&gt;/events.jsonl</code></td></tr>
+<tr><td>사고(<code>incidents.py</code>)</td><td>수준이 bad 인 사건마다. 같은 장치에서 30초 안이면 한 폴더</td><td><code>incidents/&lt;시각&gt;_&lt;장치&gt;_&lt;내용&gt;/</code>: 요약, 그 순간의 점검 결과, 오류 낸 프로세스의 로그 앞뒤, 같이 돌던 프로세스의 로그</td></tr>
+</table>
+<p>제어 주기에는 끼어들지 않는다. 로그 파일과 sysfs 를 읽기만 한다.</p>
+
+<div class="changed"><b>리뷰 뒤 바뀐 것 (c37fff4): 녹화기의 스트림 오류가 hub 에 보인다.</b>
+<ul>
+<li><b>전:</b> <code>devices.*.recorder_stream</code> 은 화면 문구에만 쓰였다. 녹화 중 촉각 보드가 빠져도 hub 의 촉각 칸은 그대로였고, 녹화기는 스트림 오류를 로그에 찍지도 않았다.</li>
+<li><b>후:</b> 녹화기가 상태가 바뀔 때마다 <code>[tactile-rec] stream tactile_a: error (read failed: …)</code> 한 줄을 찍는다. hub 는 그 줄을 읽어 그 스트림을 가진 장치 칸을 빨강(error, stale)이나 노랑(slow, off)으로 만든다. 일반 사건은 60초 뒤 사라지지만 이 표시는 녹화기가 <code>ok</code> 라고 할 때까지 남고, 녹화기가 꺼지면 사라진다.</li>
+<li><b>conflicts:</b> 확인 도구(<code>check_*</code>)는 녹화기와 같은 장치를 연다. 특히 <code>check_hand</code> 는 같은 UDP 포트를 열어 패킷을 나눠 가졌다. 녹화기와 모든 확인 도구가 서로 conflict 다.</li>
+<li><b>hint 하나 삭제:</b> "Connection to … closed" 는 원격 프로세스를 정상적으로 끌 때마다 걸렸다.</li>
+<li><b>끌 때 확인 (eaacb33):</b> 녹화기에 <code>confirm_stop</code> 을 넣었다.</li>
+</ul></div>
+
+<div class="danger"><b>알려진 한계.</b> 원격 프로세스는 <code>ssh -tt … docker exec -it …</code> 로 돈다. 이더넷이 끊기거나 "강제 종료"로 창을 닫았을 때 컨테이너 안의 프로세스가 같이 끝나는지는 코드로 보장하지 못한다 <span class="tag field">현장 미검증</span>. 팔 bringup 을 강제 종료한 뒤에는 "로봇 중복 실행 확인" 도구로 남은 노드가 없는지 본다.</div>
+<div class="next"><a href="#teleop">← 텔레옵과의 연결</a><a href="#hubcmd">버튼과 명령 →</a></div>
+</section>
+
+<!-- ============================================================ 버튼 -->
+<section class="page" id="hubcmd">
+<h1>버튼과 명령</h1>
+<p class="lead"><code>control_hub/config/hub.example.yaml</code> 의 모든 버튼이 실제로 무엇을 실행하는지. 이 표는 그 파일을 hub 의 loader 로 읽어 만들었다.</p>
+<p><input class="filter" id="proc-filter" type="search" placeholder="버튼 이름이나 명령으로 거르기 (예: leap, ros2 launch)"></p>
+<div class="proc-group"><h2>Robot PC <span class="sum-note">8개</span></h2><details class="proc"><summary>zenoh 라우터 <span class="tag where">Robot PC 컨테이너</span> <span class="sum-note"><code>zenohd</code></span></summary><div class="body"><p>Robot PC 컨테이너의 zenoh 라우터(:7447). 팔을 쓰는 동안 끄지 않는다.<br>컨테이너에 자동 실행 서비스가 있다. 이미 떠 있으면(&quot;zenoh :7447&quot; 점검이 정상) 켜지 않고 그대로 쓴다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>ros2 run rmw_zenoh_cpp rmw_zenohd</code></dd><dt>환경</dt><dd><code>robot_ros</code> (아래 환경 묶음)</dd><dt>준비됨 조건</dt><dd>점검 'zenoh :7447' 이 통과하면</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd><dt>로그 hint</dt><dd><code>Address already in use</code> → zenohd 가 이미 떠 있다. 그대로 쓰면 된다 (이 창은 닫는다)</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>ssh -tt -o ConnectTimeout=5 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 root@10.42.0.241 &#x27;docker exec -it open_manipulator bash -c &#x27;&quot;&#x27;&quot;&#x27;source /opt/ros/jazzy/setup.bash &amp;&amp; export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp &amp;&amp; source /workspace/omy_ws/install/setup.bash &amp;&amp; ros2 run rmw_zenoh_cpp rmw_zenohd&#x27;&quot;&#x27;&quot;&#x27;&#x27;</code></pre></div></details><details class="proc"><summary>팔 bringup (omy_ai_wrist_flip) <span class="tag where">Robot PC 컨테이너</span><span class="tag risk">확인 필요</span> <span class="sum-note"><code>arm</code></span></summary><div class="body"><p>LEAP 90° 장착용(현재 기본). follower 시작 → home → ready 이동(약 20초) → leader 동기화.<br>누르는 즉시 팔이 움직인다. leader 손목은 0 근처로 잡는다.<br>먼저 &quot;로봇 중복 실행 확인&quot; 도구로 follower/leader 가 이미 떠 있지 않은지 본다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>ros2 launch omy_leap_bringup omy_ai_wrist_flip.launch.py</code></dd><dt>환경</dt><dd><code>robot_ros</code> (아래 환경 묶음)</dd><dt>먼저 필요</dt><dd>zenoh :7447</dd><dt>같이 못 켬</dt><dd>팔 bringup 순정 (omy_ai), 팔 접기 (pack), 팔 펴기 (unpack)</dd><dt>준비됨 조건</dt><dd>로그에 <code>(?i)leader</code> 가 나오면</dd><dt>켜기 전 확인</dt><dd>☐ 작업 공간을 비웠고 비상 정지 수단을 확인했다. 누르는 즉시 팔이 움직인다<br>☐ LEAP 은 주먹 상태다 (팔이 움직이는 동안 손은 주먹)<br>☐ leader 를 손으로 잡고 트리거를 쥐고 있다</dd><dt>끄기 전 확인</dt><dd>☐ 팔을 손으로 받치고 있다 (끄면 팔이 처질 수 있다)</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 15초 기다린다. 안 끝나면 '강제 종료' 버튼</dd><dt>로그 hint</dt><dd><code>BULK_READ_FAIL</code> → 무시<br><code>Multi-turn|0xc</code> → Debug USB + Dynamixel Wizard 로 Clear 한다 (10/09 문서 부록 A). Factory Reset 금지<br><code>package &#x27;omy_leap_bringup&#x27; not found</code> → 컨테이너에 omy_leap_bringup 이 빌드되지 않았다. /workspace/omy_ws 에서 colcon build</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>ssh -tt -o ConnectTimeout=5 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 root@10.42.0.241 &#x27;docker exec -it open_manipulator bash -c &#x27;&quot;&#x27;&quot;&#x27;source /opt/ros/jazzy/setup.bash &amp;&amp; export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp &amp;&amp; source /workspace/omy_ws/install/setup.bash &amp;&amp; ros2 launch omy_leap_bringup omy_ai_wrist_flip.launch.py&#x27;&quot;&#x27;&quot;&#x27;&#x27;</code></pre></div></details><details class="proc"><summary>팔 bringup 순정 (omy_ai) <span class="tag where">Robot PC 컨테이너</span><span class="tag risk">확인 필요</span> <span class="sum-note"><code>arm_stock</code></span></summary><div class="body"><p>순정 장착(손가락이 아래)일 때만 쓴다. 90° 장착에서는 omy_ai_wrist_flip 을 쓴다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>ros2 launch open_manipulator_bringup omy_ai.launch.py</code></dd><dt>환경</dt><dd><code>robot_ros</code> (아래 환경 묶음)</dd><dt>먼저 필요</dt><dd>zenoh :7447</dd><dt>같이 못 켬</dt><dd>팔 bringup (omy_ai_wrist_flip)</dd><dt>준비됨 조건</dt><dd>로그에 <code>(?i)leader</code> 가 나오면</dd><dt>켜기 전 확인</dt><dd>☐ LEAP 이 순정 장착(손가락 아래)이다. 90° 장착이 아니다<br>☐ 작업 공간을 비웠다. 누르는 즉시 팔이 움직인다<br>☐ leader 를 손으로 잡고 있다</dd><dt>끄기 전 확인</dt><dd>☐ 팔을 손으로 받치고 있다</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 15초 기다린다. 안 끝나면 '강제 종료' 버튼</dd><dt>로그 hint</dt><dd><code>BULK_READ_FAIL</code> → 무시</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>ssh -tt -o ConnectTimeout=5 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 root@10.42.0.241 &#x27;docker exec -it open_manipulator bash -c &#x27;&quot;&#x27;&quot;&#x27;source /opt/ros/jazzy/setup.bash &amp;&amp; export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp &amp;&amp; source /workspace/omy_ws/install/setup.bash &amp;&amp; ros2 launch open_manipulator_bringup omy_ai.launch.py&#x27;&quot;&#x27;&quot;&#x27;&#x27;</code></pre></div></details><details class="proc"><summary>로봇 중복 실행 확인 <span class="tag where">Robot PC 컨테이너</span><span class="tag tool">도구</span> <span class="sum-note"><code>robot_precheck</code></span></summary><div class="body"><p>컨테이너의 자동 실행 서비스가 follower/leader 를 이미 띄웠는지 본다.<br>둘 다 비어 있으면 zenoh 라우터와 팔 bringup 을 켠다. 떠 있으면 그대로 쓰고 다시 켜지 않는다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>echo &quot;--- zenohd ---&quot;; pgrep -a zenohd; echo &quot;--- ros2 node list ---&quot;; ros2 node list</code></dd><dt>환경</dt><dd><code>robot_ros</code> (아래 환경 묶음)</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>ssh -tt -o ConnectTimeout=5 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 root@10.42.0.241 &#x27;docker exec -it open_manipulator bash -c &#x27;&quot;&#x27;&quot;&#x27;source /opt/ros/jazzy/setup.bash &amp;&amp; export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp &amp;&amp; source /workspace/omy_ws/install/setup.bash &amp;&amp; echo &quot;--- zenohd ---&quot;; pgrep -a zenohd; echo &quot;--- ros2 node list ---&quot;; ros2 node list&#x27;&quot;&#x27;&quot;&#x27;&#x27;</code></pre></div></details><details class="proc"><summary>컨트롤러 확인 <span class="tag where">Robot PC 컨테이너</span><span class="tag tool">도구</span> <span class="sum-note"><code>arm_controllers</code></span></summary><div class="body"><p>arm_controller 와 joint_state_broadcaster 가 active 여야 한다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>ros2 control list_controllers</code></dd><dt>환경</dt><dd><code>robot_ros</code> (아래 환경 묶음)</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>ssh -tt -o ConnectTimeout=5 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 root@10.42.0.241 &#x27;docker exec -it open_manipulator bash -c &#x27;&quot;&#x27;&quot;&#x27;source /opt/ros/jazzy/setup.bash &amp;&amp; export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp &amp;&amp; source /workspace/omy_ws/install/setup.bash &amp;&amp; ros2 control list_controllers&#x27;&quot;&#x27;&quot;&#x27;&#x27;</code></pre></div></details><details class="proc"><summary>leader 값 한 번 읽기 <span class="tag where">Robot PC 컨테이너</span><span class="tag tool">도구</span> <span class="sum-note"><code>leader_echo</code></span></summary><div class="body"><p>값 7개가 나온다. 마지막이 leader 트리거다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>ros2 topic echo /leader/joint_trajectory --field points --once</code></dd><dt>환경</dt><dd><code>robot_ros</code> (아래 환경 묶음)</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>ssh -tt -o ConnectTimeout=5 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 root@10.42.0.241 &#x27;docker exec -it open_manipulator bash -c &#x27;&quot;&#x27;&quot;&#x27;source /opt/ros/jazzy/setup.bash &amp;&amp; export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp &amp;&amp; source /workspace/omy_ws/install/setup.bash &amp;&amp; ros2 topic echo /leader/joint_trajectory --field points --once&#x27;&quot;&#x27;&quot;&#x27;&#x27;</code></pre></div></details><details class="proc"><summary>팔 접기 (pack) <span class="tag where">Robot PC 컨테이너</span><span class="tag tool">도구</span><span class="tag risk">확인 필요</span> <span class="sum-note"><code>pack</code></span></summary><div class="body"><p>home → pack ([0, 0, −150°, −30°, 0, 0], 각 10초). 끝나면 &quot;끄기&quot;로 닫는다.<br>omy_3m 은 끝단 없는 6축 모델이다. LEAP 을 단 채로 접을 때 손이 부딪히는지는 확인된 바 없다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>ros2 launch open_manipulator_bringup omy_3m_pack.launch.py</code></dd><dt>환경</dt><dd><code>robot_ros</code> (아래 환경 묶음)</dd><dt>같이 못 켬</dt><dd>팔 bringup (omy_ai_wrist_flip), 팔 펴기 (unpack)</dd><dt>켜기 전 확인</dt><dd>☐ 팔 bringup 을 껐다 (동시에 실행하면 안 된다)<br>☐ LEAP 5V 를 껐고 케이블이 당기지 않는다<br>☐ 팔을 받치고 있거나 손을 뗐다. 손이 베이스·바닥에 부딪히지 않는지 지켜본다</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>ssh -tt -o ConnectTimeout=5 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 root@10.42.0.241 &#x27;docker exec -it open_manipulator bash -c &#x27;&quot;&#x27;&quot;&#x27;source /opt/ros/jazzy/setup.bash &amp;&amp; export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp &amp;&amp; source /workspace/omy_ws/install/setup.bash &amp;&amp; ros2 launch open_manipulator_bringup omy_3m_pack.launch.py&#x27;&quot;&#x27;&quot;&#x27;&#x27;</code></pre></div></details><details class="proc"><summary>팔 펴기 (unpack) <span class="tag where">Robot PC 컨테이너</span><span class="tag tool">도구</span><span class="tag risk">확인 필요</span> <span class="sum-note"><code>unpack</code></span></summary><div class="body"><p>접힌 자세에서 home(전부 0)으로 편다. 끝나면 &quot;끄기&quot;로 닫는다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>ros2 launch open_manipulator_bringup omy_3m_unpack.launch.py</code></dd><dt>환경</dt><dd><code>robot_ros</code> (아래 환경 묶음)</dd><dt>같이 못 켬</dt><dd>팔 bringup (omy_ai_wrist_flip), 팔 접기 (pack)</dd><dt>켜기 전 확인</dt><dd>☐ 팔 bringup 을 껐다 (동시에 실행하면 안 된다)<br>☐ 작업 공간을 비웠다</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>ssh -tt -o ConnectTimeout=5 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 root@10.42.0.241 &#x27;docker exec -it open_manipulator bash -c &#x27;&quot;&#x27;&quot;&#x27;source /opt/ros/jazzy/setup.bash &amp;&amp; export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp &amp;&amp; source /workspace/omy_ws/install/setup.bash &amp;&amp; ros2 launch open_manipulator_bringup omy_3m_unpack.launch.py&#x27;&quot;&#x27;&quot;&#x27;&#x27;</code></pre></div></details></div><div class="proc-group"><h2>User PC <span class="sum-note">7개</span></h2><details class="proc"><summary>Manus 노드 <span class="tag where">User PC</span> <span class="sum-note"><code>manus</code></span></summary><div class="body"><p>글러브 동글을 직접 열어 /manus_glove_0 을 약 120 Hz 로 낸다. 글러브를 착용하고 켠다.<br>MANUS Core Dashboard 가 켜져 있으면 동글을 못 잡는다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>ros2 run manus_ros2 manus_data_publisher</code></dd><dt>환경</dt><dd><code>teleop</code> (아래 환경 묶음)</dd><dt>먼저 필요</dt><dd>MANUS Dashboard 꺼짐</dd><dt>준비됨 조건</dt><dd>로그에 <code>integrated mode</code> 가 나오면</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd><dt>로그 hint</dt><dd><code>Resource busy|claimed by another program</code> → MANUS Core Dashboard 가 동글을 잡고 있다. Dashboard 를 끄고 다시 켠다<br><code>SDK license|No license found</code> → 먼저 Dashboard 가 꺼졌는지 본다. 꺼진 상태에서도 나면 라이선스에 Integrated 기능이 없다<br><code>bad_alloc|tcp/10\.42\.0\.241:7447</code> → zenoh 환경이 남아 있다. envs.teleop 에 LEAP_NO_ZENOH=1 이 있는지 확인한다</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>bash -c &#x27;export LEAP_ROS_DISTRO=humble OMY_ROBOT_IP=10.42.0.241 LEAP_NO_ZENOH=1 &amp;&amp; export LEAP_MANUS_WS=&quot;&lt;레포&gt;/third_party/manus/ROS2 package&quot; &amp;&amp; source &quot;&lt;레포&gt;/user_pc/scripts/leap_aliases.sh&quot; &amp;&amp; leap_env &amp;&amp; ros2 run manus_ros2 manus_data_publisher&#x27;</code></pre></div></details><details class="proc"><summary>LEAP 모터 확인 (leap_check) <span class="tag where">User PC</span><span class="tag tool">도구</span> <span class="sum-note"><code>leap_check</code></span></summary><div class="body"><p>ID 0~15 가 모두 응답하고 오류가 0 이어야 한다. LEAP 5V 를 편 손으로 켠 뒤에 한다.<br>편 손에서 1·5·9번(약 −85°) 말고는 0 근처(±15°)여야 한다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>leap_check</code></dd><dt>환경</dt><dd><code>teleop</code> (아래 환경 묶음)</dd><dt>먼저 필요</dt><dd>LEAP USB (/dev/ttyUSB0)</dd><dt>같이 못 켬</dt><dd>leader 트리거 → LEAP (leap_leader), Manus → LEAP 텔레옵 (leap_manus), LEAP 영점 기록 (calibrate_motors)</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd><dt>로그 hint</dt><dd><code>Missing or unresponsive</code> → 5V, USB, Dynamixel Wizard 가 포트를 잡고 있는지 본다. 일부 ID 만 빠지면 그 손가락 케이블을 다시 꽂는다<br><code>Permission denied.*ttyUSB</code> → sudo usermod -aG dialout $USER 후 재로그인 (임시: sudo chmod 666 /dev/ttyUSB0)</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>bash -c &#x27;export LEAP_ROS_DISTRO=humble OMY_ROBOT_IP=10.42.0.241 LEAP_NO_ZENOH=1 &amp;&amp; export LEAP_MANUS_WS=&quot;&lt;레포&gt;/third_party/manus/ROS2 package&quot; &amp;&amp; source &quot;&lt;레포&gt;/user_pc/scripts/leap_aliases.sh&quot; &amp;&amp; leap_env &amp;&amp; leap_check&#x27;</code></pre></div></details><details class="proc"><summary>Manus → LEAP 텔레옵 (leap_manus) <span class="tag where">User PC</span><span class="tag risk">확인 필요</span> <span class="sum-note"><code>leap_manus</code></span></summary><div class="body"><p>글러브 → 리타게팅 → LEAP. 엄지 IK 가 기본이고 주먹이 safe-pose 다.<br>처음에는 dry-run 으로 &quot;[teleop] live&quot; 와 값 변화를 본 뒤, dry-run 을 끄고 다시 켠다.<br>--record-udp 로 녹화기에 손 값을 보낸다 (받는 쪽이 없어도 영향 없음).<br>manus_leap.yaml 은 시작할 때만 읽는다. 값을 바꾸면 껐다 켠다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>leap_manus --record-udp</code></dd><dt>환경</dt><dd><code>teleop</code> (아래 환경 묶음)</dd><dt>옵션</dt><dd><code>--dry-run</code> dry-run (LEAP 을 건드리지 않고 로그만) <b>(기본 켜짐)</b><br><code>--thumb affine</code> 엄지 affine (진단용)</dd><dt>먼저 필요</dt><dd>Manus 노드</dd><dt>같이 못 켬</dt><dd>LEAP 모터 확인 (leap_check), leader 트리거 → LEAP (leap_leader), LEAP 영점 기록 (calibrate_motors)</dd><dt>준비됨 조건</dt><dd>로그에 <code>\[teleop\] live</code> 가 나오면</dd><dt>켜기 전 확인</dt><dd>☐ LEAP 5V 를 편 손으로 켰고 차단 수단이 손 닿는 곳에 있다 <span class='sum-note'>(옵션 dry_run 이면 생략)</span><br>☐ 손가락 주변에 손·케이블이 없다 <span class='sum-note'>(옵션 dry_run 이면 생략)</span><br>☐ LEAP 모터 확인(leap_check)이 통과했다 <span class='sum-note'>(옵션 dry_run 이면 생략)</span></dd><dt>끄기 전 확인</dt><dd>☐ 손에 물체가 없다 (끄면 Torque OFF 로 손이 풀린다)</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd><dt>로그 hint</dt><dd><code>(?i)fall(ing|s)? back to affine|using affine</code> → 키포인트를 못 찾아 엄지가 affine 으로 돈다. /manus_glove_0 의 손목 Invalid, 엄지 DIP 노드를 확인한다<br><code>Run calibrate_motors</code> → 영점 파일(user_pc/config/hardware_motors.yaml)이 없다. &#x27;LEAP 영점 기록&#x27; 도구를 먼저 한다<br><code>manus_calibration</code> → 작업자 캘리브레이션 파일이 없다. &#x27;글러브 편 손/주먹 기록&#x27; 도구를 먼저 한다<br><code>Missing or unresponsive</code> → LEAP 5V 와 USB 를 본다. leap_check 를 먼저 돌린다</dd></dl><p><b>실제로 실행되는 한 줄</b> (기본 옵션일 때)</p><pre><code>bash -c &#x27;export LEAP_ROS_DISTRO=humble OMY_ROBOT_IP=10.42.0.241 LEAP_NO_ZENOH=1 &amp;&amp; export LEAP_MANUS_WS=&quot;&lt;레포&gt;/third_party/manus/ROS2 package&quot; &amp;&amp; source &quot;&lt;레포&gt;/user_pc/scripts/leap_aliases.sh&quot; &amp;&amp; leap_env &amp;&amp; leap_manus --record-udp --dry-run&#x27;</code></pre></div></details><details class="proc"><summary>leader 트리거 → LEAP (leap_leader) <span class="tag where">User PC</span><span class="tag risk">확인 필요</span> <span class="sum-note"><code>leap_leader</code></span></summary><div class="body"><p>2단계(검증 끝): leader 트리거로 LEAP 을 열고 닫는다. 팔 + zenoh + LEAP 경로 확인용.<br>토픽이 0.5초 끊기면 hold, 3초 끊기면 안전 자세.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>leap_leader</code></dd><dt>환경</dt><dd><code>teleop_zenoh</code> (아래 환경 묶음)</dd><dt>옵션</dt><dd><code>--dry-run</code> dry-run (LEAP 을 건드리지 않고 로그만) <b>(기본 켜짐)</b></dd><dt>먼저 필요</dt><dd>zenoh :7447</dd><dt>같이 못 켬</dt><dd>LEAP 모터 확인 (leap_check), Manus → LEAP 텔레옵 (leap_manus), LEAP 영점 기록 (calibrate_motors)</dd><dt>준비됨 조건</dt><dd>로그에 <code>\[teleop\] live</code> 가 나오면</dd><dt>켜기 전 확인</dt><dd>☐ LEAP 5V 를 편 손으로 켰고 차단 수단이 손 닿는 곳에 있다 <span class='sum-note'>(옵션 dry_run 이면 생략)</span></dd><dt>끄기 전 확인</dt><dd>☐ 손에 물체가 없다 (끄면 Torque OFF 로 손이 풀린다)</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b> (기본 옵션일 때)</p><pre><code>bash -c &#x27;unset LEAP_NO_ZENOH &amp;&amp; export LEAP_ROS_DISTRO=humble OMY_ROBOT_IP=10.42.0.241 &amp;&amp; export LEAP_MANUS_WS=&quot;&lt;레포&gt;/third_party/manus/ROS2 package&quot; &amp;&amp; source &quot;&lt;레포&gt;/user_pc/scripts/leap_aliases.sh&quot; &amp;&amp; leap_env &amp;&amp; leap_leader --dry-run&#x27;</code></pre></div></details><details class="proc"><summary>녹화기 (tactile-rec) <span class="tag where">User PC</span> <span class="sum-note"><code>recorder</code></span></summary><div class="body"><p>팔·손·촉각·카메라를 한 시간축으로 기록한다. 켜지면 오른쪽 띠의 &quot;녹화기 열기&quot;(:8800)로 간다.<br>녹화기가 카메라를 직접 연다. ROS 카메라 노드와 같이 켤 수 없다.<br>태스크·수집자는 녹화기 화면의 설정 페이지에서 바꾼다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>tactile-rec record --config config/rig.yaml</code></dd><dt>환경</dt><dd><code>recorder</code> (아래 환경 묶음)</dd><dt>같이 못 켬</dt><dd>손목 카메라 ROS 노드 (미리보기용), 스트림 확인: cam_ext, 스트림 확인: cam_wrist, 스트림 확인: glove, 스트림 확인: hand, 스트림 확인: tactile_a, 스트림 확인: tactile_b, 녹화기 (가짜 신호)</dd><dt>준비됨 조건</dt><dd>점검 '녹화기 UI (:8800)' 이 통과하면</dd><dt>끄기 전 확인</dt><dd>☐ 녹화 중이 아니다 (녹화 중에 끄면 그 에피소드는 멈추고 미저장으로 남는다)</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd><dt>로그 hint</dt><dd><code>open failed</code> → ROS 카메라 노드가 켜져 있거나 rig.yaml 의 serial / router 가 틀렸다<br><code>board modules do not match</code> → rig.yaml 의 places 를 메시지에 나온 실제 모듈 이름에 맞춘다<br><code>rig.yaml.*(No such file|not found)</code> → recorder/config/rig.example.yaml 을 rig.yaml 로 복사한다</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>bash -c &#x27;unset PYTHONPATH ROS_DOMAIN_ID RMW_IMPLEMENTATION ZENOH_CONFIG_OVERRIDE &amp;&amp; cd &quot;&lt;레포&gt;/recorder&quot; &amp;&amp; source .venv/bin/activate &amp;&amp; tactile-rec record --config config/rig.yaml&#x27;</code></pre></div></details><details class="proc"><summary>녹화기 (가짜 신호) <span class="tag where">User PC</span> <span class="sum-note"><code>recorder_fake</code></span></summary><div class="body"><p>실물 없이 녹화기 UI 와 녹화·변환을 돌려 본다. 결과는 recorder/data_fake/ 에 쌓인다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>tactile-rec record --config config/rig.fake.yaml</code></dd><dt>환경</dt><dd><code>recorder</code> (아래 환경 묶음)</dd><dt>같이 못 켬</dt><dd>녹화기 (tactile-rec)</dd><dt>준비됨 조건</dt><dd>점검 '녹화기 UI (:8800)' 이 통과하면</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>bash -c &#x27;unset PYTHONPATH ROS_DOMAIN_ID RMW_IMPLEMENTATION ZENOH_CONFIG_OVERRIDE &amp;&amp; cd &quot;&lt;레포&gt;/recorder&quot; &amp;&amp; source .venv/bin/activate &amp;&amp; tactile-rec record --config config/rig.fake.yaml&#x27;</code></pre></div></details><details class="proc"><summary>손목 카메라 ROS 노드 (미리보기용) <span class="tag where">User PC</span> <span class="sum-note"><code>camera_ros</code></span></summary><div class="body"><p>D405 를 ROS 토픽(/camera/cam_wrist/color/image_raw)으로 낸다. 녹화에는 쓰지 않는다. 녹화기를 켜기 전에 끈다.<br>OMY 를 다시 켜면 카메라가 USB 에서 사라진다. 다시 꽂는다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>ros2 launch realsense2_camera rs_launch.py camera_namespace:=camera camera_name:=cam_wrist enable_depth:=false depth_module.color_profile:=424x240x30</code></dd><dt>환경</dt><dd><code>teleop</code> (아래 환경 묶음)</dd><dt>같이 못 켬</dt><dd>스트림 확인: cam_wrist, 녹화기 (tactile-rec)</dd><dt>준비됨 조건</dt><dd>없음. 창이 뜨면 준비됨</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd><dt>로그 hint</dt><dd><code>Failed to read busnum/devnum</code> → 무시<br><code>No RealSense devices were found</code> → OMY 를 다시 켰으면 카메라 USB 를 다시 꽂는다</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>bash -c &#x27;export LEAP_ROS_DISTRO=humble OMY_ROBOT_IP=10.42.0.241 LEAP_NO_ZENOH=1 &amp;&amp; export LEAP_MANUS_WS=&quot;&lt;레포&gt;/third_party/manus/ROS2 package&quot; &amp;&amp; source &quot;&lt;레포&gt;/user_pc/scripts/leap_aliases.sh&quot; &amp;&amp; leap_env &amp;&amp; ros2 launch realsense2_camera rs_launch.py camera_namespace:=camera camera_name:=cam_wrist enable_depth:=false depth_module.color_profile:=424x240x30&#x27;</code></pre></div></details></div><div class="proc-group"><h2>도구 <span class="sum-note">11개</span></h2><details class="proc"><summary>LEAP 영점 기록 (calibrate_motors) <span class="tag where">User PC</span><span class="tag tool">도구</span><span class="tag risk">확인 필요</span> <span class="sum-note"><code>leap_zero</code></span></summary><div class="body"><p>Torque OFF 상태에서 편 손의 모터 위치를 user_pc/config/hardware_motors.yaml 에 기록한다.<br>손을 완전히 편 자세로 잡고, 아래 입력 줄에 RECORD 를 쳐서 보낸다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>python3 -m leap_teleop.tools.calibrate_motors</code></dd><dt>환경</dt><dd><code>teleop</code> (아래 환경 묶음)</dd><dt>옵션</dt><dd><code>--force</code> 기존 파일 덮어쓰기</dd><dt>먼저 필요</dt><dd>LEAP USB (/dev/ttyUSB0)</dd><dt>같이 못 켬</dt><dd>LEAP 모터 확인 (leap_check), leader 트리거 → LEAP (leap_leader), Manus → LEAP 텔레옵 (leap_manus)</dd><dt>켜기 전 확인</dt><dd>☐ LEAP 을 손으로 완전히 편 자세로 잡고 있다</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd><dt>입력</dt><dd>화면에서 이 프로세스에 글자를 보낼 수 있다 (Enter 를 기다리는 도구)</dd></dl><p><b>실제로 실행되는 한 줄</b> (기본 옵션일 때)</p><pre><code>bash -c &#x27;export LEAP_ROS_DISTRO=humble OMY_ROBOT_IP=10.42.0.241 LEAP_NO_ZENOH=1 &amp;&amp; export LEAP_MANUS_WS=&quot;&lt;레포&gt;/third_party/manus/ROS2 package&quot; &amp;&amp; source &quot;&lt;레포&gt;/user_pc/scripts/leap_aliases.sh&quot; &amp;&amp; leap_env &amp;&amp; python3 -m leap_teleop.tools.calibrate_motors&#x27;</code></pre></div></details><details class="proc"><summary>글러브 편 손/주먹 기록 (leap_glovecal) <span class="tag where">User PC</span><span class="tag tool">도구</span> <span class="sum-note"><code>leap_glovecal</code></span></summary><div class="body"><p>작업자마다 한다. 글러브를 낀 손으로 한다. LEAP 은 필요 없다.<br>편 손은 충분히 쭉 편 채 &quot;보내기&quot;(Enter), 주먹은 엄지를 검지·중지 위로 감싼 채 &quot;보내기&quot;.<br>마지막 줄 fist thumb 의 두 값 부호가 같아야 한다. 다르면 manus_leap.yaml 의 thumb_ik.flip_normal 을 바꾼다.<br>Manus SDK 캘리브레이션(.mcal)은 별도 Dashboard 에서 먼저 해 둔다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>leap_glovecal --force</code></dd><dt>환경</dt><dd><code>teleop</code> (아래 환경 묶음)</dd><dt>먼저 필요</dt><dd>Manus 노드</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd><dt>입력</dt><dd>화면에서 이 프로세스에 글자를 보낼 수 있다 (Enter 를 기다리는 도구)</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>bash -c &#x27;export LEAP_ROS_DISTRO=humble OMY_ROBOT_IP=10.42.0.241 LEAP_NO_ZENOH=1 &amp;&amp; export LEAP_MANUS_WS=&quot;&lt;레포&gt;/third_party/manus/ROS2 package&quot; &amp;&amp; source &quot;&lt;레포&gt;/user_pc/scripts/leap_aliases.sh&quot; &amp;&amp; leap_env &amp;&amp; leap_glovecal --force&#x27;</code></pre></div></details><details class="proc"><summary>글러브 토픽 주기 <span class="tag where">User PC</span><span class="tag tool">도구</span> <span class="sum-note"><code>manus_hz</code></span></summary><div class="body"><p>약 120 Hz 여야 한다. 확인했으면 &quot;끄기&quot;로 닫는다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>ros2 topic hz /manus_glove_0</code></dd><dt>환경</dt><dd><code>teleop</code> (아래 환경 묶음)</dd><dt>먼저 필요</dt><dd>Manus 노드</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>bash -c &#x27;export LEAP_ROS_DISTRO=humble OMY_ROBOT_IP=10.42.0.241 LEAP_NO_ZENOH=1 &amp;&amp; export LEAP_MANUS_WS=&quot;&lt;레포&gt;/third_party/manus/ROS2 package&quot; &amp;&amp; source &quot;&lt;레포&gt;/user_pc/scripts/leap_aliases.sh&quot; &amp;&amp; leap_env &amp;&amp; ros2 topic hz /manus_glove_0&#x27;</code></pre></div></details><details class="proc"><summary>스트림 확인: hand <span class="tag where">User PC</span><span class="tag tool">도구</span> <span class="sum-note"><code>check_hand</code></span></summary><div class="body"><p>텔레옵이 --record-udp 로 돌고 있을 때. 약 50 Hz, delay_ms 중앙값 1 ms 안팎.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>tactile-rec check hand --config config/rig.yaml</code></dd><dt>환경</dt><dd><code>recorder</code> (아래 환경 묶음)</dd><dt>같이 못 켬</dt><dd>스트림 확인: glove, 녹화기 (tactile-rec)</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>bash -c &#x27;unset PYTHONPATH ROS_DOMAIN_ID RMW_IMPLEMENTATION ZENOH_CONFIG_OVERRIDE &amp;&amp; cd &quot;&lt;레포&gt;/recorder&quot; &amp;&amp; source .venv/bin/activate &amp;&amp; tactile-rec check hand --config config/rig.yaml&#x27;</code></pre></div></details><details class="proc"><summary>스트림 확인: glove <span class="tag where">User PC</span><span class="tag tool">도구</span> <span class="sum-note"><code>check_glove</code></span></summary><div class="body"><p>약 50 Hz, 노드 이름이 나와야 한다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>tactile-rec check glove --config config/rig.yaml</code></dd><dt>환경</dt><dd><code>recorder</code> (아래 환경 묶음)</dd><dt>같이 못 켬</dt><dd>스트림 확인: hand, 녹화기 (tactile-rec)</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>bash -c &#x27;unset PYTHONPATH ROS_DOMAIN_ID RMW_IMPLEMENTATION ZENOH_CONFIG_OVERRIDE &amp;&amp; cd &quot;&lt;레포&gt;/recorder&quot; &amp;&amp; source .venv/bin/activate &amp;&amp; tactile-rec check glove --config config/rig.yaml&#x27;</code></pre></div></details><details class="proc"><summary>스트림 확인: arm_state <span class="tag where">User PC</span><span class="tag tool">도구</span> <span class="sum-note"><code>check_arm_state</code></span></summary><div class="body"><p>값이 오고 Hz 가 측정되면 그 값을 rig.yaml 의 hz 에 넣는다.<br>&quot;open failed&quot; 면 router 주소와 domain_id. 연결은 되는데 0개면 키가 Robot PC 와 안 맞는 것이다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>tactile-rec check arm_state --config config/rig.yaml</code></dd><dt>환경</dt><dd><code>recorder</code> (아래 환경 묶음)</dd><dt>먼저 필요</dt><dd>zenoh :7447</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>bash -c &#x27;unset PYTHONPATH ROS_DOMAIN_ID RMW_IMPLEMENTATION ZENOH_CONFIG_OVERRIDE &amp;&amp; cd &quot;&lt;레포&gt;/recorder&quot; &amp;&amp; source .venv/bin/activate &amp;&amp; tactile-rec check arm_state --config config/rig.yaml&#x27;</code></pre></div></details><details class="proc"><summary>스트림 확인: arm_action <span class="tag where">User PC</span><span class="tag tool">도구</span> <span class="sum-note"><code>check_arm_action</code></span></summary><div class="body"><p>leader 를 움직이는 동안 돌린다. 값이 오고 source_stamps 가 있는지 본다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>tactile-rec check arm_action --config config/rig.yaml</code></dd><dt>환경</dt><dd><code>recorder</code> (아래 환경 묶음)</dd><dt>먼저 필요</dt><dd>zenoh :7447</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>bash -c &#x27;unset PYTHONPATH ROS_DOMAIN_ID RMW_IMPLEMENTATION ZENOH_CONFIG_OVERRIDE &amp;&amp; cd &quot;&lt;레포&gt;/recorder&quot; &amp;&amp; source .venv/bin/activate &amp;&amp; tactile-rec check arm_action --config config/rig.yaml&#x27;</code></pre></div></details><details class="proc"><summary>스트림 확인: tactile_a <span class="tag where">User PC</span><span class="tag tool">도구</span> <span class="sum-note"><code>check_tactile_a</code></span></summary><div class="body"><p>missed 0, meta.layout 의 모듈이 실제 배선과 같아야 한다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>tactile-rec check tactile_a --config config/rig.yaml</code></dd><dt>환경</dt><dd><code>recorder</code> (아래 환경 묶음)</dd><dt>같이 못 켬</dt><dd>녹화기 (tactile-rec)</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>bash -c &#x27;unset PYTHONPATH ROS_DOMAIN_ID RMW_IMPLEMENTATION ZENOH_CONFIG_OVERRIDE &amp;&amp; cd &quot;&lt;레포&gt;/recorder&quot; &amp;&amp; source .venv/bin/activate &amp;&amp; tactile-rec check tactile_a --config config/rig.yaml&#x27;</code></pre></div></details><details class="proc"><summary>스트림 확인: tactile_b <span class="tag where">User PC</span><span class="tag tool">도구</span> <span class="sum-note"><code>check_tactile_b</code></span></summary><div class="body"><p>두 번째 보드. missed 0, meta.layout 의 모듈이 실제 배선과 같아야 한다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>tactile-rec check tactile_b --config config/rig.yaml</code></dd><dt>환경</dt><dd><code>recorder</code> (아래 환경 묶음)</dd><dt>같이 못 켬</dt><dd>녹화기 (tactile-rec)</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>bash -c &#x27;unset PYTHONPATH ROS_DOMAIN_ID RMW_IMPLEMENTATION ZENOH_CONFIG_OVERRIDE &amp;&amp; cd &quot;&lt;레포&gt;/recorder&quot; &amp;&amp; source .venv/bin/activate &amp;&amp; tactile-rec check tactile_b --config config/rig.yaml&#x27;</code></pre></div></details><details class="proc"><summary>스트림 확인: cam_wrist <span class="tag where">User PC</span><span class="tag tool">도구</span> <span class="sum-note"><code>check_cam_wrist</code></span></summary><div class="body"><p>설정 fps 유지. ts_domain 이 0 이면 dataset.time 을 recv 로 둔다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>tactile-rec check cam_wrist --config config/rig.yaml</code></dd><dt>환경</dt><dd><code>recorder</code> (아래 환경 묶음)</dd><dt>같이 못 켬</dt><dd>손목 카메라 ROS 노드 (미리보기용), 녹화기 (tactile-rec)</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>bash -c &#x27;unset PYTHONPATH ROS_DOMAIN_ID RMW_IMPLEMENTATION ZENOH_CONFIG_OVERRIDE &amp;&amp; cd &quot;&lt;레포&gt;/recorder&quot; &amp;&amp; source .venv/bin/activate &amp;&amp; tactile-rec check cam_wrist --config config/rig.yaml&#x27;</code></pre></div></details><details class="proc"><summary>스트림 확인: cam_ext <span class="tag where">User PC</span><span class="tag tool">도구</span> <span class="sum-note"><code>check_cam_ext</code></span></summary><div class="body"><p>rig.yaml 에 cam_ext 를 넣은 뒤에 쓴다 (serial 필수). 설정 fps 유지,<br>meta.serial 과 model 이 외부 카메라의 것인지 본다.</p><dl class="kv"><dt>명령 (<code>cmd</code>)</dt><dd><code>tactile-rec check cam_ext --config config/rig.yaml</code></dd><dt>환경</dt><dd><code>recorder</code> (아래 환경 묶음)</dd><dt>같이 못 켬</dt><dd>녹화기 (tactile-rec)</dd><dt>끄기</dt><dd>Ctrl+C 를 보내고 10초 기다린다. 안 끝나면 '강제 종료' 버튼</dd></dl><p><b>실제로 실행되는 한 줄</b></p><pre><code>bash -c &#x27;unset PYTHONPATH ROS_DOMAIN_ID RMW_IMPLEMENTATION ZENOH_CONFIG_OVERRIDE &amp;&amp; cd &quot;&lt;레포&gt;/recorder&quot; &amp;&amp; source .venv/bin/activate &amp;&amp; tactile-rec check cam_ext --config config/rig.yaml&#x27;</code></pre></div></details></div>
+
+<h2>점검 (오른쪽 띠)</h2>
+<table><tr><th>점검</th><th>종류</th><th>대상</th><th>실패하면</th></tr><tr><td>로봇 ping<br><code>robot_ping</code></td><td>ping<br><span class='sum-note'>ping 한 번</span></td><td><code>10.42.0.241</code></td><td>로봇 전원(LED 흰색)과 이더넷을 본다. USB 랜이 &quot;getting IP configuration&quot; 이면 한 번만:<br>nmcli connection modify &quot;Wired connection 1&quot; ipv4.method shared  (약 10초 뒤 로봇이 10.42.0.241)</td></tr><tr><td>로봇 ssh<br><code>robot_ssh</code></td><td>ssh<br><span class='sum-note'>ssh 로 true 실행</span></td><td><code>robot</code></td><td>터미널에서 ssh root@10.42.0.241 이 비밀번호 없이 되는지 본다. banner exchange 타임아웃이면 USB 랜 허브 문제다.</td></tr><tr><td>zenoh :7447<br><code>zenoh_port</code></td><td>tcp<br><span class='sum-note'>TCP 접속</span></td><td><code>10.42.0.241:7447</code></td><td>Robot PC 의 zenoh 라우터가 안 떠 있다. 실행 페이지에서 &quot;zenoh 라우터&quot;를 켠다.</td></tr><tr><td>MANUS Dashboard 꺼짐<br><code>manus_core_off</code></td><td>no_process<br><span class='sum-note'>프로세스가 없는가</span></td><td><code>MANUS_Core</code></td><td>MANUS Core Dashboard 를 끈다. 켜져 있으면 Manus 노드가 동글을 못 잡는다.</td></tr><tr><td>Manus 동글 USB<br><code>manus_dongle</code></td><td>command<br><span class='sum-note'>셸 명령의 종료 코드</span></td><td><code>lsusb | grep -Ei &#x27;3325:|1915:83fd&#x27;</code></td><td>동글을 다시 꽂는다. udev 규칙(third_party/manus/70-manus-hid.rules)이 /etc/udev/rules.d/ 에 있는지 본다.</td></tr><tr><td>LEAP USB (/dev/ttyUSB0)<br><code>leap_port</code></td><td>serial<br><span class='sum-note'>장치 파일이 있고 열 수 있는가</span></td><td><code>/dev/ttyUSB0</code></td><td>LEAP 의 FTDI USB 를 꽂는다. 번호가 다르면(ttyUSB1) 다른 USB-시리얼 장치를 뺀다.</td></tr><tr><td>손목 카메라 USB (D405)<br><code>realsense_usb</code></td><td>usb<br><span class='sum-note'>sysfs 에서 USB id</span></td><td><code>8086:0b5b</code><br><span class='sum-note'>5000 Mbps 아래면 경고</span></td><td>OMY 를 다시 켜면 카메라가 USB 에서 사라진다. 다시 꽂는다.</td></tr><tr><td>외부 카메라 USB (D435i)<br><code>cam_ext_usb</code></td><td>usb<br><span class='sum-note'>sysfs 에서 USB id</span></td><td><code>8086:0b3a</code><br><span class='sum-note'>5000 Mbps 아래면 경고</span></td><td>외부 고정 카메라를 USB3 포트에 꽂는다.</td></tr><tr><td>Paxini 보드 (/dev/ttyACM*)<br><code>paxini_port</code></td><td>serial<br><span class='sum-note'>장치 파일이 있고 열 수 있는가</span></td><td><code>/dev/ttyACM*</code></td><td>Paxini 통신 보드 USB 를 꽂는다. 권한 오류면 dialout 그룹을 확인한다.</td></tr><tr><td>녹화기 UI (:8800)<br><code>recorder_ui</code></td><td>http<br><span class='sum-note'>HTTP GET</span></td><td><code>http://127.0.0.1:8800/</code><br><span class='sum-note'>정상이면 링크: 녹화기 열기</span></td><td>녹화기가 꺼져 있다. 실행 페이지에서 켠다.</td></tr></table>
+
+<h2>실행표</h2>
+<p>실행표는 켜는 순서다. ✋ 는 사람이 직접 하는 단계다. 끌 때 "전체 끄기"는 켠 순서의 역순으로 하나씩 끈다.</p>
+<details><summary>수집 (팔 + 손 + 녹화) <span class="sum-note"><code>collect</code> · 12단계</span></summary><div class="body"><p>데이터 수집 세션. 위에서부터 하나씩 켠다. 끌 때는 &quot;전체 끄기&quot;가 역순으로 끈다.</p><ol class="steps"><li class="human">로봇 전원을 켜고 LED 가 흰색이 될 때까지 기다린다. 이더넷 연결</li><li class="human">LEAP 을 편 손으로 두고 5V 를 켠다. 5V 차단 수단을 손 닿는 곳에 둔다</li><li class="human">글러브를 착용한다. MANUS Core Dashboard 는 끈다</li><li><b>Manus 노드</b> <span class='sum-note'>User PC</span><br><code>ros2 run manus_ros2 manus_data_publisher</code></li><li><b>LEAP 모터 확인 (leap_check)</b> <span class='sum-note'>User PC</span><br><code>leap_check</code></li><li><b>로봇 중복 실행 확인</b> <span class='sum-note'>Robot PC 컨테이너</span><br><code>echo &quot;--- zenohd ---&quot;; pgrep -a zenohd; echo &quot;--- ros2 node list ---&quot;; ros2 node list</code></li><li><b>zenoh 라우터</b> <span class='sum-note'>Robot PC 컨테이너</span><br><code>ros2 run rmw_zenoh_cpp rmw_zenohd</code></li><li class="human">LEAP 을 주먹으로 둔다. leader 를 손으로 잡고 트리거를 쥔다</li><li><b>팔 bringup (omy_ai_wrist_flip)</b> <span class='sum-note'>Robot PC 컨테이너</span><br><code>ros2 launch omy_leap_bringup omy_ai_wrist_flip.launch.py</code></li><li><b>Manus → LEAP 텔레옵 (leap_manus)</b> <span class='sum-note'>User PC</span><br><code>leap_manus --record-udp</code></li><li class="human">손목 카메라 ROS 노드가 꺼져 있는지 본다 (녹화기가 카메라를 직접 연다)</li><li><b>녹화기 (tactile-rec)</b> <span class='sum-note'>User PC</span><br><code>tactile-rec record --config config/rig.yaml</code></li></ol></div></details><details><summary>팔 + 손 (4단계) <span class="sum-note"><code>arm_hand</code> · 8단계</span></summary><div class="body"><p>팔은 leader, 손은 글러브. 녹화 없이 텔레옵만 본다.</p><ol class="steps"><li class="human">로봇 전원 ON, LED 흰색. LEAP 5V 를 편 손으로 켠다</li><li><b>Manus 노드</b> <span class='sum-note'>User PC</span><br><code>ros2 run manus_ros2 manus_data_publisher</code></li><li><b>LEAP 모터 확인 (leap_check)</b> <span class='sum-note'>User PC</span><br><code>leap_check</code></li><li><b>로봇 중복 실행 확인</b> <span class='sum-note'>Robot PC 컨테이너</span><br><code>echo &quot;--- zenohd ---&quot;; pgrep -a zenohd; echo &quot;--- ros2 node list ---&quot;; ros2 node list</code></li><li><b>zenoh 라우터</b> <span class='sum-note'>Robot PC 컨테이너</span><br><code>ros2 run rmw_zenoh_cpp rmw_zenohd</code></li><li class="human">LEAP 을 주먹으로 둔다. leader 를 손으로 잡고 트리거를 쥔다</li><li><b>팔 bringup (omy_ai_wrist_flip)</b> <span class='sum-note'>Robot PC 컨테이너</span><br><code>ros2 launch omy_leap_bringup omy_ai_wrist_flip.launch.py</code></li><li><b>Manus → LEAP 텔레옵 (leap_manus)</b> <span class='sum-note'>User PC</span><br><code>leap_manus --record-udp</code></li></ol></div></details><details><summary>손만 (3단계) <span class="sum-note"><code>hand_only</code> · 6단계</span></summary><div class="body"><p>팔 없이 Manus → LEAP 만. Robot PC 는 필요 없다.</p><ol class="steps"><li class="human">LEAP 을 편 손으로 두고 5V 를 켠다. 5V 차단 수단을 손 닿는 곳에 둔다</li><li class="human">글러브를 착용한다. MANUS Core Dashboard 는 끈다</li><li><b>Manus 노드</b> <span class='sum-note'>User PC</span><br><code>ros2 run manus_ros2 manus_data_publisher</code></li><li><b>글러브 편 손/주먹 기록 (leap_glovecal)</b> <span class='sum-note'>User PC</span><br><code>leap_glovecal --force</code></li><li><b>LEAP 모터 확인 (leap_check)</b> <span class='sum-note'>User PC</span><br><code>leap_check</code></li><li><b>Manus → LEAP 텔레옵 (leap_manus)</b> <span class='sum-note'>User PC</span><br><code>leap_manus --record-udp</code></li></ol></div></details><details><summary>leader 트리거 (2단계) <span class="sum-note"><code>leader</code> · 6단계</span></summary><div class="body"><p>팔 + zenoh + LEAP 경로 확인용. 이미 검증된 단계.</p><ol class="steps"><li class="human">로봇 전원 ON, LED 흰색. LEAP 5V 를 편 손으로 켠다</li><li><b>로봇 중복 실행 확인</b> <span class='sum-note'>Robot PC 컨테이너</span><br><code>echo &quot;--- zenohd ---&quot;; pgrep -a zenohd; echo &quot;--- ros2 node list ---&quot;; ros2 node list</code></li><li><b>zenoh 라우터</b> <span class='sum-note'>Robot PC 컨테이너</span><br><code>ros2 run rmw_zenoh_cpp rmw_zenohd</code></li><li class="human">LEAP 을 주먹으로 둔다. leader 를 손으로 잡고 트리거를 쥔다</li><li><b>팔 bringup (omy_ai_wrist_flip)</b> <span class='sum-note'>Robot PC 컨테이너</span><br><code>ros2 launch omy_leap_bringup omy_ai_wrist_flip.launch.py</code></li><li><b>leader 트리거 → LEAP (leap_leader)</b> <span class='sum-note'>User PC</span><br><code>leap_leader</code></li></ol></div></details><details><summary>센서 확인 <span class="sum-note"><code>sensors</code> · 8단계</span></summary><div class="body"><p>녹화기 전체를 띄우기 전에 스트림을 하나씩 본다 (recorder_usage.md 5.1).</p><ol class="steps"><li><b>스트림 확인: hand</b> <span class='sum-note'>User PC</span><br><code>tactile-rec check hand --config config/rig.yaml</code></li><li><b>스트림 확인: glove</b> <span class='sum-note'>User PC</span><br><code>tactile-rec check glove --config config/rig.yaml</code></li><li><b>스트림 확인: arm_state</b> <span class='sum-note'>User PC</span><br><code>tactile-rec check arm_state --config config/rig.yaml</code></li><li><b>스트림 확인: arm_action</b> <span class='sum-note'>User PC</span><br><code>tactile-rec check arm_action --config config/rig.yaml</code></li><li><b>스트림 확인: tactile_a</b> <span class='sum-note'>User PC</span><br><code>tactile-rec check tactile_a --config config/rig.yaml</code></li><li><b>스트림 확인: tactile_b</b> <span class='sum-note'>User PC</span><br><code>tactile-rec check tactile_b --config config/rig.yaml</code></li><li><b>스트림 확인: cam_wrist</b> <span class='sum-note'>User PC</span><br><code>tactile-rec check cam_wrist --config config/rig.yaml</code></li><li class="human">외부 카메라를 달았으면 도구 목록의 &#x27;스트림 확인: cam_ext&#x27; 도 돌린다</li></ol></div></details>
+
+<h2>장치 칸</h2>
+<table><tr><th>장치</th><th>점검</th><th>프로세스</th><th>도구</th><th>녹화기 스트림</th><th>로그 event 규칙</th></tr><tr><td>로봇 PC<br><code>robot</code></td><td>로봇 ping<br>로봇 ssh<br>zenoh :7447</td><td>zenoh 라우터</td><td>로봇 중복 실행 확인</td><td>-</td><td>-</td></tr><tr><td>팔<br><code>arm</code></td><td>zenoh :7447</td><td>팔 bringup (omy_ai_wrist_flip)<br>팔 bringup 순정 (omy_ai)</td><td>컨트롤러 확인<br>leader 값 한 번 읽기<br>스트림 확인: arm_state<br>스트림 확인: arm_action<br>팔 접기 (pack)<br>팔 펴기 (unpack)</td><td><code>arm_state</code>, <code>arm_action</code></td><td><code>Multi-turn|0xc</code> → 팔 모터 Multi-turn 오류</td></tr><tr><td>LEAP Hand<br><code>leap</code></td><td>LEAP USB (/dev/ttyUSB0)</td><td>Manus → LEAP 텔레옵 (leap_manus)<br>leader 트리거 → LEAP (leap_leader)</td><td>LEAP 모터 확인 (leap_check)<br>LEAP 영점 기록 (calibrate_motors)<br>스트림 확인: hand</td><td><code>hand</code></td><td><code>Missing or unresponsive DYNAMIXEL IDs: \[?(?P&lt;motors&gt;[\d, ]+…</code> → 모터 응답 없음: {motors}<br><code>Torque-off was not acknowledged by (motor )?IDs:? [\[(]?(?P&lt;…</code> → 토크 OFF 미확인: {motors}. 5V 차단<br><code>Feedback unavailable for DYNAMIXEL ID (?P&lt;motors&gt;\d+)</code> → 모터 {motors} 피드백 없음<br><code>\[leap\] feedback read failed</code> → LEAP 읽기 실패 (모터 번호 모름). leap_check 로 확인</td></tr><tr><td>글러브<br><code>glove</code></td><td>MANUS Dashboard 꺼짐<br>Manus 동글 USB</td><td>Manus 노드</td><td>글러브 편 손/주먹 기록 (leap_glovecal)<br>글러브 토픽 주기<br>스트림 확인: glove</td><td><code>glove</code></td><td>-</td></tr><tr><td>촉각 (Paxini)<br><code>tactile</code></td><td>Paxini 보드 (/dev/ttyACM*)</td><td>-</td><td>스트림 확인: tactile_a<br>스트림 확인: tactile_b</td><td><code>tactile_a</code>, <code>tactile_b</code></td><td>-</td></tr><tr><td>손목 카메라<br><code>cam_wrist</code></td><td>손목 카메라 USB (D405)</td><td>손목 카메라 ROS 노드 (미리보기용)</td><td>스트림 확인: cam_wrist</td><td><code>cam_wrist</code></td><td>-</td></tr><tr><td>외부 카메라<br><code>cam_ext</code></td><td>외부 카메라 USB (D435i)</td><td>-</td><td>스트림 확인: cam_ext</td><td><code>cam_ext</code></td><td>-</td></tr></table>
+
+<h2>환경 묶음 (<code>envs</code>)</h2>
+<table><tr><th>이름</th><th>명령 앞에 붙는 줄 (<code>&amp;&amp;</code> 로 이어진다)</th><th>쓰는 버튼</th></tr><tr><td><code>robot_ros</code></td><td><code>source /opt/ros/jazzy/setup.bash</code><br><code>export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp</code><br><code>source /workspace/omy_ws/install/setup.bash</code></td><td>8개</td></tr><tr><td><code>teleop</code></td><td><code>export LEAP_ROS_DISTRO=humble OMY_ROBOT_IP=10.42.0.241 LEAP_NO_ZENOH=1</code><br><code>export LEAP_MANUS_WS=&quot;&lt;레포&gt;/third_party/manus/ROS2 package&quot;</code><br><code>source &quot;&lt;레포&gt;/user_pc/scripts/leap_aliases.sh&quot;</code><br><code>leap_env</code></td><td>7개</td></tr><tr><td><code>teleop_zenoh</code></td><td><code>unset LEAP_NO_ZENOH</code><br><code>export LEAP_ROS_DISTRO=humble OMY_ROBOT_IP=10.42.0.241</code><br><code>export LEAP_MANUS_WS=&quot;&lt;레포&gt;/third_party/manus/ROS2 package&quot;</code><br><code>source &quot;&lt;레포&gt;/user_pc/scripts/leap_aliases.sh&quot;</code><br><code>leap_env</code></td><td>1개</td></tr><tr><td><code>recorder</code></td><td><code>unset PYTHONPATH ROS_DOMAIN_ID RMW_IMPLEMENTATION ZENOH_CONFIG_OVERRIDE</code><br><code>cd &quot;&lt;레포&gt;/recorder&quot;</code><br><code>source .venv/bin/activate</code></td><td>10개</td></tr></table><p>hosts: <code>robot</code> = <code>root@10.42.0.241</code>, <code>robot_container</code> = <code>root@10.42.0.241</code> 의 컨테이너 <code>open_manipulator</code></p>
+<div class="next"><a href="#hub">← Control Hub</a><a href="#ui">한 화면에서 쓰기 →</a></div>
+</section>
+
+<!-- ============================================================ UI -->
+<section class="page" id="ui">
+<h1>한 화면에서 쓰기</h1>
+<p class="lead">hub 의 "녹화" 메뉴 안에서 녹화기 화면이 그대로 열린다. 프로그램은 여전히 둘이고, 화면만 하나다.</p>
+
+<div class="changed"><b>이번에 넣은 것.</b> hub 왼쪽 메뉴에 <b>녹화</b>가 생겼다. 녹화기가 떠 있으면(<code>checks.recorder_ui</code> 가 정상) 그 화면을 frame 으로 보여 주고, 꺼져 있으면 켜는 버튼으로 안내한다. 이 페이지에서는 오른쪽 점검 띠를 숨겨 폭을 다 쓴다.</div>
+
+<h2>왜 코드를 합치지 않았나</h2>
+<table>
+<tr><th>방법</th><th>비용</th><th>잃는 것</th></tr>
+<tr><td><b>hub 안에 녹화기 화면을 frame 으로 (선택)</b></td><td>hub 화면 파일 3개에 수십 줄. 녹화기 코드는 그대로</td><td>없음. 녹화기는 hub 없이도 그대로 쓴다</td></tr>
+<tr><td>hub 가 녹화기의 API 를 불러 자기 화면을 그림</td><td>녹화 페이지(미리보기, 촉각 맵, 키 처리)를 hub 쪽에 다시 만든다</td><td>같은 화면이 두 벌이 된다</td></tr>
+<tr><td>한 프로세스로 합침</td><td>크다</td><td>hub 를 재시작하면 녹화가 끊긴다. tmux 로 수명을 뗀 이유가 사라진다. ROS 없는 venv 와 hub 의 환경도 섞인다</td></tr>
+</table>
+
+<h2>동작 방식</h2>
+<ul>
+<li>frame 의 주소는 <code>checks</code> 에서 <code>link</code> 가 있는 http 점검의 주소다(예시 설정의 <code>recorder_ui</code>, <code>http://127.0.0.1:8800/</code>).</li>
+<li>hub 를 태블릿에서 열면 <code>127.0.0.1</code> 은 태블릿 자신이 된다. 그래서 주소가 localhost 면 hub 를 연 호스트 이름으로 바꿔서 연다. 이 경우 녹화기도 <code>--host 0.0.0.0</code> 으로 띄워야 한다.</li>
+<li>frame 은 녹화기가 뜰 때 한 번만 불러온다. hub 의 1초 갱신이 녹화 화면을 다시 그리지 않는다.</li>
+<li>녹화기의 키(<kbd>Space</kbd> 등)는 frame 안을 한 번 누른 뒤에 듣는다. 브라우저의 focus 규칙이다.</li>
+<li>녹화기는 다른 사이트가 보낸 변경 요청을 Origin 으로 막는다. frame 안의 요청은 녹화기 자신의 origin 에서 나가므로 통과한다.</li>
+</ul>
+<div class="note"><b>확인 범위.</b> 가짜 녹화기를 띄우고 hub 화면을 열어, 꺼져 있을 때의 안내와 켜졌을 때 녹화기 화면이 hub 안에 뜨는 것을 스크린샷으로 확인했다. 다만 이 Mac 에는 tmux 가 없어 hub 는 프로세스를 켤 수 없는 상태였다. <b>hub 버튼으로 녹화기를 켜고 끄면서 화면이 바뀌는 것, frame 안에서의 키 입력과 실제 녹화</b>는 Ubuntu 에서 봐야 한다 (<a href="#field">실물 시험 가이드</a> 0단계).</div>
+<div class="next"><a href="#hubcmd">← 버튼과 명령</a><a href="#cyclo">Cyclo 와 다른 녹화 경로 →</a></div>
+</section>
+
+<!-- ============================================================ cyclo -->
+<section class="page" id="cyclo">
+<h1>Cyclo Intelligence 와 다른 녹화 경로</h1>
+<p class="lead">ROBOTIS 의 Cyclo 를 쓰지 않고 따로 만든 이유, 가져온 것, 그리고 레포에 남아 있는 다른 기록 경로들.</p>
+
+<h2>Cyclo 가 하는 일 (분석: <code>docs/data_preparation/2026-11-13-cyclo-analysis.md</code>)</h2>
+<table>
+<tr><th></th><th>Cyclo Intelligence</th><th>우리 녹화기</th></tr>
+<tr><td>형태</td><td>Jazzy 컨테이너 하나에 UI, orchestrator, 녹화, 변환, 학습, 추론, BT 까지</td><td>Python 패키지 하나. 녹화와 변환만</td></tr>
+<tr><td>받는 방법</td><td>ROS 2 토픽 (<code>rmw_zenoh</code>)</td><td>장치별 어댑터. ROS 없음</td></tr>
+<tr><td>원본 형식</td><td>MCAP rosbag2 + 카메라별 H.264 MP4</td><td>스트림별 npz + 카메라별 MJPEG 와 프레임 index</td></tr>
+<tr><td>시각</td><td>state 는 <code>header.stamp</code>, action 은 받은 시각</td><td>모두 받은 시각을 찍고, 장치 시각도 같이 남겨 변환 때 고른다</td></tr>
+<tr><td>리샘플</td><td>causal, 보간 없음, staleness 보고</td><td>같다 (그대로 가져왔다)</td></tr>
+<tr><td>촉각</td><td>bag 에 기록만 하고 LeRobot 으로 변환하지 않는다</td><td>90 Hz 원본 + 데이터셋의 resultant / distributed / 고주파 창</td></tr>
+<tr><td>출력</td><td>LeRobot v2.1, v3.0</td><td>LeRobot v2.1 (openpi 가 쓰는 버전), npz</td></tr>
+</table>
+
+<h2>왜 따로 만들었나</h2>
+<ol>
+<li><b>Humble ↔ Jazzy.</b> Cyclo 는 Jazzy + <code>rmw_zenoh</code> 다. 손, 카메라, 촉각은 User PC(Humble)에 있고, 11/12 현장에서 Humble <code>rmw_zenoh</code> 는 Jazzy 와 데이터가 오가지 않았다.</li>
+<li><b>촉각.</b> Cyclo 의 변환기는 <code>position</code> 필드가 있는 메시지만 숫자로 읽는다. Paxini 를 넣으려면 ROS 발행기와 변환기 파서를 둘 다 만들어야 한다.</li>
+<li><b>무게.</b> 지금 필요한 것은 녹화와 변환이다. 이미지 pull 도 11/12 에 도중에 멈췄다.</li>
+<li><b>action 시각.</b> 두 PC 를 건너오는 팔 action 을 받은 시각으로만 맞추면 네트워크 지연이 그대로 섞인다. 장치 시각을 같이 남겨 두면 나중에 고를 수 있다.</li>
+</ol>
+<p>자체 녹화기로 가면 풀 문제가 "팔 데이터를 User PC 로 가져오기" 하나로 줄어든다.</p>
+
+<h2>Cyclo 에서 가져온 것</h2>
+<ul>
+<li>로봇 설정 YAML 하나가 기준 (observation / action 구조) → <code>rig.yaml</code></li>
+<li>"원본 기록 → 나중에 변환" 2단계</li>
+<li>샘플마다 장치 시각과 받은 시각을 둘 다 저장</li>
+<li>카메라는 녹화 중 바로 압축하고 프레임별 시각은 따로</li>
+<li>causal 리샘플과 staleness 보고, 반복된 프레임 수(<code>frame_reuse</code> → <code>frames_reused</code>)</li>
+<li>센서별 Hz 와 마지막 수신 뒤 경과 시간을 보여 주는 화면</li>
+<li>저장 / 버리기 / 다시 찍기와 태스크 문장</li>
+</ul>
+
+<h2>레포에 있는 기록 경로들</h2>
+<table>
+<tr><th>경로</th><th>켜는 법</th><th>나가는 것</th><th>상태</th></tr>
+<tr><td><b>UDP → 녹화기</b></td><td><code>leap-teleop … --record-udp</code></td><td>틱마다 JSON: cmd, sent, pos, vel, cur, mode, 글러브</td><td>지금 쓰는 경로</td></tr>
+<tr><td>ROS 토픽 → Cyclo</td><td><code>--publish</code> (<code>leap_record</code>)</td><td><code>/leap/joint_command</code>, <code>/leap/joint_states</code>, <code>/leap/human_hand</code>, <code>/leap/human_keypoints</code>, <code>/leap/teleop_mode</code></td><td>Cyclo 용으로 만든 것. 보류. 코드는 남아 있다(<code>ros_out.py</code>)</td></tr>
+<tr><td>CSV</td><td><code>--log-csv 파일</code></td><td>틱마다 글러브 원값, 명령, 전송값, 위치, 전류</td><td>진단용. 리타게팅을 볼 때 쓴다(<code>diag_log.py</code>)</td></tr>
+</table>
+<p>셋은 같은 인터페이스(<code>publish</code> / <code>close</code>)를 쓰고 <code>Tee</code> 로 동시에 켤 수 있다. 어느 것도 제어 경로에 있지 않다.</p>
+<div class="note"><b>결정이 필요한 것.</b> Cyclo 경로(<code>ros_out.py</code>, <code>--publish</code>, <code>leap_record</code>, <code>user_pc/config/omy_f3m_leap_config.yaml</code>)는 지금 쓰지 않는다. 나중에 Cyclo 의 추론(<code>cyclo_brain</code>)을 쓸 생각이면 두고, 아니면 지울 수 있다. 리뷰에서는 건드리지 않았다.</div>
+
+<h2>나중에 Cyclo 와 다시 만나는 지점</h2>
+<ul>
+<li><b>데이터셋:</b> 둘 다 LeRobot v2.1 을 낸다. 키 이름과 차원만 맞추면 같은 학습 코드에 넣을 수 있다.</li>
+<li><b>실행 때 관측:</b> <code>tactile_rec/live.py</code> 와 <code>features.py</code> 는 변환기와 같은 함수로 최신 관측을 만든다. 정책을 돌릴 때 학습 데이터와 같은 단위·순서·회전을 얻으려고 둔 것이다.</li>
+</ul>
+<div class="next"><a href="#ui">← 한 화면에서 쓰기</a><a href="#review">리뷰 뒤 고친 것 →</a></div>
+</section>
+
+<!-- ============================================================ review -->
+<section class="page" id="review">
+<h1>리뷰 뒤 고친 것</h1>
+<p class="lead">11/16 코드 리뷰에서 찾은 16건과, 그 뒤 다섯 번의 commit 으로 무엇이 바뀌었는지.</p>
+
+<h2>commit 순서</h2>
+<table>
+<tr><th>commit</th><th>묶음</th><th>내용</th><th>시험</th></tr>
+<tr><td><code>6de80f1</code></td><td>1. 데이터 보존</td><td>조각 쓰기, 종료 시 <code>.tmp</code> 보존과 복구, 쓰기 실패를 flag 로, 디스크 감시</td><td>녹화기 89 → 96</td></tr>
+<tr><td><code>37d49f9</code></td><td>2. 조용한 실패 없애기</td><td>영점 결과와 기록, 손 mode 검사, 버려진 값 표시, <code>hand_action</code> 필수, 변환 설정 기록</td><td>96 → 107</td></tr>
+<tr><td><code>e0a11a3</code></td><td>합치기</td><td><code>feat/control-hub</code> 를 합침 (충돌 없음)</td><td></td></tr>
+<tr><td><code>c37fff4</code></td><td>3. hub 연결</td><td>스트림 상태를 hub 장치 칸에, 확인 도구와 conflicts, 빈 serial 거부, 오탐 hint 삭제</td><td>107 → 109, hub 90 → 100</td></tr>
+<tr><td><code>eaacb33</code></td><td>4. 종료와 시험</td><td>SIGTERM/SIGHUP 처리, 웹 종료 timeout, 가짜 SDK 어댑터 시험, 종료 시험, lock 파일</td><td>109 → 122, 텔레옵 157 → 159</td></tr>
+<tr><td>이 문서와 함께</td><td>화면</td><td>hub 의 "녹화" 메뉴</td><td></td></tr>
+</table>
+
+<h2>리뷰 16건의 처리</h2>
+<table>
+<tr><th>#</th><th>찾은 것</th><th>시나리오</th><th>처리</th></tr>
+<tr><td>1</td><td>녹화 중 종료하면 에피소드를 버림. 숫자 스트림이 메모리에만 있음</td><td>10분 찍다가 창을 닫거나 프로그램이 죽으면 전부 잃는다</td><td>고침 <code>6de80f1</code> → <a href="#rec">녹화기</a></td></tr>
+<tr><td>2</td><td>브라우저 탭이 열려 있으면 Ctrl+C 한 번에 안 끝남</td><td>미리보기 연결이 끝나길 기다리며 멈춘다. 두 번 누르면 정리 없이 죽는다</td><td>고침 <code>eaacb33</code></td></tr>
+<tr><td>3</td><td><code>leap_manus</code> 를 kill 하면 Torque OFF 를 건너뜀</td><td>hub 의 "강제 종료"나 창 닫기 뒤 손이 500 ms watchdog 에만 기댄다</td><td>고침 <code>eaacb33</code> <span class="tag field">현장 미검증</span> → <a href="#teleop">텔레옵</a></td></tr>
+<tr><td>4</td><td>원격 <code>docker exec</code> 프로세스가 ssh 가 죽은 뒤 살아남을 수 있음</td><td>이더넷이 끊긴 뒤 팔 bringup 이 컨테이너에 남고, hub 는 "꺼짐"으로 본다</td><td><b>안 고침.</b> 실물에서 실제 동작을 본 뒤 설계한다 → <a href="#field">시험 3단계</a></td></tr>
+<tr><td>5</td><td><code>cam_ext</code> 의 빈 serial 이 D405 를 잡을 수 있음</td><td>외부 카메라 이름으로 손목 영상이 기록된다</td><td>고침 <code>c37fff4</code></td></tr>
+<tr><td>6</td><td>쓰기 오류나 디스크 가득이면 에피소드 폴더를 지움</td><td>카메라 하나의 쓰기 실패로 나머지 스트림까지 잃는다</td><td>고침 <code>6de80f1</code></td></tr>
+<tr><td>7</td><td>변환기가 손 <code>mode</code> 를 안 봄</td><td>글러브가 끊겨 손이 풀린 구간이 사람의 action 으로 학습된다</td><td>고침 <code>37d49f9</code> → <a href="#conv">변환기</a></td></tr>
+<tr><td>8</td><td><code>check_hand</code> / <code>check_glove</code> 가 UDP 패킷을 뺏음</td><td>녹화 중 확인 도구를 켜면 손 스트림이 절반으로 떨어진다</td><td>고침 <code>c37fff4</code> (hub conflicts)</td></tr>
+<tr><td>9</td><td>촉각 영점의 결과와 시각이 안 남음</td><td>영점이 실패했는데 "요청했습니다"만 보고 녹화한다. 어느 기준으로 찍혔는지 모른다</td><td>고침 <code>37d49f9</code></td></tr>
+<tr><td>10</td><td>조용한 counter 들</td><td><code>bad_packets</code>, <code>bad_frames</code>, <code>send_errors</code> 등이 올라가도 어디에도 안 보인다</td><td>고침 <code>37d49f9</code></td></tr>
+<tr><td>11</td><td>변환이 지금의 <code>--config</code> 를 쓰고 <code>hand_action</code> 기본값이 브랜치마다 다름</td><td>같은 원본이 어느 브랜치에서 변환했느냐에 따라 다른 action 이 된다</td><td>고침 <code>37d49f9</code></td></tr>
+<tr><td>12</td><td>두 브랜치가 서로에게 필요한 것을 안 갖고 있음</td><td>hub 브랜치의 녹화기는 <code>sent</code> 기본값 수정이 없다</td><td>합침 <code>e0a11a3</code></td></tr>
+<tr><td>13</td><td>hub 가 녹화기의 스트림 오류를 못 봄</td><td>녹화 중 보드가 빠져도 hub 홈은 초록이다</td><td>고침 <code>c37fff4</code> → <a href="#hub">Control Hub</a></td></tr>
+<tr><td>14</td><td>Hz 가 기대값의 80% 아래면 시작이 막힘</td><td>팔 <code>hz: 100</code> 은 추정값이다. 실제가 70 Hz 면 매번 강제 시작을 누르게 되고 모든 에피소드에 <code>forced_start</code> 가 붙어 변환에서 빠진다</td><td><b>코드는 그대로.</b> 실측한 Hz 를 <code>rig.yaml</code> 에 넣는 것이 답이다 → <a href="#field">시험 2단계</a></td></tr>
+<tr><td>15</td><td>"Connection to … closed" hint 오탐</td><td>원격 프로세스를 정상적으로 끌 때마다 "ssh 가 끊겼다"가 뜬다</td><td>고침 <code>c37fff4</code></td></tr>
+<tr><td>16</td><td><code>uv.lock</code>, <code>.python-version</code> 없음</td><td>설치할 때마다 버전이 달라진다</td><td>녹화기와 hub 에 추가 <code>eaacb33</code>. 텔레옵은 ROS 의 Python 을 쓰므로 고정하지 않았다</td></tr>
+</table>
+
+<h2>시험이 덮는 범위의 변화</h2>
+<table>
+<tr><th>리뷰 때의 지적</th><th>지금</th></tr>
+<tr><td>어댑터의 <code>_open</code> / <code>_read_once</code> / <code>_run_zero</code> 가 한 줄도 실행되지 않는다</td><td>Paxini, RealSense, arm zenoh 를 가짜 SDK 로 실행한다(<code>tests/test_adapters_fake_sdk.py</code>). 어댑터의 논리는 확인하지만 실제 SDK 가 그렇게 동작하는지는 여전히 실물의 몫이다</td></tr>
+<tr><td>Ctrl+C, kill, 디스크 오류 경로의 시험이 없다</td><td>실제 프로세스를 녹화 중에 SIGINT / SIGTERM / SIGHUP 으로 끝내는 시험, 조각과 복구, 쓰기 실패, 디스크 부족 시험이 있다</td></tr>
+<tr><td>LeRobot writer 는 stand-in 으로만 본다</td><td>실제 라이브러리로 쓰는 smoke test 를 넣었다. lerobot 이 있는 환경에서만 돈다. <b>아직 한 번도 실행되지 않았다</b></td></tr>
+<tr><td>hub 는 원격 명령을 문자열로만 검증한다</td><td>그대로. 실물에서 본다</td></tr>
+</table>
+
+<h2>손대지 않은 것과 이유</h2>
+<ul>
+<li><b>삭제 후보</b> (<code>ros_out.py</code>, <code>--publish</code>, <code>leap_record</code>): 결정이 필요하다 → <a href="#cyclo">Cyclo</a></li>
+<li><b>safe-pose 기본값</b>: CLI 는 <code>open</code>, 셸 함수(<code>leap_manus</code>)는 <code>fist</code> 를 준다. hub 는 셸 함수를 쓰므로 fist 다. <code>leap-teleop</code> 을 직접 실행하면 open 이다.</li>
+<li><b>시리얼 포트 이름</b>: LEAP <code>/dev/ttyUSB0</code> 이 세 곳에 적혀 있고, Paxini 는 꽂는 순서에 따라 번호가 바뀐다. hub 의 장치 탐색이 보드를 구분할 수 있으면 by-id 경로로 바꿀 근거가 된다.</li>
+<li><b>haptic 브랜치</b>: 이름을 받지 못해 리뷰하지 않았다.</li>
+</ul>
+<div class="next"><a href="#cyclo">← Cyclo</a><a href="#field">실물 시험 가이드 →</a></div>
+</section>
+
+<!-- ============================================================ field -->
+<section class="page" id="field">
+<h1>실물 시험 가이드</h1>
+<p class="lead">위에서부터 한 단계씩. 각 단계는 앞 단계가 통과해야 의미가 있다. 숫자는 <code>docs/field-test/YYYY-MM-DD-results.md</code> 에 적는다.</p>
+<div class="danger"><b>안전.</b> 팔 bringup 은 누르는 즉시 팔이 움직인다. LEAP 5V 차단 수단을 손 닿는 곳에 둔다. 3단계의 강제 종료 시험은 손에 물체가 없는 상태에서, 먼저 dry-run 으로 한다.</div>
+
+<h2>0단계. 준비 (실물 없이, Ubuntu 워크스테이션)</h2>
+<div class="check">
+<label><input type="checkbox"> 브랜치 <code>feat/control-hub-and-recorder</code> 를 받는다</label>
+<label><input type="checkbox"> <code>sudo apt install tmux</code> (hub 시험 34개가 tmux 없이는 skip 된다)</label>
+<label><input type="checkbox"> 세 패키지 시험: <code>cd recorder && uv run --extra dev pytest -q</code> (122 passed, lerobot 없으면 1 skipped), <code>cd ../control_hub && uv run --extra dev pytest -q</code> (<b>skip 없이</b> 통과해야 한다), <code>cd ../user_pc && env -u PYTHONPATH python -m pytest -q</code></label>
+<label><input type="checkbox"> <code>recorder/config/rig.yaml</code>: <code>dataset.hand_action: sent</code> 가 있는가. serial 이 빈 <code>cam_ext</code> 가 없는가. (없으면 실행이 설정 오류로 멈춘다)</label>
+<label><input type="checkbox"> <code>control_hub/config/hub.yaml</code>: example 의 변경을 옮겼는가 (녹화기 <code>conflicts</code> / <code>confirm_stop</code>, <code>check_tactile_b</code>, <code>check_cam_ext</code>, <code>devices.tactile.recorder_stream</code>, "Connection closed" hint 삭제). <code>control-hub validate --config config/hub.yaml</code></label>
+<label><input type="checkbox"> 가짜로 전체 리허설: <code>control-hub serve --config config/hub.fake.yaml</code> (:8701) 와 <code>tactile-rec record --config config/rig.fake.yaml --port 8809</code> (가짜 hub 설정의 "녹화기 UI" 점검이 8809 를 본다. 실제 <code>hub.example.yaml</code> 은 8800)</label>
+</div>
+<table>
+<tr><th>리허설에서 볼 것</th><th>통과 기준</th></tr>
+<tr><td>hub 의 <b>녹화</b> 메뉴</td><td>녹화기 화면이 hub 안에 뜬다. hub 버튼으로 녹화기를 끄면 안내로 바뀌고, 다시 켜면 화면이 돌아온다. frame 안을 한 번 누른 뒤 <kbd>Space</kbd> 로 녹화가 시작된다 <span class="tag field">현장 미검증</span></td></tr>
+<tr><td>녹화 중 Ctrl+C</td><td><code>unsaved episode kept in …</code> 가 찍히고, 다시 띄우면 에피소드 페이지에 "미저장"이 있다. 성공으로 저장하면 <code>ep_NNNN</code> 이 된다</td></tr>
+<tr><td>녹화 중 <code>kill -9</code></td><td>다시 띄우면 "미저장"에 "녹화 중 프로그램이 죽음"이 있고, 저장하면 마지막 5초를 뺀 나머지가 복구된다</td></tr>
+<tr><td><kbd>Z</kbd></td><td>"촉각 영점 보정 완료: tactile_a, tactile_b"</td></tr>
+</table>
+
+<h2>1단계. hub 와 Robot PC</h2>
+<ol class="steps">
+<li>ROS 를 source 하지 않은 새 터미널에서 <code>control-hub serve --config config/hub.yaml</code>.</li>
+<li class="human">로봇 전원을 켜고 LED 가 흰색이 될 때까지 기다린다.</li>
+<li>오른쪽 띠의 "로봇 ping", "로봇 ssh" 가 정상인지 본다.</li>
+<li><b>전체 → 로봇 중복 실행 확인</b>. <code>ros2 node list</code> 까지 출력되는지 본다.</li>
+<li><b>zenoh 라우터</b>를 켠다. "zenoh :7447" 이 정상이 되고, <b>끄기</b>로 실제로 꺼지는지 본다.</li>
+</ol>
+<table>
+<tr><th>실패</th><th>볼 곳</th></tr>
+<tr><td>ssh 가 비밀번호를 묻는다</td><td>키 등록. <code>ssh root@10.42.0.241</code></td></tr>
+<tr><td>"No such container"</td><td><code>hosts.robot_container.container</code>. Robot PC 에서 <code>docker ps</code></td></tr>
+<tr><td>끄기를 눌러도 원격 프로세스가 남는다</td><td><code>tmux -L shapeup attach -t hub</code> 로 창을 보고 결과를 적는다 (리뷰 4번의 근거가 된다)</td></tr>
+</table>
+
+<h2>2단계. 장치 하나씩 (실행표 "센서 확인")</h2>
+<p>녹화기 전체를 띄우기 전에 스트림을 하나씩 본다. 녹화기가 켜져 있으면 이 도구들은 막힌다(같은 장치를 연다).</p>
+<table>
+<tr><th>도구</th><th>조건</th><th>통과 기준</th><th>결과로 고칠 설정</th></tr>
+<tr><td>스트림 확인: hand</td><td><code>leap_manus</code> 가 dry-run 으로 돌고 있다</td><td>약 50 Hz, <code>delay_ms</code> 중앙값 1 ms 안팎</td><td></td></tr>
+<tr><td>스트림 확인: glove</td><td>같음</td><td>약 50 Hz, 노드 이름이 나온다</td><td></td></tr>
+<tr><td>스트림 확인: arm_state</td><td>zenohd, 팔 bringup</td><td>값이 온다. <b>Hz 를 적는다</b></td><td><code>streams.arm_state.hz</code> 에 실측값 (리뷰 14번)</td></tr>
+<tr><td>스트림 확인: arm_action</td><td>leader 를 움직이는 동안</td><td>값이 온다. <code>source_stamps</code> 가 있는지 적는다</td><td><code>streams.arm_action.hz</code></td></tr>
+<tr><td>스트림 확인: tactile_a / tactile_b</td><td>보드 연결</td><td>Hz 측정, <code>missed</code> 0, <code>meta.layout</code> 이 실제 배선과 같다</td><td><code>places</code>, <code>port</code>, <code>hz</code></td></tr>
+<tr><td>스트림 확인: cam_wrist</td><td>ROS 카메라 노드 꺼짐</td><td>설정 fps 유지. <code>ts_domain</code> 과 <code>meta.usb</code> 를 적는다</td><td><code>ts_domain</code> 이 0 이면 <code>dataset.time</code> 에서 카메라를 <code>recv</code> 로</td></tr>
+</table>
+<div class="note"><b>arm 이 "연결은 되는데 0개"면</b> SDK 가 만드는 zenoh 키가 Robot PC 와 안 맞는 것이다. 이 경우 Robot PC 컨테이너에 작은 중계 노드를 두는 쪽으로 바꾼다. 바꿀 파일은 <code>streams/arm_zenoh.py</code> 하나다.</div>
+<p>hub 의 <b>장치 탐색</b>도 이때 본다: Paxini 보드 두 개의 시리얼 번호가 서로 다르게 보이는가, LEAP 의 latency timer 가 1 인가, 손목 카메라가 5000 Mbps(USB3)로 잡히는가.</p>
+
+<h2>3단계. 텔레옵과 종료 경로</h2>
+<ol class="steps">
+<li class="human">LEAP 을 편 손으로 두고 5V 를 켠다. 글러브를 착용한다.</li>
+<li>실행표 <b>손만</b>: Manus 노드 → 글러브 기록 → LEAP 모터 확인 → <code>leap_manus</code> (dry-run).</li>
+<li>dry-run 에서 "준비됨"(<code>[teleop] live</code>)을 본 뒤 dry-run 을 끄고 다시 켠다.</li>
+<li><b>끄기</b>: 로그에 Torque OFF 가 찍히고 손이 풀리는지 본다.</li>
+<li><b>새로 볼 것, 강제 종료:</b> 다시 켠 뒤 손에 물체가 없는 상태에서 <code>tmux -L shapeup kill-window -t hub:leap_manus</code> (또는 끄기가 늦을 때 나오는 "강제 종료"). 손이 풀리는지, 그리고 다음 <code>leap_check</code> 가 정상인지 본다.</li>
+<li>글러브 동글을 3초 넘게 뽑아 본다. hold → release 가 로그에 찍히고 손이 주먹(safe pose)으로 가는지 본다.</li>
+</ol>
+<table>
+<tr><th>볼 것</th><th>통과 기준</th></tr>
+<tr><td>강제 종료 뒤 손</td><td>풀린다(Torque OFF). 풀리지 않고 굳어 있으면 5V 를 끄고 결과를 적는다</td></tr>
+<tr><td>팔 bringup 을 끈 뒤</td><td>"로봇 중복 실행 확인"에 follower / leader 가 남아 있지 않다</td></tr>
+</table>
+
+<h2>4단계. 녹화기 전체와 짧은 녹화</h2>
+<ol class="steps">
+<li>실행표 <b>수집</b>을 위에서부터 켠다. 마지막이 녹화기다.</li>
+<li>hub 의 <b>녹화</b> 메뉴로 간다. 센서 페이지에서 모든 스트림이 "정상"인지 본다.</li>
+<li>손목 카메라가 바로 서 있는지 본다. 누워 있으면 <code>rotation_deg</code> 를 90 ↔ 270 으로 바꾼다(다시 찍을 필요 없다).</li>
+<li class="human">손가락을 하나씩 눌러 화면의 같은 손가락·같은 마디가 반응하는지 본다. 다르면 <code>places</code> 가 틀렸다.</li>
+<li class="human">손에 아무것도 닿지 않게 하고 <kbd>Z</kbd>. 보드별 "완료"를 본다.</li>
+<li>10초짜리 에피소드를 찍고 성공으로 저장한다. <code>tactile-rec inspect &lt;에피소드&gt;</code> 로 스트림별 Hz 와 최대 공백을 본다.</li>
+</ol>
+<table>
+<tr><th>볼 것</th><th>통과 기준</th></tr>
+<tr><td>검토 화면의 "주의"</td><td>비어 있다. "강제 시작"이 뜨면 2단계의 Hz 설정으로 돌아간다</td></tr>
+<tr><td>센서 페이지의 "버린 것"</td><td>없거나 늘지 않는다</td></tr>
+<tr><td><code>episode.json</code> 의 <code>tactile_zero</code></td><td>두 보드 모두 <code>ok: true</code></td></tr>
+</table>
+
+<h2>5단계. 잃지 않는지 확인 (이번 수정의 핵심)</h2>
+<table>
+<tr><th>해 볼 것</th><th>통과 기준</th></tr>
+<tr><td>녹화 중 hub 에서 녹화기 <b>끄기</b></td><td>확인 문구가 뜬다. 끈 뒤 다시 켜면 "미저장"에 그 에피소드가 있고 길이가 맞다</td></tr>
+<tr><td>녹화 중 녹화기 창 닫기 (<code>tmux kill-window</code>)</td><td>같음</td></tr>
+<tr><td>녹화 중 촉각 보드 USB 뽑기</td><td>녹화기: 소리 세 번, "끊김". hub 홈: 촉각 칸이 빨강 "녹화기 tactile_a: 끊김/오류", 사고 폴더 생김. 다시 꽂으면 둘 다 풀린다</td></tr>
+<tr><td>녹화 중 카메라 USB 뽑기</td><td>같음. 정지하면 검토 화면에 끊김 횟수가 있다</td></tr>
+<tr><td>녹화기가 켜진 채 "스트림 확인: hand" 누르기</td><td>버튼이 막히고 이유가 나온다</td></tr>
+</table>
+
+<h2>6단계. 시간 차이 실측</h2>
+<ol class="steps">
+<li>태스크 이름을 <code>sync_test</code> 로 바꾼다.</li>
+<li class="human">가만히 있다가 손가락을 빠르게 쥔다. 1초 쉬고 반복, 5회 이상.</li>
+<li class="human">손끝 센서로 책상을 톡 친다. 1초 쉬고 반복, 5회 이상.</li>
+<li><code>tactile-rec tap &lt;에피소드&gt; --ref hand.cmd</code>, <code>--ref tactile_a.force</code>.</li>
+</ol>
+<ul>
+<li><code>offset</code> 이 + 면 그 스트림이 기준보다 늦게 보인다. 같은 순간이어야 하는 쌍(촉각 힘 대 모터 전류, 손 위치 대 카메라)의 값을 <code>dataset.latency_ms</code> 에 넣는다.</li>
+<li><code>spread</code> 가 수십 ms 면 지연이 일정하지 않다는 뜻이다. 값 하나로 보정되지 않으니 원인부터 본다.</li>
+<li>이 단계는 스트림 사이의 <em>상대</em> 차이만 잰다. 카메라의 절대 지연(QR)과 명령 → 위치의 실행 지연은 <a href="#latency">지연 실측 실험</a>의 L1, E1, E2 로 따로 잰다.</li>
+</ul>
+
+<h2>7단계. 오래 돌리기</h2>
+<p>10분짜리 에피소드 하나(<code>time_limit_s: 600</code>).</p>
+<table>
+<tr><th>볼 것</th><th>통과 기준</th></tr>
+<tr><td>센서 페이지의 Hz 추이</td><td>평평하다. "빠짐"이 늘지 않는다</td></tr>
+<tr><td><code>inspect</code> 의 <code>write-dropped</code></td><td>0. 아니면 디스크나 CPU 가 못 따라간 것이다</td></tr>
+<tr><td>녹화 중 <code>ep_NNNN.tmp/parts/</code></td><td>5초마다 조각이 늘어난다</td></tr>
+<tr><td><code>top</code> 의 녹화기 메모리</td><td>계속 늘지 않는다 (숫자 스트림은 이제 5초마다 디스크로 내려간다)</td></tr>
+</table>
+
+<h2>8단계. 변환과 학습</h2>
+<ol class="steps">
+<li>태스크 폴더를 학습 서버로 복사한다 (<code>rsync -a</code>).</li>
+<li>openpi 환경에서 <code>pip install -e recorder</code> 뒤 <code>pytest recorder/tests/test_convert.py</code>. <b>lerobot smoke test 가 skip 이 아니라 통과</b>해야 한다.</li>
+<li><code>tactile-rec convert --config config/rig.yaml --in … --out … --repo-id …</code>.</li>
+<li><code>*.conversion_report.json</code> 에서 제외된 에피소드와 이유, <code>dataset</code>(쓴 설정), <code>streams.hand.mode_steps</code> 를 본다.</li>
+<li>openpi 쪽에 우리 키를 pi0.5 입력에 잇는 데이터 설정을 만들고 정규화 통계와 학습 몇 스텝을 돌린다. 이 설정은 아직 없다.</li>
+</ol>
+<div class="next"><a href="#review">← 리뷰 뒤 고친 것</a><a href="#ref">설정과 미검증 목록 →</a></div>
+</section>
+
+<!-- ============================================================ ref -->
+<section class="page" id="ref">
+<h1>설정과 미검증 목록</h1>
+<p class="lead">두 설정 파일에서 자주 만지는 키와, 실물에서 아직 보지 못한 것 전부.</p>
+
+<h2><code>recorder/config/rig.yaml</code></h2>
+<table>
+<tr><th>키</th><th>기본</th><th>뜻</th></tr>
+<tr><td><code>rig.mount</code></td><td></td><td>장착 모드. 다른 장착의 에피소드는 한 데이터셋으로 변환되지 않는다</td></tr>
+<tr><td><code>record.preroll_s</code></td><td class="num">1.0</td><td>시작 직전 몇 초를 같이 저장할지 (최대 1.5)</td></tr>
+<tr><td><code>record.flush_s</code> <span class="tag new">새로</span></td><td class="num">5</td><td>녹화 중 몇 초마다 디스크에 쓸지. 죽었을 때 잃는 최대 길이</td></tr>
+<tr><td><code>record.min_free_gb</code></td><td class="num">5</td><td>이보다 적으면 시작을 막고, 녹화 중 이 아래로 가면 멈춘다</td></tr>
+<tr><td><code>record.zero_timeout_s</code> <span class="tag new">새로</span></td><td class="num">3</td><td>영점 보정을 기다리는 시간</td></tr>
+<tr><td><code>record.time_limit_s</code></td><td class="num">0</td><td>에피소드 길이 제한. 0 이면 없음</td></tr>
+<tr><td><code>streams.*.hz</code></td><td></td><td>기대 Hz. 80% 아래면 "느림". <b>실측해서 넣는다</b></td></tr>
+<tr><td><code>streams.*.required</code></td><td>true</td><td>false 면 없어도 녹화가 시작된다</td></tr>
+<tr><td><code>streams.&lt;paxini&gt;.places</code></td><td></td><td>보드의 모듈 이름 → 손의 위치</td></tr>
+<tr><td><code>streams.&lt;realsense&gt;.serial</code></td><td></td><td>카메라가 둘 이상이면 필수 <span class="tag new">새로</span></td></tr>
+<tr><td><code>dataset.hand_action</code></td><td><b>없음</b> <span class="tag new">바뀜</span></td><td><code>sent</code> 또는 <code>cmd</code>. 반드시 적는다</td></tr>
+<tr><td><code>dataset.time</code></td><td>recv</td><td>스트림별 <code>recv</code> / <code>src</code> / <code>respread</code></td></tr>
+<tr><td><code>dataset.latency_ms</code></td><td>{}</td><td>스트림별 지연 보정. 실측 뒤 채운다</td></tr>
+<tr><td><code>dataset.max_staleness_ms</code></td><td class="num">150</td><td>이보다 오래된 값을 쓴 에피소드는 문제로 표시</td></tr>
+<tr><td><code>dataset.tactile_hr</code></td><td class="num">3</td><td>한 스텝에 넣는 고주파 촉각 샘플 수</td></tr>
+<tr><td><code>ui.shutdown_timeout_s</code> <span class="tag new">새로</span></td><td class="num">2</td><td>끌 때 열린 브라우저 연결을 기다리는 시간</td></tr>
+</table>
+
+<h2><code>episode.json</code> 의 flags</h2>
+<table>
+<tr><th>flag</th><th>언제</th><th>변환</th></tr>
+<tr><td><code>forced_start</code></td><td>점검 실패 상태에서 시작</td><td>제외</td></tr>
+<tr><td><code>dropouts</code></td><td>필수 스트림이 녹화 중 끊김 (스트림별 횟수)</td><td>제외</td></tr>
+<tr><td><code>disk_low</code> <span class="tag new">새로</span></td><td>디스크 부족으로 자동 정지</td><td>표시만</td></tr>
+<tr><td><code>write_errors</code> <span class="tag new">새로</span></td><td>스트림을 다 쓰지 못함 (스트림별 이유)</td><td>제외</td></tr>
+<tr><td><code>recovered</code> <span class="tag new">새로</span></td><td>비정상 종료 뒤 조각에서 복구</td><td>제외</td></tr>
+</table>
+
+<h2>실물에서 아직 보지 못한 것</h2>
+<table>
+<tr><th>항목</th><th>확인하는 단계</th></tr>
+<tr><td>이 브랜치의 hub 를 tmux 와 함께 실제로 띄운 전체 동작. "녹화" 메뉴에서 켜고 끌 때의 전환과 키 입력</td><td>0</td></tr>
+<tr><td>ssh + docker exec 를 거친 Ctrl+C 가 원격 프로세스를 끝내는가. 강제 종료나 이더넷 끊김 뒤 남는 프로세스</td><td>1, 3</td></tr>
+<tr><td><code>zenoh-ros2-sdk</code> 로 Jazzy 팔 토픽을 받는가. 실제 Hz. <code>header.stamp</code> 유무</td><td>2</td></tr>
+<tr><td>Paxini: 보드 두 개 동시 스트림, 모듈 이름, <code>/dev/ttyACM*</code> 순서, 영점 명령의 실제 동작과 걸리는 시간</td><td>2, 4</td></tr>
+<tr><td>RealSense: <code>ts_domain</code>, USB 속도, <code>rotation_deg</code></td><td>2, 4</td></tr>
+<tr><td>SIGHUP / 강제 종료 뒤 LEAP 의 Torque OFF</td><td>3</td></tr>
+<tr><td>녹화기 스트림 오류가 hub 장치 칸에 뜨는 전체 경로</td><td>5</td></tr>
+<tr><td>스트림 사이의 실제 지연 → <code>latency_ms</code></td><td>6</td></tr>
+<tr><td>10분 녹화의 CPU, 디스크, 프레임 버림</td><td>7</td></tr>
+<tr><td>실제 lerobot 으로 쓰기, openpi 데이터 설정</td><td>8</td></tr>
+</table>
+
+<h2>같이 볼 문서</h2>
+<ul>
+<li><code>docs/data_preparation/recorder_usage.md</code>: 녹화기 설치와 사용법</li>
+<li><code>docs/data_preparation/control_hub_usage.md</code>: hub 설치와 사용법, 현장 확인 표</li>
+<li><code>docs/data_preparation/2026-11-14-recorder-design.html</code>: 녹화기 구조 검토(이전 문서). 이 문서가 그 뒤의 변경을 포함한다</li>
+<li><code>docs/data_preparation/2026-11-13-cyclo-analysis.md</code>: Cyclo 분석</li>
+<li><code>docs/manus_teleop_guide.html</code>: 텔레옵 현장 절차</li>
+</ul>
+<div class="next"><a href="#field">← 실물 시험 가이드</a><a href="#biblio">참고 자료 →</a></div>
+</section>
+
+<!-- ============================================================ 참고 자료 -->
+<section class="page" id="biblio">
+<h1>참고 자료</h1>
+<p class="lead">시간 맞추기와 지연 실측의 근거, 다른 수집 시스템과의 비교, 통신·장치 문서, 학습 쪽(openpi, LeRobot) 자료. 각 항목에 우리 코드의 어느 부분과 이어지는지, 그리고 원문을 어디까지 읽었는지 적는다. <span class="tag new">11/17 추가</span></p>
+
+<div class="note"><b>읽은 범위.</b> UMI 는 원문 PDF 에서 §IV(PD1), §V-B, 부록 A 를 읽었다. openpi 는 <code>pyproject.toml</code> 원본을 읽었다. 5·6절은 11/16 리뷰 문서(<code>2026-11-16-recorder-review.html</code>)와 레포 문서에 이미 인용된 것을 옮겼다. 나머지는 검색 결과의 요약만 보았다. 인용하기 전에 원문을 확인한다.</div>
+
+<h2>1. 고르는 규칙: causal, 보간 없음</h2>
+<table>
+<tr><th>자료</th><th>내용</th><th>우리와의 관계</th><th>읽은 범위</th></tr>
+<tr><td><a href="https://en.wikipedia.org/wiki/Zero-order_hold">Zero-order hold (Wikipedia)</a>, <a href="https://archive.nptel.ac.in/content/storage2/courses/117101055/group11/11b_1.htm">NPTEL Sampling and Reconstruction</a>. 교과서: Oppenheim &amp; Schafer, sampling 장</td><td>다음 샘플이 올 때까지 값을 계단처럼 들고 있는 복원. first-order hold(선형 보간)와 비교</td><td><code>align.pick_latest</code> 가 이 계단을 격자 시각에서 읽는다</td><td>요약</td></tr>
+<tr><td>LeRobot <code>record.py</code> 녹화 루프 (공식 <code>huggingface/lerobot</code>)</td><td>1/fps 루프마다 <code>get_observation()</code> 으로 최신 값을 읽고 <code>busy_wait</code> 로 주기를 맞춘다</td><td>같은 규칙을 녹화 중에 바로 한다. 우리는 원본을 남겨 나중에 한다</td><td>요약 (미러 코드)</td></tr>
+<tr><td><code>docs/data_preparation/2026-11-13-cyclo-analysis.md</code></td><td>Cyclo 의 causal 리샘플, staleness 보고, frame_reuse</td><td>우리가 그대로 가져온 원본</td><td>레포 문서</td></tr>
+</table>
+
+<h2>2. 대조군: 가장 가까운 시각끼리 묶기</h2>
+<table>
+<tr><th>자료</th><th>내용</th><th>우리와의 관계</th><th>읽은 범위</th></tr>
+<tr><td><a href="https://mirror.umd.edu/roswiki/message_filters(2f)ApproximateTime.html">ROS message_filters ApproximateTime (ROS wiki)</a>, <a href="https://docs.ros.org/en/rolling/p/message_filters/doc/index.html">ROS 2 문서</a></td><td>토픽별 queue 머리에서 가장 늦은 메시지를 pivot 으로 잡고 시각 차이가 가장 작은 조합을 찾는다. 파라미터가 없다</td><td>가까우면 미래 메시지도 묶는다. 분석에는 좋지만 정책 학습에서는 실행 때와 달라진다</td><td>요약</td></tr>
+</table>
+
+<h2>3. 다른 시계 옮기기</h2>
+<table>
+<tr><th>자료</th><th>내용</th><th>우리와의 관계</th><th>읽은 범위</th></tr>
+<tr><td>E. Olson, <a href="https://april.eecs.umich.edu/pdfs/olson2010.pdf">"A Passive Solution to the Sensor Synchronization Problem"</a>, 2010. 구현 예: <a href="https://relatedrepos.com/gh/hanley6/time_sync">hanley6/time_sync</a></td><td>센서가 협조하지 않아도, 받는 쪽에서 "offset 은 모르고 지연은 항상 양수"라는 조건만으로 시계 차이를 추정한다</td><td>팔의 <code>remote_wall</code> 변환(offset = min(t_recv − t_src))과 촉각 <code>respread</code>("받은 시각보다 앞으로만")가 같은 생각이다. 가장 가까운 이론</td><td>요약</td></tr>
+</table>
+
+<h2>4. 지연 실측</h2>
+<table>
+<tr><th>자료</th><th>내용</th><th>우리와의 관계</th><th>읽은 범위</th></tr>
+<tr><td>C. Chi et al., <a href="https://arxiv.org/abs/2402.10329">"Universal Manipulation Interface"</a>, RSS 2024. <a href="https://umi-gripper.github.io">프로젝트 페이지</a></td><td>부록 A: 카메라는 QR 시각, 고유감각은 로봇 시각 또는 ½ ping, 실행 지연은 명령과 측정의 cross-correlation. 실행 때는 가장 늦은 스트림 기준으로 맞추고(PD1.1) 실행 지연만큼 앞선 action 을 버린다(PD1.2). 지연 맞추기를 끄면 던지기 87.5% → 57.5%</td><td><a href="#latency">지연 실측 실험</a>의 L1, L2, E1, E2 가 이 방법을 옮긴 것이다</td><td>원문 §IV PD1, §V-B, 부록 A</td></tr>
+<tr><td>P. Furgale, J. Rehder, R. Siegwart, "Unified Temporal and Spatial Calibration for Multi-Sensor Systems", IROS 2013. <a href="https://github.com/ethz-asl/kalibr/wiki/camera-imu-calibration">Kalibr wiki</a></td><td>카메라와 IMU 의 time offset 을 continuous-time batch 추정으로 공간 보정과 함께 구한다. 초기값은 두 센서가 본 각속도의 상관</td><td><code>tap</code> 의 "같은 사건이 두 스트림에 언제 보이나"를 정식으로 푼 것이다. 더 정밀하게 갈 때 본다</td><td>요약</td></tr>
+<tr><td>T. Qin, S. Shen, <a href="https://arxiv.org/abs/1808.00692">"Online Temporal Calibration for Monocular Visual-Inertial Systems"</a>, arXiv 2018 (학회 미확인)</td><td>보정판 없이 time offset 을 상태에 넣어 온라인으로 추정</td><td>센서 사이 offset 을 패턴 없이 잡는 다른 길</td><td>요약</td></tr>
+</table>
+
+<h2>5. 다른 수집 시스템과의 비교 (related work)</h2>
+<p>수집 방식은 크게 둘이다. <b>루프 동기형</b>은 고정 주기 루프마다 모든 센서의 최신 값을 한 행으로 쓴다. <b>원본·오프라인 정렬형</b>은 센서마다 자기 속도로 시각과 함께 저장하고 나중에 격자에 맞춘다(우리, Cyclo, UMI). 비교 전체는 11/16 리뷰 문서 8절에 있다.</p>
+<table>
+<tr><th>자료</th><th>방식과 주기</th><th>우리와의 관계</th><th>읽은 범위</th></tr>
+<tr><td>HATO: T. Lin et al., "Learning Visuotactile Skills with Two Multifingered Hands", <a href="https://arxiv.org/abs/2404.16823">arXiv 2404.16823</a>, <a href="https://toruowo.github.io/hato">프로젝트</a></td><td>루프 동기형. 다지 손 + 촉각, 모든 모달리티를 10 Hz 로</td><td>목적이 가장 비슷하다. 촉각을 루프 주기로 낮췄고, 우리는 90 Hz 원본을 보존한다는 점이 차별점이다</td><td>리뷰 문서 (손끝 촉각 주기 세부 <span class="tag field">UNVERIFIED</span>)</td></tr>
+<tr><td>DROID: A. Khazatsky et al., <a href="https://arxiv.org/abs/2403.12945">arXiv 2403.12945</a></td><td>루프 동기형, 15 Hz, 스테레오 카메라 3대</td><td>대규모 수집의 운영(메타데이터, 장면 ID, 수집자)을 참고</td><td>리뷰 문서 (원본 형식 <span class="tag field">UNVERIFIED</span>)</td></tr>
+<tr><td>ALOHA: <a href="https://docs.trossenrobotics.com/aloha_docs/2.0/operation/data_collection.html">Trossen ALOHA data collection</a></td><td>루프 동기형(ROS), 에피소드마다 HDF5</td><td>센서가 균질할 때의 기준점. 우리 장비에는 맞지 않는다</td><td>리뷰 문서 (50 Hz · 30 fps <span class="tag field">UNVERIFIED</span>)</td></tr>
+<tr><td>LeRobot 녹화 (<code>lerobot-record</code>)</td><td>루프 동기형. 루프 시각 = 행 시각</td><td>원래 유력안이었다. 90 Hz 촉각 손실과 Python ≥ 3.12 요구(User PC 3.10) 때문에 버렸다</td><td>리뷰 문서</td></tr>
+<tr><td>UMI, Cyclo</td><td>원본·오프라인 정렬형</td><td>4절, 1절 참고</td><td>위와 같음</td></tr>
+</table>
+
+<h2>6. 통신과 장치</h2>
+<table>
+<tr><th>자료</th><th>내용</th><th>우리와의 관계</th><th>읽은 범위</th></tr>
+<tr><td><a href="https://zettascalelabs.github.io/ros-z/chapters/distro_compatibility.html">ros-z: distro compatibility</a></td><td>rmw_zenoh 배포판 사이의 타입 해시 차이</td><td>11/12 현장에서 Humble ↔ Jazzy 가 토픽은 보이고 데이터는 0개였던 현상의 근거. 녹화기가 ROS 를 거치지 않고 팔을 받는 이유(<a href="#arch">전체 구조</a>)</td><td>리뷰 문서</td></tr>
+<tr><td><a href="https://robotis-git.github.io/zenoh_ros2_sdk/">zenoh-ros2-sdk 문서</a>, <a href="https://pypi.org/project/zenoh-ros2-sdk/0.1.6/">PyPI 0.1.6</a>, <a href="https://github.com/ros2/rmw_zenoh">ros2/rmw_zenoh</a></td><td>ROS 없이 rmw_zenoh 토픽을 구독하는 Python SDK, 그 아래 RMW</td><td><code>streams/arm_zenoh.py</code> 가 쓰는 SDK. 실물 수신은 <span class="tag field">현장 미검증</span></td><td>리뷰 문서, 10/09 현장 문서</td></tr>
+<tr><td><a href="https://github.com/realsenseai/librealsense/blob/master/tools/enumerate-devices/readme.md">librealsense rs-enumerate-devices</a>, <a href="https://github.com/realsenseai/realsense-ros/blob/ros2-master/README.md">realsense-ros README</a></td><td>카메라 serial, USB 속도 확인, ROS 카메라 노드</td><td><code>streams/realsense.py</code>(pyrealsense2 직접)와 hub 의 "손목 카메라 ROS 노드"</td><td>수집 가이드 문서</td></tr>
+<tr><td>ROBOTIS OMY 문서: <a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/zenoh_communication/">zenoh 통신</a>, <a href="https://docs.robotis.com/docs/systems/omy/quick_start_guide/operation_guide/teleoperation/">teleoperation</a>, <a href="https://docs.robotis.com/docs/systems/omy/imitation_learning/data_recording/">data recording</a></td><td>Robot PC 컨테이너, zenoh 라우터, leader/follower, Cyclo 녹화</td><td>hub 의 Robot PC 버튼들과 Cyclo 분석의 출처</td><td>수집 가이드 문서</td></tr>
+</table>
+
+<h2>7. 학습 쪽: openpi 와 LeRobot 형식</h2>
+<table>
+<tr><th>자료</th><th>내용</th><th>우리와의 관계</th><th>읽은 범위</th></tr>
+<tr><td>Physical Intelligence, "π<sub>0.5</sub>: a Vision-Language-Action Model with Open-World Generalization", <a href="https://arxiv.org/abs/2504.16054">arXiv 2504.16054</a>, CoRL 2025 (<a href="https://proceedings.mlr.press/v305/black25a.html">PMLR v305</a>)</td><td>π<sub>0</sub> 위에 이종 데이터 co-training. flow-matching action expert</td><td>학습할 정책. 우리 키(<code>observation.state</code> 22, <code>action</code> 22, 촉각, 영상)를 이 입력에 잇는 설정이 아직 없다(<a href="#field">실물 시험</a> 8단계)</td><td>요약</td></tr>
+<tr><td><a href="https://github.com/Physical-Intelligence/openpi">Physical-Intelligence/openpi</a></td><td>π<sub>0</sub>, π<sub>0</sub>-FAST, π<sub>0.5</sub> 체크포인트와 학습 코드. 자기 데이터는 <code>LeRobotDataConfig</code> 를 가진 <code>TrainConfig</code> 를 <code>src/openpi/training/config.py</code> 에 추가하고 norm stats 를 먼저 계산한다</td><td>변환기 출력을 읽는 쪽. <code>pyproject.toml</code> 이 lerobot 을 commit <code>0cf86487</code> 로 고정하고 <code>requires-python = "&gt;=3.11"</code> 이다. 그래서 변환기는 User PC(3.10)가 아니라 학습 서버의 openpi 환경에서 돌린다</td><td><code>pyproject.toml</code> 원본. 설정 방법은 요약</td></tr>
+<tr><td>LeRobot (<a href="https://github.com/huggingface/lerobot">huggingface/lerobot</a>) dataset v2.1 / <a href="https://huggingface.co/docs/lerobot/lerobot-dataset-v3">v3.0</a></td><td>v2.1: <code>meta/info.json</code>(<code>codebase_version</code>), <code>episodes.jsonl</code>, <code>tasks.jsonl</code>, <code>episodes_stats.jsonl</code>, 에피소드마다 parquet 과 카메라별 mp4. v3.0 은 lerobot 0.4.0 부터 기본이고 여러 에피소드를 큰 파일에 묶는다</td><td><code>convert/dataset.py</code> 가 v2.1 로 쓰는 이유: openpi 가 고정한 lerobot 이 v2.1 을 읽는다. 그 commit 의 <code>CODEBASE_VERSION</code> 이 v2.1 인지는 2차 자료만 확인 <span class="tag field">UNVERIFIED</span></td><td>요약 (2차 자료)</td></tr>
+</table>
+
+<h2>읽는 순서 추천</h2>
+<ol class="steps">
+<li>Zero-order hold 위키 (고르는 규칙)</li>
+<li>UMI §IV PD1 과 부록 A (지연을 왜, 어떻게 재나)</li>
+<li>Olson 2010 (다른 시계 옮기기)</li>
+<li>필요하면 Kalibr, Qin &amp; Shen (정밀한 offset 추정)</li>
+</ol>
+<div class="next"><a href="#ref">← 설정과 미검증 목록</a><a href="#overview">처음으로</a></div>
+</section>
+
+</main>
+</div>
+<script>
+(function () {
+  var pages = Array.prototype.slice.call(document.querySelectorAll("section.page"));
+  var links = Array.prototype.slice.call(document.querySelectorAll("#nav a"));
+  function show() {
+    var id = location.hash.slice(1);
+    var target = document.getElementById(id);
+    var page = target ? target.closest("section.page") : null;
+    if (!page) page = pages[0];
+    pages.forEach(function (p) { p.classList.toggle("on", p === page); });
+    links.forEach(function (a) { a.classList.toggle("on", a.getAttribute("href") === "#" + page.id); });
+    if (!document.body.classList.contains("all")) {
+      if (target && target !== page) target.scrollIntoView(); else window.scrollTo(0, 0);
+    }
+  }
+  window.addEventListener("hashchange", show);
+  show();
+  document.getElementById("all-btn").addEventListener("click", function () {
+    var on = document.body.classList.toggle("all");
+    this.textContent = on ? "한 장씩 보기" : "전체 펼쳐 보기";
+  });
+  var filter = document.getElementById("proc-filter");
+  if (filter) filter.addEventListener("input", function () {
+    var words = this.value.toLowerCase().split(/\s+/).filter(Boolean);
+    document.querySelectorAll("details.proc").forEach(function (d) {
+      var text = d.textContent.toLowerCase();
+      d.hidden = !words.every(function (w) { return text.indexOf(w) >= 0; });
+    });
+    document.querySelectorAll(".proc-group").forEach(function (g) {
+      g.hidden = !g.querySelector("details.proc:not([hidden])");
+    });
+  });
+  document.querySelectorAll(".check input").forEach(function (box, index) {
+    var key = "hub-rec-overview-check-" + index;
+    try { box.checked = localStorage.getItem(key) === "1"; } catch (e) {}
+    box.addEventListener("change", function () { try { localStorage.setItem(key, box.checked ? "1" : "0"); } catch (e) {} });
+  });
+})();
+</script>
+</body>
+</html>

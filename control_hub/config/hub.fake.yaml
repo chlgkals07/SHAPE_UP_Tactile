@@ -1,0 +1,233 @@
+# 실물 없이 화면 전체를 눌러 보는 설정. 모든 프로세스가 echo 와 sleep 이다.
+#   control-hub serve --config config/hub.fake.yaml      # http://localhost:8701
+# "가짜 로봇 전원" 도구로 전원을 켜고 끄면 홈 화면의 로봇 PC 칸이 바뀐다.
+# 텔레옵(가짜)을 켜면 3초 뒤 LEAP 모터 7 이 빠지는 오류가 나고, 사고 폴더가 생긴다.
+
+ui: {host: 127.0.0.1, port: 8701}
+tmux: {socket: shapeup-fake, session: hub}
+log_dir: ~/.local/state/control_hub/fake-logs
+session_dir: ~/.local/state/control_hub/fake-sessions
+check_interval_s: 1
+
+envs:
+  fake: ["export WHO=fake"]
+
+hints:
+  - {match: "command not found", hint: "명령이 없습니다. envs 의 환경 준비 줄을 확인합니다"}
+
+processes:
+  zenohd:
+    title: zenoh 라우터 (가짜)
+    group: Robot PC
+    env: fake
+    cmd: 'echo "[zenohd] listening on :7447"; touch /tmp/hub_fake_zenoh; trap "rm -f /tmp/hub_fake_zenoh" EXIT; sleep 100000'
+    requires: [robot_power]
+    ready: {check: zenoh_port}
+    help: 가짜 라우터. 켜지면 /tmp/hub_fake_zenoh 파일이 생기고 "zenoh :7447" 점검이 통과한다.
+
+  arm:
+    title: 팔 bringup (가짜)
+    group: Robot PC
+    env: fake
+    cmd: >-
+      echo "[follower] controllers active"; sleep 1; echo "[executor] home -> ready"; sleep 3;
+      echo "[BULK_READ_FAIL] -3001 (ignored)"; echo "[leader] started, syncing"; sleep 100000
+    requires: [zenoh_port]
+    conflicts: [pack]
+    ready: {log: "\\[leader\\] started"}
+    help: |
+      누르는 즉시 팔이 움직인다고 가정한 가짜 bringup. 4초 뒤 준비됨이 된다.
+    confirm_start:
+      - 작업 공간을 비웠다. 누르는 즉시 팔이 움직인다
+      - LEAP 은 주먹 상태다
+      - leader 를 손으로 잡고 트리거를 쥐고 있다
+    confirm_stop:
+      - 팔을 손으로 받치고 있다
+    hints:
+      - {match: "BULK_READ_FAIL", ignore: true}
+
+  pack:
+    title: 팔 접기 (가짜)
+    group: Robot PC
+    kind: tool
+    cmd: 'echo "home -> pack"; sleep 3; echo done'
+    confirm_start: [팔 bringup 을 껐다]
+
+  manus:
+    title: Manus 노드 (가짜)
+    group: User PC
+    cmd: 'echo "running in integrated mode"; while true; do sleep 5; echo "glove 119.9 Hz"; done'
+    ready: {log: "integrated mode"}
+    help: 글러브 동글을 여는 노드의 가짜.
+
+  leap_manus:
+    title: Manus → LEAP 텔레옵 (가짜)
+    group: User PC
+    cmd: >-
+      echo "[teleop] waiting"; sleep 2; echo "[teleop] live"; sleep 1;
+      echo "ConnectionError: Missing or unresponsive DYNAMIXEL IDs: [7]";
+      while true; do sleep 10;
+      echo "[leap] feedback read failed: feedback sync read failed for ID None: no status packet";
+      done #
+    flags:
+      - {id: dry_run, label: "dry-run (LEAP 을 건드리지 않고 로그만)", arg: --dry-run, default: true}
+    requires: [manus]
+    ready: {log: "\\[teleop\\] live"}
+    confirm_start:
+      - {text: "LEAP 5V 를 편 손으로 켰고 차단 수단이 손 닿는 곳에 있다", unless_flag: dry_run}
+    confirm_stop:
+      - 손에 물체가 없다 (끄면 Torque OFF 로 손이 풀린다)
+
+  camera:
+    title: 카메라 노드 (실패하는 예)
+    group: User PC
+    cmd: 'echo "[camera] opening device"; sleep 1; echo "ERROR: Resource busy: device is claimed by another program"; exit 1'
+    conflicts: [recorder]
+    help: 1초 뒤 오류로 끝난다. 오류 표시, 힌트, 로그를 확인하는 용도.
+    hints:
+      - {match: "Resource busy", hint: "다른 프로그램이 장치를 잡고 있다. 그 프로그램을 끄고 다시 켠다"}
+
+  stubborn:
+    title: Ctrl+C 를 무시하는 예
+    group: User PC
+    cmd: 'trap "echo ignoring Ctrl+C" INT; while true; do sleep 1; done'
+    stop_grace_s: 3
+    help: 끄기를 눌러도 끝나지 않는다. 3초 뒤 "강제 종료"가 나오는 것을 확인하는 용도.
+
+  recorder:
+    title: 녹화기 (가짜)
+    group: User PC
+    cmd: 'echo "serving on :8809"; exec python3 -m http.server 8809 --bind 127.0.0.1'
+    ready: {check: recorder_ui}
+    help: 8809 포트에 빈 웹 서버를 띄운다. "녹화기 UI" 점검과 링크를 확인하는 용도.
+
+  glovecal:
+    title: 글러브 편 손/주먹 기록 (가짜)
+    group: 도구
+    kind: tool
+    input: true
+    cmd: 'printf "편 손 Enter → 기록 "; read -r _; echo "open ok"; printf "주먹 Enter → 기록 "; read -r _; echo "fist ok"; echo "saved"'
+    requires: [manus]
+    help: 아래 입력 줄에서 "보내기"를 두 번 누른다.
+
+  leap_check:
+    title: LEAP 모터 확인 (가짜)
+    group: 도구
+    kind: tool
+    cmd: >-
+      echo "Connected with torque OFF: /dev/ttyUSB0";
+      echo "Motor IDs/model numbers: {0: 1060, 1: 1060, 2: 1060, 3: 1060, 4: 1060, 5: 1060, 6: 1060, 7: 1060, 8: 1060, 9: 1060, 10: 1060, 11: 1060, 12: 1060, 13: 1060, 14: 1060, 15: 1060}";
+      echo "Positions: [2.1, -85.3, 1.0, 0.4, 3.2, -84.9, 0.0, 1.1, -2.0, -85.1, 0.3, 0.2, 5.5, 1.2, 0.8, 0.1] deg";
+      echo "Temperatures: [31.0, 33.0, 32.0, 31.0, 30.0, 34.0, 33.0, 52.0, 31.0, 32.0, 33.0, 31.0, 35.0, 36.0, 34.0, 33.0] C";
+      echo "Input voltages: [5.1, 5.1, 5.1, 5.1, 5.1, 5.1, 5.1, 5.0, 5.1, 5.1, 5.1, 5.1, 5.1, 5.1, 5.1, 5.1] V";
+      echo "Hardware errors: [0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0]";
+      echo "Torque was never enabled. Add --torque-test only after inspection."
+    conflicts: [leap_manus]
+    help: 모터 16개를 하나씩 확인한 결과(가짜). 7번이 뜨겁고 오류 비트가 켜져 있다.
+
+  zero:
+    title: LEAP 영점 기록 (가짜)
+    group: 도구
+    kind: tool
+    input: true
+    cmd: 'printf "Type RECORD to capture: "; read -r A; if [ "$A" = RECORD ]; then echo saved; else echo "aborted: got $A"; exit 2; fi'
+    help: 입력 줄에 RECORD 를 쳐서 보낸다. 다른 것을 보내면 오류로 끝난다.
+
+  power_on:
+    title: 가짜 로봇 전원 켜기
+    group: 도구
+    kind: tool
+    cmd: touch /tmp/hub_fake_robot && echo "robot on"
+  power_off:
+    title: 가짜 로봇 전원 끄기
+    group: 도구
+    kind: tool
+    cmd: rm -f /tmp/hub_fake_robot && echo "robot off"
+
+checks:
+  robot_power:
+    title: 로봇 ping (가짜)
+    file: /tmp/hub_fake_robot
+    help: 도구의 "가짜 로봇 전원 켜기"를 실행한다. 실제에서는 로봇 전원과 이더넷을 본다.
+  zenoh_port:
+    title: "zenoh :7447 (가짜)"
+    file: /tmp/hub_fake_zenoh
+    help: 실행 페이지에서 "zenoh 라우터"를 켠다.
+  leap_port:
+    title: LEAP USB (가짜, 항상 있음)
+    file: /tmp
+  cam_usb:
+    title: 손목 카메라 USB (D405)
+    usb: "8086:0b5b"
+    warn_below_mbps: 5000
+    help: 실물이 없으면 "꽂혀 있지 않음"이 정상이다.
+  recorder_ui:
+    title: 녹화기 UI (가짜 :8809)
+    http: "http://127.0.0.1:8809/"
+    link: 녹화기 열기
+    help: 녹화기를 켠다.
+
+profiles:
+  - id: collect
+    title: 수집 (팔 + 손 + 녹화)
+    help: 위에서부터 하나씩 켠다. 끌 때는 "전체 끄기"가 역순으로 끈다.
+    steps:
+      - {note: "로봇 전원을 켠다 (도구 → 가짜 로봇 전원 켜기)"}
+      - {note: "LEAP 을 편 손으로 두고 5V 를 켠다"}
+      - manus
+      - zenohd
+      - {note: "LEAP 을 주먹으로 둔다. leader 를 손으로 잡는다"}
+      - arm
+      - leap_manus
+      - recorder
+  - id: hand_only
+    title: 손만
+    steps: [{note: "LEAP 을 편 손으로 두고 5V 를 켠다"}, manus, glovecal, leap_manus]
+  - id: failures
+    title: 오류 연습
+    help: 오류로 끝나는 것과 Ctrl+C 를 무시하는 것을 켜 본다.
+    steps: [camera, stubborn, zero]
+
+known_usb:
+  "0403:6014": "FTDI (LEAP?)"
+  "8086:0b5b": "RealSense D405"
+
+devices:
+  robot:
+    title: 로봇 PC
+    checks: [robot_power, zenoh_port]
+    processes: [zenohd]
+    tools: [power_on, power_off]
+  arm:
+    title: 팔
+    recorder_stream: [arm_state, arm_action]
+    checks: [zenoh_port]
+    processes: [arm]
+    tools: [pack]
+  leap:
+    title: LEAP Hand
+    kind: leap
+    recorder_stream: hand
+    usb_id: "0403:6014"
+    checks: [leap_port]
+    processes: [leap_manus]
+    tools: [leap_check, zero]
+    events:
+      - {match: "Missing or unresponsive DYNAMIXEL IDs: \\[?(?P<motors>[\\d, ]+)", level: bad, text: "모터 응답 없음: {motors}"}
+      - {match: "\\[leap\\] feedback read failed", level: warn, text: "LEAP 읽기 실패 (모터 번호 모름). leap_check 로 확인"}
+  glove:
+    title: 글러브
+    recorder_stream: glove
+    processes: [manus]
+    tools: [glovecal]
+  tactile:
+    title: 촉각 (Paxini)
+    recorder_stream: tactile_a
+  cam_wrist:
+    title: 손목 카메라
+    recorder_stream: cam_wrist
+    checks: [cam_usb]
+    processes: [camera]
+  cam_ext:
+    title: 외부 카메라
+    recorder_stream: cam_ext

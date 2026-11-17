@@ -42,6 +42,7 @@ FROZEN_AFTER_S = 0.5
 def human_from_glove(
     ergonomics: Mapping[str, float],
     nodes: Mapping[tuple[str, str], Sequence[float]] | None = None,
+    raw_nodes: tuple | None = None,
 ) -> HumanHand | None:
     """Build a HumanHand, or None if an angle is missing or anything is not finite.
 
@@ -59,7 +60,16 @@ def human_from_glove(
     if nodes is not None and all(KEYPOINT_NODES[n] in nodes for n in KEYPOINT_NAMES):
         points = np.array([nodes[KEYPOINT_NODES[n]] for n in KEYPOINT_NAMES], dtype=np.float64)
         keypoints = points if np.all(np.isfinite(points)) else None
-    return HumanHand(np.array(angles), keypoints)
+    return HumanHand(np.array(angles), keypoints, raw_nodes)
+
+
+def raw_node_list(msg_nodes) -> tuple:
+    """Every skeleton node as ("Chain/Joint", (x, y, z, qx, qy, qz, qw)), for recording."""
+    out = []
+    for n in msg_nodes:
+        p, q = n.pose.position, n.pose.orientation
+        out.append((f"{n.chain_type}/{n.joint_type}", (p.x, p.y, p.z, q.x, q.y, q.z, q.w)))
+    return tuple(out)
 
 
 class Ros2ManusSource(Source):
@@ -100,7 +110,7 @@ class Ros2ManusSource(Source):
             )
             for n in msg.raw_nodes
         }
-        human = human_from_glove(ergonomics, nodes)
+        human = human_from_glove(ergonomics, nodes, raw_node_list(msg.raw_nodes))
         if human is None:
             return
         now = self._clock()

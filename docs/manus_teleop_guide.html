@@ -87,6 +87,12 @@ button:focus-visible,.chk:focus-within{outline:3px solid #6fc8bd;outline-offset:
 .link b{color:var(--teal-dark);font-size:.82rem}
 .link::before,.link::after{content:"";width:2px;flex:1;background:var(--teal);opacity:.5}
 .foot{margin-top:30px;font-size:.84rem;color:var(--muted)}
+/* 검증용 임시 단계: 검증되면 가이드에서 빠진다 */
+.temp{background:#f3effb;border:1.5px dashed #8b6fc9;border-radius:10px;padding:11px 14px;margin:12px 0;font-size:.93rem;color:#3d2c6b}
+.step[data-temp]{border-color:#cdbfe9}
+.step[data-temp] .eyebrow{color:#6b4fb0}
+.grp.is-temp{color:#6b4fb0}
+.grp.is-temp::after{content:" · 검증 후 삭제";font-weight:600;letter-spacing:0;text-transform:none}
 @media (max-width:860px){
   .wrap{grid-template-columns:1fr;padding:16px}
   nav.side{position:static;max-height:none;display:none}
@@ -118,12 +124,12 @@ button:focus-visible,.chk:focus-within{outline:3px solid #6fc8bd;outline-offset:
   <h2>전체 구조</h2>
   <p class="lead">팔은 Robot PC 안에서, 손은 User PC에서 따로 돈다. 두 PC는 zenoh로 토픽을 주고받는다.</p>
   <div class="ok">
-    <b>현재 상태 (11/13)</b>
+    <b>현재 상태 (11/15)</b>
     <ul style="margin-bottom:0">
       <li>LEAP은 플랜지에서 <b>오른쪽 90° 돌려 단 것이 최종 장착</b>이다. 팔은 <code>omy_ai</code> 대신 <code>omy_ai_wrist_flip</code>으로 띄운다 (“zenohd와 omy_ai” 단계).</li>
       <li>Manus → LEAP 텔레옵은 약 80% 완성. 남은 것: 잡기 위한 리타겟팅/IK 보정, 글러브 SDK 캘리브레이션을 다시 한 뒤 엄지 IK 확인.</li>
       <li>손목 카메라 D405 <span class="tag meas">실측 11/12</span>, Paxini 촉각 센서 연동 <span class="tag meas">실측 11/12</span> 확인.</li>
-      <li>Cyclo 기록(단계 5)은 <b>보류</b>. Humble↔Jazzy <code>rmw_zenoh</code> 불통으로 막혔고, 촉각도 같이 모아야 해서 자체 녹화 프로그램(LeRobot 형식)을 만든다.</li>
+      <li>기록은 Cyclo 대신 <b>자체 녹화기 <code>tactile-rec</code></b>(LeRobot 형식)로 한다 (11/15). ROS 없이 팔·손·촉각·카메라를 직접 받아서 Humble↔Jazzy 불통과 무관하다. 장치 켜고 끄기는 <b>컨트롤 허브</b>(브라우저)로 한다. 둘 다 실물 검증 전이다 → <b>단계 5·6 (검증 후 삭제)</b>.</li>
     </ul>
   </div>
   <div class="diagram">
@@ -140,14 +146,15 @@ button:focus-visible,.chk:focus-within{outline:3px solid #6fc8bd;outline-offset:
       <div class="item"><b>leap_teleop</b> → LEAP Hand (USB, 5V, 90° 장착)</div>
       <div class="item"><b>D405</b> 손목 카메라 (OMY Camera 포트 → USB)</div>
       <div class="item"><b>Paxini</b> 촉각 (통신 보드 USB)</div>
-      <div class="item">/leap/* 기록용 발행</div>
+      <div class="item"><b>tactile-rec</b> 녹화기 ← 텔레옵 UDP · 촉각 · 카메라 · 팔(zenoh 직접)</div>
+      <div class="item"><b>control_hub</b> 브라우저에서 위 프로세스를 켜고 끔</div>
     </div>
   </div>
   <ul>
     <li><b>팔의 텔레옵 루프</b>는 Robot PC 안에서 닫힌다. leader를 움직이면 follower가 따라간다. User PC는 관여하지 않는다.</li>
     <li><b>손의 루프</b>는 <code>leap_teleop</code> 한 프로세스에서 닫힌다. Manus(또는 leader 트리거) 입력 → 리타겟팅 → LEAP.</li>
     <li>팔과 손은 <b>서로 독립 프로세스</b>다. 그래서 팔 없이도 Manus → LEAP만 먼저 시험할 수 있다.</li>
-    <li>Cyclo용 <code>/leap/*</code> 발행은 <b>기록 전용</b>이다. 실패해도 손은 멈추지 않는다.</li>
+    <li>녹화용 <code>--record-udp</code> 송신은 <b>기록 전용</b>이다. 받는 쪽이 없거나 실패해도 손은 멈추지 않는다.</li>
   </ul>
   <div class="tblw"><table>
     <tr><th>장치</th><th>역할</th></tr>
@@ -169,12 +176,13 @@ button:focus-visible,.chk:focus-within{outline:3px solid #6fc8bd;outline-offset:
     <tr><td><b>2</b></td><td>leader 트리거 → LEAP <small>(검증 끝)</small></td><td class="y">필요</td><td class="n">불필요</td><td class="y">필요</td><td class="y">켠다</td></tr>
     <tr><td><b>3</b></td><td>Manus → LEAP, <b>팔 없음</b></td><td class="n">불필요</td><td class="y">필요</td><td class="y">필요<br><small>(dry-run은 불필요)</small></td><td class="z">끈다<br>LEAP_NO_ZENOH=1</td></tr>
     <tr><td><b>4</b></td><td>Manus + 팔</td><td class="y">필요</td><td class="y">필요</td><td class="y">필요</td><td class="z">끈다</td></tr>
-    <tr><td><b>5</b></td><td>Cyclo 기록 <small>(보류)</small></td><td class="y">필요</td><td class="y">필요</td><td class="y">필요</td><td class="y">켠다</td></tr>
+    <tr><td><b>5</b></td><td>녹화기 검증 <small>(임시)</small></td><td class="y">필요</td><td class="y">필요</td><td class="y">필요</td><td class="z">끈다<br><small>녹화기가 zenoh에 직접 붙는다</small></td></tr>
+    <tr><td><b>6</b></td><td>컨트롤 허브 검증 <small>(임시)</small></td><td colspan="4">위 단계들을 허브 화면에서 다시 한다</td></tr>
   </table></div>
-  <div class="warn"><b>같은 RMW 규칙.</b> Manus 노드와 <code>leap_teleop</code>은 같은 RMW를 써야 서로 토픽이 보인다. 3·4단계는 둘 다 기본 RMW(zenoh 끔), 5단계는 둘 다 zenoh(켬). 한쪽만 zenoh이면 <code>[teleop] waiting</code>에서 멈춘다.</div>
+  <div class="warn"><b>같은 RMW 규칙.</b> Manus 노드와 <code>leap_teleop</code>은 같은 RMW를 써야 서로 토픽이 보인다. 3·4·5단계는 둘 다 기본 RMW(zenoh 끔). 2단계(leader)만 zenoh를 켠다 (Manus 노드 불필요). 한쪽만 zenoh이면 <code>[teleop] waiting</code>에서 멈춘다.</div>
   <ul>
     <li>3·4단계의 <code>leap_teleop</code>은 <code>/manus_glove_*</code>만 읽고 팔 토픽은 읽지 않는다.</li>
-    <li>5단계에서 zenoh를 켜는 이유: <code>/leap/*</code>를 Cyclo(컨테이너)가 받아야 한다.</li>
+    <li>5단계에서 zenoh를 끄는 이유: 녹화기는 ROS 없이 Robot PC <code>zenohd</code>에 직접 붙고, 손 값은 텔레옵에서 UDP로 받는다.</li>
     <li>Manus 노드와 LEAP이 <b>다른 PC</b>면 두 PC가 같은 토픽을 볼 수 있어야 한다. 같은 PC가 가장 단순하다.</li>
   </ul>
 </section>
@@ -191,7 +199,7 @@ source ~/SHAPE_UP_Tactile/user_pc/scripts/leap_aliases.sh
 export LEAP_ROS_DISTRO=humble       # 이 User PC는 Ubuntu 22.04 + ROS 2 Humble
 export OMY_ROBOT_IP=10.42.0.241     # ROBOT PC IP (44B1050)
 export LEAP_MANUS_WS="$HOME/SHAPE_UP_Tactile/third_party/manus/ROS2 package"
-export LEAP_NO_ZENOH=1              # 기본은 손만(3·4단계). 2·5단계 셸에서는 unset LEAP_NO_ZENOH
+export LEAP_NO_ZENOH=1              # 기본(3·4·5단계). 2단계 셸에서만 unset LEAP_NO_ZENOH
 export PYTEST_ADDOPTS="-p no:anyio" # ~/.local anyio 플러그인과 apt pytest(6.x) 충돌 회피</code></pre></div>
   <div class="tblw"><table>
     <tr><th>단축 명령</th><th>하는 일</th></tr>
@@ -199,7 +207,7 @@ export PYTEST_ADDOPTS="-p no:anyio" # ~/.local anyio 플러그인과 apt pytest(
     <tr><td><code>leap_manus</code></td><td>Manus → LEAP (엄지 IK, 주먹 safe-pose). <code>--dry-run</code>, <code>--thumb affine</code>, <code>--kp</code>/<code>--kd</code> (기본 공식값 P 600 / D 200 / 350 mA), <code>--log-csv logs/run.csv</code> (틱마다 기록 → <code>python3 -m leap_teleop.tools.analyze_log</code>)</td></tr>
     <tr><td><code>leap_glovecal --force</code></td><td>글러브 캘리브레이션 (편 손 → 주먹)</td></tr>
     <tr><td><code>leap_check</code></td><td>LEAP 모터 ID 0~15 응답 확인</td></tr>
-    <tr><td><code>leap_leader</code> / <code>leap_record</code> / <code>leap_topics</code></td><td>2단계 leader 트리거 / 5단계 기록용 발행 / 토픽 목록</td></tr>
+    <tr><td><code>leap_leader</code> / <code>leap_record</code> / <code>leap_topics</code></td><td>2단계 leader 트리거 / <code>/leap/*</code> ROS 발행 (Cyclo용, 지금은 안 씀. 녹화는 <code>leap_manus --record-udp</code>) / 토픽 목록</td></tr>
   </table></div>
   <h3>①-b Humble용 패키지 (한 번)</h3>
   <p><code>dynamixel_sdk</code>는 <code>python3-serial</code>이 없으면 import가 안 된다 (pytest는 하드웨어 없이 돌아서 통과해 버린다). <span class="tag meas">실측 11/03</span> 설치함.</p>
@@ -504,60 +512,313 @@ leap_manus</code></pre></div>
   <div class="warn">leader를 <b>손으로 잡고</b> 한다. 팔이 움직이는 동안 LEAP은 주먹이어야 한다.</div>
 </section>
 
-<!-- ============ 단계 5 ============ -->
-<section class="step" data-group="단계 5 · Cyclo 기록 (보류)" data-title="Cyclo 준비">
-  <div class="eyebrow">단계 5 · Cyclo 기록 (보류)</div>
-  <h2>Cyclo 준비</h2>
-  <div class="danger"><b>보류 (11/13).</b> User PC(Humble)가 Robot PC(Jazzy) 토픽의 메시지를 못 받는다 <span class="tag meas">실측 11/12</span>. 그래서 Cyclo(Jazzy 컨테이너)에서는 반대로 손·카메라가 안 보일 것으로 예상한다. 촉각도 같이 모아야 해서 <b>자체 녹화 프로그램(LeRobot 형식)</b>으로 간다. 이 단계는 참고용으로 남긴다.</div>
-  <p class="lead">세화형의 <code>omy_demonstration_runbook.md</code>(카메라 3대 기록)를 그대로 쓰고, 달라지는 점만 더한다.</p>
+<!-- ============ 단계 5 · 녹화기 검증 (임시) ============ -->
+<section class="step" data-temp data-group="단계 5 · 녹화기 검증" data-title="녹화기 설치와 가짜 신호">
+  <div class="eyebrow">단계 5 · 녹화기 검증</div>
+  <h2>녹화기 설치와 가짜 신호</h2>
+  <div class="temp"><b>검증용 임시 단계.</b> 자체 녹화기(<code>tactile-rec</code>)를 실물로 확인하는 절차다. 통과하면 이 단계(5-1 ~ 5-6)는 가이드에서 빠지고 "기록하기" 한 쪽만 남는다. Cyclo 기록은 쓰지 않는다 (11/15).</div>
+  <p class="lead">녹화기는 ROS 없이 팔(zenoh), 손·글러브(텔레옵 UDP), 촉각(Paxini 보드), 카메라(RealSense)를 직접 받아 한 시계로 저장한다. 그래서 Humble↔Jazzy <code>rmw_zenoh</code> 불통과 무관하다.</p>
   <div class="tblw"><table>
-    <tr><th>무엇</th><th>토픽</th><th>Cyclo 역할</th></tr>
-    <tr><td>팔 state</td><td><code>/joint_states</code> (joint1..6)</td><td>observation.state.arm</td></tr>
-    <tr><td>팔 action</td><td><code>/leader/joint_trajectory</code></td><td>action.arm</td></tr>
-    <tr><td>손 state</td><td><code>/leap/joint_states</code> (rad, mA)</td><td>observation.state.hand</td></tr>
-    <tr><td>손 action</td><td><code>/leap/joint_command</code> (rad)</td><td>action.hand</td></tr>
-    <tr><td>부가</td><td><code>/leap/human_hand</code> · <code>/leap/human_keypoints</code> · <code>/leap/teleop_mode</code></td><td>extra_topics (bag에만)</td></tr>
+    <tr><th>스트림</th><th>어디서 받나</th><th>먼저 켜져 있어야 하는 것</th></tr>
+    <tr><td><code>arm_state</code> · <code>arm_action</code></td><td>Robot PC <code>zenohd</code> (10.42.0.241:7447)에 SDK로 직접</td><td><code>zenohd</code>, <code>omy_ai_wrist_flip</code></td></tr>
+    <tr><td><code>hand</code> · <code>glove</code></td><td>텔레옵의 <code>--record-udp</code> (127.0.0.1:47800)</td><td>Manus 노드, <code>leap_manus --record-udp</code></td></tr>
+    <tr><td><code>tactile_a</code> · <code>tactile_b</code></td><td>Paxini 보드 <code>/dev/ttyACM0</code>, <code>/dev/ttyACM1</code></td><td>보드 USB</td></tr>
+    <tr><td><code>cam_wrist</code> (· <code>cam_ext</code>)</td><td>RealSense를 녹화기가 직접 연다</td><td><b>ROS 카메라 노드는 꺼져 있어야 한다</b></td></tr>
   </table></div>
-  <p>state·action 각각 팔 6 + 손 16 = <b>22차원</b>. action은 로봇에 <b>실제로 보낸 최종 명령</b>이다.</p>
-  <h3>로봇 config 복사</h3>
-  <span class="where user">USER PC 호스트</span>
-  <div class="cmd"><pre><code>cp ~/SHAPE_UP_Tactile/user_pc/config/omy_f3m_leap_config.yaml ~/cyclo_intelligence/shared/shared/robot_configs/
-nano ~/cyclo_intelligence/shared/shared/robot_configs/omy_f3m_leap_config.yaml</code></pre></div>
+  <h3>① 설치 (한 번)</h3>
+  <span class="where user">USER PC · ROS를 source 하지 않은 새 터미널</span>
+  <div class="cmd"><pre><code>cd ~/SHAPE_UP_Tactile/recorder
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -e '.[ui,arm,tactile,camera]'
+pip install -e ../third_party/paxini
+pip install -e '.[dev]' &amp;&amp; env -u PYTHONPATH python -m pytest -q</code></pre></div>
   <ul>
-    <li><b>카메라 3개의 <code>topic</code></b>을 세화형 B6에서 확인한 실제 RGB 압축 토픽으로 바꾼다 (파일 값은 예시).</li>
-    <li>손 <code>joint_names</code> 16개는 <code>leap_teleop</code>이 내는 이름과 글자까지 같아야 한다. 바꾸지 않는다.</li>
-    <li>팔 <code>joint_names</code>는 <code>joint1..6</code>만 (<code>rh_r1_joint</code> 제외).</li>
-    <li>세화형 B7(<code>omy_f3m_config.yaml</code> 편집)은 하지 않는다. 새 로봇 타입이다.</li>
+    <li><b>첫 실행은 인터넷이 되는 상태에서</b> 한다. 팔 스트림이 메시지 정의를 git에서 내려받는다.</li>
+    <li>셸에 ROS가 올라와 있으면 명령 앞에 <code>env -u PYTHONPATH</code>를 붙인다.</li>
   </ul>
-  <label class="chk"><input type="checkbox"><span>세화형 A, B1–B6 완료: 카메라 3대 동작, 토픽 경로 확인</span></label>
-  <label class="chk"><input type="checkbox"><span>config 복사, 카메라 topic 수정</span></label>
+  <h3>② 가짜 신호로 한 바퀴</h3>
+  <div class="cmd"><pre><code>tactile-rec record --config config/rig.fake.yaml      # 브라우저 http://localhost:8800</code></pre></div>
+  <ol>
+    <li>4초마다 촉각·모터 전류·카메라 밝기가 동시에 튀는지 본다.</li>
+    <li><code>Space</code> 시작 → 몇 초 뒤 <code>Space</code> 정지 → <code>S</code> 성공 저장.</li>
+    <li>터미널에서 확인:</li>
+  </ol>
+  <div class="cmd"><pre><code>tactile-rec inspect data_fake
+tactile-rec convert --config config/rig.fake.yaml --in data_fake/demo_task --out /tmp/demo_npz --format npz</code></pre></div>
+  <label class="chk"><input type="checkbox"><span>녹화기 시험이 모두 통과</span></label>
+  <label class="chk"><input type="checkbox"><span>가짜 신호로 녹화 → 저장 → <code>inspect</code> → npz 변환까지 됨</span></label>
 </section>
 
-<section class="step" data-group="단계 5 · Cyclo 기록 (보류)" data-title="기록하기">
-  <div class="eyebrow">단계 5 · Cyclo 기록 (보류)</div>
-  <h2>leap_record와 녹화</h2>
-  <div class="warn"><b>zenoh를 켠다.</b> Manus 노드(셸 1)를 <code>Ctrl+C</code> 하고, <code>unset LEAP_NO_ZENOH</code> 한 셸에서 다시 띄운다. 둘 다 같은 환경이어야 한다.</div>
+<section class="step" data-temp data-group="단계 5 · 녹화기 검증" data-title="rig.yaml 맞추기">
+  <div class="eyebrow">단계 5 · 녹화기 검증</div>
+  <h2>rig.yaml 맞추기</h2>
+  <div class="temp"><b>검증용 임시 단계.</b> 검증되면 가이드에서 빠진다.</div>
+  <span class="where user">USER PC</span>
+  <div class="cmd"><pre><code>cd ~/SHAPE_UP_Tactile/recorder
+cp config/rig.example.yaml config/rig.yaml
+nano config/rig.yaml
+ls /dev/ttyACM* /dev/serial/by-id/          # Paxini 보드 포트
+rs-enumerate-devices -s                     # RealSense 시리얼 (librealsense 도구)</code></pre></div>
+  <div class="tblw"><table>
+    <tr><th>키</th><th>지금 값</th><th>맞추는 법</th></tr>
+    <tr><td><code>streams.tactile_a.port</code> · <code>tactile_b.port</code></td><td><code>/dev/ttyACM0</code> · <code>/dev/ttyACM1</code></td><td>보드를 하나씩 꽂아 보며 번호 확인. 다음 쪽 <code>check</code>가 맞는 모듈 이름을 알려 준다</td></tr>
+    <tr><td><code>streams.tactile_*.places</code></td><td>Thumb/Index (a), Middle/Ring (b)</td><td>틀리면 <code>check</code>가 "board modules do not match"와 실제 모듈 이름을 낸다. 그 이름으로 고친다</td></tr>
+    <tr><td><code>streams.cam_wrist.serial</code></td><td><code>335122272125</code></td><td><code>rs-enumerate-devices -s</code></td></tr>
+    <tr><td><code>streams.cam_wrist.rotation_deg</code></td><td><code>90</code></td><td>5-4에서 화면이 누워 있으면 <code>270</code>. 다시 찍을 필요 없다</td></tr>
+    <tr><td><code>streams.cam_ext</code></td><td>시리얼 비어 있음, <code>required: false</code></td><td>달기 전에는 그대로 둔다</td></tr>
+    <tr><td><code>streams.arm_*.hz</code></td><td><code>100</code> (추정)</td><td>다음 쪽 <code>check</code>에서 잰 값으로 바꾼다</td></tr>
+    <tr><td><code>session</code></td><td>pick_cup / hamin</td><td>검증 중에는 <code>--task sync_test</code>처럼 따로 둔다</td></tr>
+  </table></div>
+  <div class="warn">손목 카메라를 녹화기가 직접 연다. <code>realsense2_camera</code> ROS 노드(“손목 카메라와 Paxini” 단계)를 켜 두었으면 <b>끈다</b>. 둘이 동시에 같은 카메라를 열 수 없다.</div>
+  <label class="chk"><input type="checkbox"><span><code>rig.yaml</code> 만들고 포트·시리얼 확인</span></label>
+  <label class="chk"><input type="checkbox"><span>ROS 카메라 노드 꺼짐</span></label>
+</section>
+
+<section class="step" data-temp data-group="단계 5 · 녹화기 검증" data-title="스트림 하나씩 (check)">
+  <div class="eyebrow">단계 5 · 녹화기 검증</div>
+  <h2>스트림 하나씩 확인</h2>
+  <div class="temp"><b>검증용 임시 단계.</b> 검증되면 가이드에서 빠진다.</div>
+  <p class="lead"><code>check</code>는 스트림 하나만 5초 돌리고 Hz, 간격, 빠진 수, 마지막 값을 낸다. 녹화기 전체를 띄우기 전에 하나씩 통과시킨다.</p>
+  <h3>① 손·글러브 (LEAP 없이 먼저)</h3>
   <span class="where user">셸 1 · Manus 노드</span>
-  <div class="cmd"><pre><code>unset LEAP_NO_ZENOH
+  <div class="cmd"><pre><code>export LEAP_NO_ZENOH=1
 leap_env &amp;&amp; ros2 run manus_ros2 manus_data_publisher</code></pre></div>
-  <span class="where user">셸 2 · 기록용 발행</span>
-  <div class="cmd"><pre><code>unset LEAP_NO_ZENOH
-leap_record                      # leap_manus --publish
-leap_topics                      # /leap/joint_command, /leap/joint_states, /leap/human_*, /leap/teleop_mode
-ros2 topic hz /leap/joint_command /leap/joint_states     # 50 Hz 근처인지</code></pre></div>
-  <label class="chk"><input type="checkbox"><span><code>/leap/*</code> 토픽이 <b>컨테이너에서도</b> 보인다 <span class="tag unk">미검증</span></span></label>
-  <label class="chk"><input type="checkbox"><span><code>joint_states</code>가 50 Hz 근처 (16모터 피드백 비용)</span></label>
-  <span class="where web">브라우저 · Cyclo UI</span>
+  <span class="where user">셸 2 · 텔레옵 (dry-run: LEAP을 건드리지 않는다)</span>
+  <div class="cmd"><pre><code>export LEAP_NO_ZENOH=1
+leap_manus --dry-run --record-udp       # [teleop] sending record data to udp://127.0.0.1:47800</code></pre></div>
+  <span class="where user">셸 3 · 녹화기 venv</span>
+  <div class="cmd"><pre><code>cd ~/SHAPE_UP_Tactile/recorder &amp;&amp; source .venv/bin/activate
+tactile-rec check hand  --config config/rig.yaml
+tactile-rec check glove --config config/rig.yaml</code></pre></div>
+  <p>텔레옵은 zenoh를 끈 4단계 환경 그대로다. 녹화용 UDP는 받는 쪽이 없어도 텔레옵에 영향이 없다.</p>
+  <h3>② 팔 (Robot PC가 켜진 뒤)</h3>
+  <p><code>zenohd</code>와 <code>omy_ai_wrist_flip</code>을 “zenohd와 omy_ai” 단계대로 띄운다. action은 <b>leader를 손으로 잡고 움직이는 동안</b> 잰다.</p>
+  <div class="cmd"><pre><code>tactile-rec check arm_state  --config config/rig.yaml
+tactile-rec check arm_action --config config/rig.yaml</code></pre></div>
+  <h3>③ 촉각과 카메라</h3>
+  <div class="cmd"><pre><code>tactile-rec check tactile_a --config config/rig.yaml
+tactile-rec check tactile_b --config config/rig.yaml
+tactile-rec check cam_wrist --config config/rig.yaml</code></pre></div>
+  <div class="tblw"><table>
+    <tr><th>스트림</th><th>통과 기준</th><th>막히면</th></tr>
+    <tr><td><code>hand</code></td><td>약 50 Hz, <code>delay_ms</code> 중앙값 1 ms 안팎</td><td>"없음": 텔레옵에 <code>--record-udp</code>가 빠졌거나 포트(47800)가 다르다</td></tr>
+    <tr><td><code>glove</code></td><td>약 50 Hz, <code>meta.node_names</code>가 나옴</td><td>Manus 노드와 텔레옵의 RMW가 다르다 (둘 다 <code>LEAP_NO_ZENOH=1</code>)</td></tr>
+    <tr><td><code>arm_state</code> <span class="tag unk">미검증</span></td><td>값이 오고 Hz가 측정됨 → 그 값을 <code>hz</code>에</td><td>"open failed": <code>router</code>, <code>domain_id</code>, 인터넷(메시지 정의). 연결은 되는데 0개: SDK 키가 안 맞는다 → Robot PC 컨테이너 중계 노드로 바꾼다 (<code>streams/arm_zenoh.py</code>만 교체)</td></tr>
+    <tr><td><code>arm_action</code> <span class="tag unk">미검증</span></td><td>leader를 움직이면 값이 오고 <code>source_stamps</code>가 있음</td><td>위와 같다</td></tr>
+    <tr><td><code>tactile_a</code> · <code>_b</code> <span class="tag unk">미검증</span></td><td>약 90 Hz, <code>missed</code> 0, <code>meta.layout</code>의 모듈이 실제 배선과 같음</td><td>"board modules do not match": 메시지의 이름으로 <code>places</code>를 고친다. 포트 문제: <code>/dev/ttyACM*</code> 번호·권한(dialout)</td></tr>
+    <tr><td><code>cam_wrist</code> <span class="tag unk">미검증</span></td><td>설정 fps 유지, <code>meta.usb</code> 확인</td><td>"open failed": ROS 카메라 노드가 켜져 있거나 <code>serial</code>이 틀림. <code>ts_domain</code>이 0이면 <code>dataset.time</code>에서 cam을 <code>recv</code>로</td></tr>
+  </table></div>
+  <label class="chk"><input type="checkbox"><span><code>hand</code>, <code>glove</code> 통과 (Hz: ____ / ____)</span></label>
+  <label class="chk"><input type="checkbox"><span><code>arm_state</code>, <code>arm_action</code> 값이 옴, 잰 Hz를 <code>rig.yaml</code>에 넣음 (Hz: ____ / ____)</span></label>
+  <label class="chk"><input type="checkbox"><span><code>tactile_a</code>, <code>tactile_b</code> 통과, <code>places</code> 맞춤 (Hz: ____ / ____)</span></label>
+  <label class="chk"><input type="checkbox"><span><code>cam_wrist</code> 통과 (fps, <code>ts_domain</code>: ____)</span></label>
+</section>
+
+<section class="step" data-temp data-group="단계 5 · 녹화기 검증" data-title="전체 띄우고 짧게 녹화">
+  <div class="eyebrow">단계 5 · 녹화기 검증</div>
+  <h2>전체 띄우고 짧게 녹화</h2>
+  <div class="temp"><b>검증용 임시 단계.</b> 검증되면 가이드에서 빠진다.</div>
+  <p class="lead">이제 LEAP 5V를 켜고 텔레옵을 실물로(dry-run 없이) 돌린다. 켜는 순서: LEAP 5V(편 손) → Manus 노드 → <code>zenohd</code> → <code>omy_ai_wrist_flip</code> → <code>leap_manus --record-udp</code> → 녹화기.</p>
+  <span class="where user">셸 3 · 녹화기</span>
+  <div class="cmd"><pre><code>tactile-rec record --config config/rig.yaml --task sync_test --text "sync test" --operator hamin
+# 브라우저 http://localhost:8800</code></pre></div>
   <ol>
-    <li>Cyclo 실행 후 <code>http://localhost:7080/</code>, 로봇 유형 <b>OMY F3M + LEAP</b> 선택.</li>
-    <li><code>Record → Topic Monitor</code>에서 <code>/leap/*</code>, 팔 두 토픽, 카메라 3개가 모두 수신되는지 본다.</li>
-    <li>시작 상태에 놓고 <code>Record Start</code> → 짧게 시연 → <code>Save Episode</code>.</li>
+    <li><b>센서 페이지</b>: 모든 필수 스트림이 "정상". "느림"은 기대 Hz의 80% 아래, "끊김"은 3주기 이상 조용함.</li>
+    <li><b>녹화 페이지</b>: 손목 카메라가 바로 서 있는지. 누워 있으면 <code>rotation_deg</code>를 270으로 바꾸고 다시 띄운다.</li>
+    <li><b>촉각 패널</b>: 손가락을 하나씩 눌러 화면의 <b>같은 손가락·같은 마디</b>가 반응하는지. 다르면 <code>places</code>가 틀렸다.</li>
+    <li>손에 아무것도 닿지 않은 상태에서 <code>Z</code> (촉각 영점).</li>
+    <li><code>Space</code> → 10초 시연 → <code>Space</code> → <code>S</code>. <code>M</code>은 표시 남기기, <code>D</code>는 버리기.</li>
   </ol>
-  <h3>기록 확인</h3>
-  <div class="cmd"><pre><code>ros2 bag info /workspace/rosbag2/&lt;데이터셋&gt;/0/</code></pre></div>
-  <label class="chk"><input type="checkbox"><span>토픽 5개(<code>/leap/*</code>)의 메시지 수가 0보다 크다</span></label>
-  <label class="chk"><input type="checkbox"><span><code>/leap/human_keypoints</code>가 0이 아니다 (0이면 키포인트를 못 찾은 것)</span></label>
-  <label class="chk"><input type="checkbox"><span><code>Convert Dataset</code> 후 state·action이 22차원 <span class="tag unk">미검증</span></span></label>
+  <div class="cmd"><pre><code>tactile-rec inspect ~/data/shape_up/sync_test       # 스트림별 개수, Hz, 최대 공백</code></pre></div>
+  <div class="note">시작 전 점검은 필수 스트림 정상, 텔레옵 <code>live</code>, 디스크 여유를 본다. 걸리면 이유가 나오고 시작되지 않는다. 녹화 중 센서가 끊기면 소리 세 번과 함께 그 에피소드에 "주의"가 남는다.</div>
+  <label class="chk"><input type="checkbox"><span>센서 페이지 전부 정상</span></label>
+  <label class="chk"><input type="checkbox"><span>카메라 방향, 촉각 손가락 위치가 맞음</span></label>
+  <label class="chk"><input type="checkbox"><span>10초 에피소드 저장, <code>inspect</code>에서 모든 스트림 Hz가 설정과 비슷하고 큰 공백 없음</span></label>
+</section>
+
+<section class="step" data-temp data-group="단계 5 · 녹화기 검증" data-title="시간 차이 실측">
+  <div class="eyebrow">단계 5 · 녹화기 검증</div>
+  <h2>시간 차이 실측</h2>
+  <div class="temp"><b>검증용 임시 단계.</b> 검증되면 가이드에서 빠진다. 여기서 잰 값은 <code>rig.yaml</code>에 남는다.</div>
+  <p class="lead">사건이 뚜렷한 에피소드를 따로 찍어 스트림끼리 몇 ms 어긋나는지 잰다.</p>
+  <ol>
+    <li><b>쥐기</b>: 가만히 있다가 손가락을 빠르게 쥔다. 1초 쉬고 반복, 5회 이상. (글러브, 손 명령, 손 위치, 카메라 움직임)</li>
+    <li><b>톡 치기</b>: 손끝 센서로 책상을 톡 친다. 1초 쉬고 반복, 5회 이상. (촉각 힘, 모터 전류)</li>
+  </ol>
+  <div class="cmd"><pre><code>tactile-rec tap ~/data/shape_up/sync_test/&lt;세션&gt;/ep_0002 --ref hand.cmd           # 쥐기 기준
+tactile-rec tap ~/data/shape_up/sync_test/&lt;세션&gt;/ep_0003 --ref tactile_a.force    # 톡 치기 기준</code></pre></div>
+  <ul>
+    <li><code>offset</code>이 <code>+</code>면 그 스트림이 기준보다 늦게 보인다. 그 값을 <code>dataset.latency_ms</code>에 넣으면 변환 때 상쇄된다.</li>
+    <li><b>원래 늦는 것은 보정하지 않는다</b>: 명령 → 위치(모터가 따라가는 시간), 글러브 → 명령(리타겟팅).</li>
+    <li>보정 대상은 같은 순간이어야 하는 쌍: 촉각 힘 ↔ 모터 전류, 손 위치 ↔ 카메라 움직임.</li>
+    <li><code>spread</code>가 수십 ms면 지연이 일정하지 않다. 값 하나로 보정하지 말고 원인을 먼저 본다.</li>
+  </ul>
+  <label class="chk"><input type="checkbox"><span>쥐기 에피소드 <code>tap</code> 결과 기록</span></label>
+  <label class="chk"><input type="checkbox"><span>톡 치기 에피소드 <code>tap</code> 결과 기록, 필요한 값만 <code>latency_ms</code>에 넣음</span></label>
+</section>
+
+<section class="step" data-temp data-group="단계 5 · 녹화기 검증" data-title="오래 돌리기와 변환">
+  <div class="eyebrow">단계 5 · 녹화기 검증</div>
+  <h2>오래 돌리기와 변환</h2>
+  <div class="temp"><b>검증용 임시 단계.</b> 검증되면 가이드에서 빠진다.</div>
+  <h3>① 10분 녹화</h3>
+  <p><code>rig.yaml</code>의 <code>record.time_limit_s</code>를 <code>600</code>으로 두고 한 에피소드를 찍는다.</p>
+  <ul>
+    <li>센서 페이지의 Hz 추이가 평평한지, 스트림 표의 "빠짐"이 늘지 않는지.</li>
+    <li><code>tactile-rec inspect</code>에서 카메라의 <code>write-dropped</code>가 없는지. 있으면 디스크나 CPU가 못 따라간 것이다.</li>
+    <li><code>top</code>으로 녹화기 메모리. 조금씩 느는 것은 정상, 10분에 수백 MB를 넘으면 기록한다.</li>
+  </ul>
+  <h3>② 변환</h3>
+  <span class="where user">USER PC (빠른 확인)</span>
+  <div class="cmd"><pre><code>tactile-rec convert --config config/rig.yaml --in ~/data/shape_up/sync_test --out /tmp/sync_npz --format npz
+tactile-rec replay ~/data/shape_up/sync_test/&lt;세션&gt;/ep_0001        # Rerun으로 원본 보기 ([viz] 설치 시)</code></pre></div>
+  <span class="where">학습 서버 · openpi 환경</span>
+  <div class="cmd"><pre><code>rsync -a ~/data/shape_up/sync_test &lt;서버&gt;:/data/shape_up/
+tactile-rec convert --config config/rig.yaml --in /data/shape_up/sync_test \
+    --out /data/lerobot/shape_up/sync_test --repo-id shape_up/sync_test</code></pre></div>
+  <ul>
+    <li>출력 옆 <code>*.conversion_report.json</code>에서 제외된 에피소드와 이유, 스트림별 "가장 오래된 값(ms)"을 본다.</li>
+    <li>기본 제외: 실패 표시, 녹화 중 끊김, 강제 시작, 150 ms 넘게 오래된 값.</li>
+    <li>openpi 데이터 설정(우리 키 → pi0.5 입력)은 아직 없다. 첫 실제 데이터셋이 나오면 만든다.</li>
+  </ul>
+  <label class="chk"><input type="checkbox"><span>10분 에피소드: Hz 평평, <code>write-dropped</code> 없음, 메모리 기록</span></label>
+  <label class="chk"><input type="checkbox"><span>npz 변환과 <code>replay</code>로 정렬 확인</span></label>
+  <label class="chk"><input type="checkbox"><span>학습 서버에서 LeRobot 변환, 보고서 확인</span></label>
+  <div class="note">결과는 <code>docs/field-test/YYYY-MM-DD-results.md</code>에 숫자와 함께 적는다. 자세한 설명: <code>docs/data_preparation/recorder_usage.md</code> 5절.</div>
+</section>
+
+<!-- ============ 단계 6 · 컨트롤 허브 검증 (임시) ============ -->
+<section class="step" data-temp data-group="단계 6 · 컨트롤 허브 검증" data-title="허브 설치와 첫 화면">
+  <div class="eyebrow">단계 6 · 컨트롤 허브 검증</div>
+  <h2>허브 설치와 첫 화면</h2>
+  <div class="temp"><b>검증용 임시 단계.</b> 컨트롤 허브(<code>control_hub</code>)를 실물로 확인하는 절차다. 통과하면 이 단계(6-1 ~ 6-6)는 가이드에서 빠지고, 위 단계들의 터미널 명령도 허브 화면 기준으로 바뀐다.</div>
+  <p class="lead">허브는 위 단계의 터미널 여러 개를 브라우저 한 화면으로 대신한다. 프로세스는 tmux가 붙들고 있어서, 허브를 껐다 켜도 팔·손은 계속 돈다.</p>
+  <span class="where user">USER PC · ROS를 source 하지 않은 새 터미널</span>
+  <div class="cmd"><pre><code>sudo apt install tmux
+cd ~/SHAPE_UP_Tactile/control_hub
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -e .
+cp config/hub.example.yaml config/hub.yaml
+control-hub validate --config config/hub.yaml      # 정상: 프로세스 24개, 점검 10개, 실행표 5개, 장치 7개
+ssh root@10.42.0.241 true                          # 비밀번호를 묻지 않아야 한다
+control-hub serve --config config/hub.yaml         # http://localhost:8700</code></pre></div>
+  <ul>
+    <li>먼저 가짜로 화면을 익히려면 <code>control-hub serve --config config/hub.fake.yaml</code> (:8701).</li>
+    <li>화면이 말썽이면 언제든 터미널로: <code>tmux -L shapeup attach -t hub</code> (<code>Ctrl+b w</code> 창 선택, <code>Ctrl+b d</code> 나가기).</li>
+    <li>녹화기를 허브에서 켜려면 5-1의 녹화기 venv와 <code>rig.yaml</code>이 있어야 한다.</li>
+  </ul>
+  <label class="chk"><input type="checkbox"><span><code>validate</code> 정상, ssh 비밀번호 없이 됨</span></label>
+  <label class="chk"><input type="checkbox"><span>홈 화면에 장치 7칸과 오른쪽 상태 띠가 보인다</span></label>
+</section>
+
+<section class="step" data-temp data-group="단계 6 · 컨트롤 허브 검증" data-title="연결과 장치 탐색">
+  <div class="eyebrow">단계 6 · 컨트롤 허브 검증</div>
+  <h2>연결과 장치 탐색 (아무것도 켜지 않고)</h2>
+  <div class="temp"><b>검증용 임시 단계.</b> 검증되면 가이드에서 빠진다.</div>
+  <p class="lead">장치만 꽂고 로봇 전원만 켠 상태에서 본다. 허브는 장치를 열지 않고 sysfs만 읽는다.</p>
+  <h3>① 오른쪽 상태 띠</h3>
+  <div class="tblw"><table>
+    <tr><th>점검</th><th>기대</th><th>다르면</th></tr>
+    <tr><td>로봇 ping</td><td>초록, 지연 ms 표시</td><td>이더넷, 공유 모드 (“전원과 연결” 단계)</td></tr>
+    <tr><td>로봇 ssh</td><td>초록</td><td>ssh 키 등록</td></tr>
+    <tr><td>MANUS Dashboard 꺼짐</td><td>초록</td><td>Dashboard를 끈다</td></tr>
+    <tr><td>Manus 동글 USB</td><td>꽂았을 때만 초록</td><td><code>lsusb</code>로 id 확인 → <code>checks.manus_dongle</code></td></tr>
+    <tr><td>LEAP USB (<code>/dev/ttyUSB0</code>)</td><td>초록</td><td>"권한 없음 (dialout 그룹)": <code>sudo usermod -aG dialout $USER</code> 후 재로그인</td></tr>
+    <tr><td>손목 카메라 USB (D405)</td><td>초록, 경고 없음</td><td>"USB 480 Mbps 로 잡힘" 경고: USB3 포트·케이블. OMY를 다시 켰으면 다시 꽂는다</td></tr>
+    <tr><td>Paxini 보드</td><td>초록</td><td>포트 번호, 권한</td></tr>
+  </table></div>
+  <h3>② 장치 상세: LEAP Hand</h3>
+  <ul>
+    <li>연결 칸의 <b>latency timer</b>가 <code>1</code>이어야 빠르다. <code>16</code>이면 경고가 뜬다 (USB를 다시 꽂으면 16으로 돌아간다). udev 규칙으로 1에 고정하는 것은 별도 작업.</li>
+    <li>by-id, 시리얼 번호가 나오는지.</li>
+  </ul>
+  <h3>③ 장치 탐색 페이지</h3>
+  <ul>
+    <li>LEAP(FTDI <code>0403:6014</code>), Paxini 보드 두 개, D405(<code>8086:0b5b</code>), Manus 동글이 <b>각각 따로</b> 보이는지.</li>
+    <li><b>Paxini 두 보드의 시리얼 번호가 서로 다른지</b>. 다르면 나중에 포트 자동 지정의 근거가 된다.</li>
+    <li>이름이 안 붙은 장치는 <code>hub.yaml</code>의 <code>known_usb</code>에 id를 더하고 <b>설정 다시 읽기</b>.</li>
+  </ul>
+  <label class="chk"><input type="checkbox"><span>상태 띠 점검이 실제와 맞다 (꽂고 빼면 바뀐다)</span></label>
+  <label class="chk"><input type="checkbox"><span>LEAP latency timer: ____, D405 속도: ____ Mbps</span></label>
+  <label class="chk"><input type="checkbox"><span>장치 탐색에서 모든 장치 구분, Paxini 시리얼 서로 다름</span></label>
+</section>
+
+<section class="step" data-temp data-group="단계 6 · 컨트롤 허브 검증" data-title="팔 쪽 켜고 끄기">
+  <div class="eyebrow">단계 6 · 컨트롤 허브 검증</div>
+  <h2>팔 쪽 켜고 끄기</h2>
+  <div class="temp"><b>검증용 임시 단계.</b> 검증되면 가이드에서 빠진다.</div>
+  <p class="lead">Robot PC 프로세스는 허브가 User PC의 tmux 창에서 <code>ssh … docker exec …</code>로 띄운다. Robot PC에는 아무것도 설치하지 않는다.</p>
+  <ol>
+    <li><b>전체 → 로봇 중복 실행 확인</b> 실행. 로그에 <code>ros2 node list</code>까지 나와야 한다. 안 나오면 컨테이너 이름(<code>hosts.robot_container</code>)과 <code>envs.robot_ros</code>.</li>
+    <li><b>zenoh 라우터</b> 켜기 → "준비됨", 상태 띠 "zenoh :7447" 초록.</li>
+    <li><b>zenoh 라우터 끄기</b> → 실제로 꺼지는지 (Robot PC에서 <code>pgrep -a zenohd</code>가 비어야 함). ssh를 거친 Ctrl+C가 안 닿으면 <code>tmux attach</code>로 확인하고 기록한다.</li>
+    <li>다시 켜고 <b>팔 bringup (omy_ai_wrist_flip)</b>. 확인 항목을 모두 체크해야 켜진다. leader 동기화 뒤 "준비됨"이 되는지. 계속 "켜는 중"이면 <code>processes.arm.ready.log</code>를 실제 문구로 바꾼다 (동작에는 영향 없음).</li>
+    <li>장치 상세 <b>팔</b>에서 <b>컨트롤러 확인</b>, <b>leader 값 한 번 읽기</b>.</li>
+    <li><b>팔 bringup 끄기</b> (팔을 손으로 받친다). follower·leader가 모두 끝나는지. 안 끝나면 <code>stop_grace_s</code>를 늘린다. 자동 강제 종료는 없다.</li>
+  </ol>
+  <label class="chk"><input type="checkbox"><span>로봇 중복 실행 확인이 <code>ros2 node list</code>까지 출력</span></label>
+  <label class="chk"><input type="checkbox"><span>zenoh 라우터 켜기·끄기가 실제로 됨</span></label>
+  <label class="chk"><input type="checkbox"><span>팔 bringup "준비됨", 끄기로 모두 끝남</span></label>
+</section>
+
+<section class="step" data-temp data-group="단계 6 · 컨트롤 허브 검증" data-title="손 쪽: Manus, 모터, 텔레옵">
+  <div class="eyebrow">단계 6 · 컨트롤 허브 검증</div>
+  <h2>손 쪽: Manus, 모터 확인, 텔레옵</h2>
+  <div class="temp"><b>검증용 임시 단계.</b> 검증되면 가이드에서 빠진다.</div>
+  <ol>
+    <li><b>Manus 노드</b> 켜기 → <code>integrated mode</code>에서 "준비됨". 안 되면 <code>processes.manus.ready.log</code>.</li>
+    <li>LEAP 5V를 켜고(편 손) 장치 상세 <b>LEAP Hand → LEAP 모터 확인</b> 실행. 모터 표 16칸에 위치·온도·전압이 채워지는지. 편 손에서 1·5·9번만 약 −85°, 나머지는 0 근처.</li>
+    <li><b>Manus → LEAP 텔레옵</b>을 <b>dry-run 체크된 채로</b> 켠다 → <code>[teleop] live</code>에서 "준비됨". 텔레옵이 켜져 있는 동안 모터 확인 버튼은 막혀 있어야 한다 (같은 포트).</li>
+    <li>끄고 dry-run을 풀어 실물로. 5V 확인 항목을 체크해야 켜진다.</li>
+    <li>끄기 → Torque OFF로 손이 풀린다 (물체가 손에 없는지).</li>
+  </ol>
+  <label class="chk"><input type="checkbox"><span>Manus 노드 "준비됨"</span></label>
+  <label class="chk"><input type="checkbox"><span>LEAP 모터 확인 → 모터 표 16칸이 채워짐</span></label>
+  <label class="chk"><input type="checkbox"><span>텔레옵 dry-run / 실물 모두 "준비됨", 끄기로 Torque OFF</span></label>
+</section>
+
+<section class="step" data-temp data-group="단계 6 · 컨트롤 허브 검증" data-title="오류 기록 확인">
+  <div class="eyebrow">단계 6 · 컨트롤 허브 검증</div>
+  <h2>오류가 어디서 났는지 남는지</h2>
+  <div class="temp"><b>검증용 임시 단계.</b> 검증되면 가이드에서 빠진다. 여기서 본 실제 로그 줄로 <code>hub.yaml</code>의 <code>devices.leap.events</code> 정규식을 맞춘다.</div>
+  <p class="lead">일부러 안전한 오류를 내서 홈 화면, 사고 폴더, 로그 화면이 제대로 남기는지 본다.</p>
+  <h3>① LEAP 모터 응답 없음 (5V 끈 채로)</h3>
+  <ol>
+    <li><b>LEAP 5V를 끈 상태</b>로 텔레옵을 dry-run 해제해서 켠다 (5V 확인 항목은 이 시험에서만 그냥 체크한다. 모터에 전원이 없으니 움직이지 않는다). 연결 단계에서 <code>Missing or unresponsive DYNAMIXEL IDs: [...]</code>로 끝나야 한다.</li>
+    <li>홈의 LEAP 칸이 빨개지고 <b>"모터 응답 없음: 0, 1, …"</b>처럼 번호가 나오는지. 장치 상세 모터 표의 해당 칸이 빨간지.</li>
+    <li><b>로그</b> 페이지에 사고가 하나 생기고, 30초 뒤 <code>leap_manus.log</code>, <code>others/</code>가 채워지는지. <b>zip 받기</b>.</li>
+    <li>5V를 켜고 5분 안에 <b>LEAP 모터 확인</b>을 돌리면 그 사고 폴더에 <code>leap_check.txt</code>가 붙는지.</li>
+  </ol>
+  <h3>② USB 빠짐</h3>
+  <ol>
+    <li>손목 카메라 USB를 뺀다 → 사건 "손목 카메라 USB (D405) 없음", "USB 빠짐: …". 다시 꽂으면 "다시 잡힘".</li>
+  </ol>
+  <h3>③ 텔레옵 중 끊김 (실제로 생길 때)</h3>
+  <ul>
+    <li>텔레옵 중 특정 모터가 빠지면 <code>[leap] feedback read failed: …</code> 줄이 주의로 남는다 (1초에 한 번). 그때 <b>홈의 문제 줄 → LEAP 모터 확인</b> 버튼으로 바로 확인한다.</li>
+    <li>로그에 찍힌 실제 문구가 정규식에 안 걸리면(홈에 안 뜨면) 그 줄을 복사해 두고 <code>devices.leap.events</code>를 고친다 → <b>설정 다시 읽기</b>.</li>
+  </ul>
+  <div class="note">사고 폴더 위치: <code>~/.local/state/control_hub/sessions/&lt;세션&gt;/incidents/&lt;시각_장치_내용&gt;/</code> (<code>summary.md</code>, <code>checks.json</code>, 프로세스 로그, <code>others/</code>, <code>leap_check.txt</code>). 같은 장치에서 30초 안에 난 오류는 한 폴더에 모인다.</div>
+  <label class="chk"><input type="checkbox"><span>5V OFF 텔레옵 → LEAP 칸에 모터 번호, 사고 폴더 생성, zip 받기 됨</span></label>
+  <label class="chk"><input type="checkbox"><span>사고 폴더에 <code>leap_check.txt</code> 붙음</span></label>
+  <label class="chk"><input type="checkbox"><span>USB 빼기/꽂기가 사건으로 남음</span></label>
+</section>
+
+<section class="step" data-temp data-group="단계 6 · 컨트롤 허브 검증" data-title="수집 실행표로 한 번에">
+  <div class="eyebrow">단계 6 · 컨트롤 허브 검증</div>
+  <h2>수집 실행표로 한 번에</h2>
+  <div class="temp"><b>검증용 임시 단계.</b> 통과하면 이 흐름이 가이드의 기본 실행 방법이 된다.</div>
+  <ol>
+    <li><b>실행표 → 수집 (팔 + 손 + 녹화)</b>. 위에서부터 하나씩 켠다. 체크박스 줄은 사람이 하는 단계 (5V 등).</li>
+    <li>녹화기가 켜지면 오른쪽 띠 "녹화기 UI (:8800)"가 초록이 되고 <b>녹화기 열기 ▸</b> 링크가 나온다. 거기서 5-4처럼 짧게 하나 찍는다.</li>
+    <li>녹화기가 켜져 있으면 <b>손목 카메라 ROS 노드</b>, <b>스트림 확인: cam_wrist / tactile_a</b>는 막혀 있어야 한다 (같은 장치를 연다).</li>
+    <li><b>허브 재시작</b>: 프로세스가 도는 채로 허브 터미널을 <code>Ctrl+C</code> 하고 다시 <code>serve</code>. 도는 것을 그대로 인식하고, 옛 오류가 새 사건으로 다시 나오지 않는지.</li>
+    <li><b>전체 끄기</b> → 켠 순서의 역순으로 하나씩 꺼지는지 (팔은 받친다). 마지막에 LEAP 5V OFF.</li>
+  </ol>
+  <label class="chk"><input type="checkbox"><span>수집 실행표로 녹화까지 됨</span></label>
+  <label class="chk"><input type="checkbox"><span>허브 재시작 후 상태 유지, 옛 오류 반복 없음</span></label>
+  <label class="chk"><input type="checkbox"><span>전체 끄기가 역순으로 동작</span></label>
+  <div class="note">결과는 <code>docs/field-test/YYYY-MM-DD-results.md</code>에 적는다. 자세한 설명: <code>docs/data_preparation/control_hub_usage.md</code> 5절.</div>
 </section>
 
 <!-- ============ 마무리 ============ -->
@@ -567,13 +828,13 @@ ros2 topic hz /leap/joint_command /leap/joint_states     # 50 Hz 근처인지</c
   <ol>
     <li>녹화가 끝났는지 확인한다.</li>
     <li><b><code>leap_*</code> 셸 <code>Ctrl+C</code></b> (Torque OFF). 손이 풀려 처지니 물체가 손에 없는지 본다.</li>
-    <li>카메라 터미널(realsense), 촉각 기록, Cyclo 터미널.</li>
+    <li>녹화기(<code>tactile-rec</code>) <code>Ctrl+C</code>. ROS 카메라 노드를 켰다면 그것도. 컨트롤 허브를 쓰면 <b>전체 끄기</b>가 역순으로 끈다.</li>
     <li><b><code>omy_ai_wrist_flip</code>(또는 <code>omy_ai</code>) <code>Ctrl+C</code></b> — <b>팔이 처질 수 있으니 손으로 받친다.</b></li>
     <li><code>zenohd</code> <code>Ctrl+C</code>, Manus 노드 종료.</li>
     <li><b>LEAP 5V OFF.</b></li>
     <li>보관하려면 다음 단계의 pack, 그다음 로봇 전원 OFF.</li>
   </ol>
-  <div class="note">켜는 순서: <code>LEAP 5V(편 손)</code> → <code>Manus 노드</code> → <code>zenohd</code> → <code>omy_ai_wrist_flip</code> → <code>leap_*</code> → <code>카메라·촉각</code> → <code>녹화</code>. 끄는 순서는 반대.</div>
+  <div class="note">켜는 순서: <code>LEAP 5V(편 손)</code> → <code>Manus 노드</code> → <code>zenohd</code> → <code>omy_ai_wrist_flip</code> → <code>leap_manus --record-udp</code> → <code>tactile-rec</code>. 끄는 순서는 반대.</div>
 </section>
 
 <section class="step" data-group="마무리" data-title="pack / unpack">
@@ -641,15 +902,16 @@ ros2 topic hz /leap/joint_command /leap/joint_states     # 50 Hz 근처인지</c
     <tr><td>엄지 IK (SDK 캘리브레이션 뒤 나빠짐)</td><td>충전 후 재캘리브레이션, <code>--log-csv</code></td><td><code>ThumbCMCStretch</code> 범위 확인</td></tr>
     <tr><td>SDK 캘리브레이션이 글러브 재부팅 후 유지되는가</td><td>껐다 켜고 PIP 확인</td><td>ROS 노드가 <code>.mcal</code>을 불러오게 (<code>CoreSdk_SetGloveCalibration</code>)</td></tr>
     <tr><td><s>Humble <code>rmw_zenoh</code>(User PC) ↔ Jazzy <code>zenohd</code>(Robot PC)</s></td><td><span class="tag meas">실측 11/12</span> 탐색만 되고 데이터 0개</td><td>DDS 통일 / Jazzy 컨테이너 / 24.04</td></tr>
-    <tr><td>호스트 <code>leap_teleop</code> 토픽이 컨테이너 Cyclo에 보이는가</td><td>5단계 <code>leap_topics</code></td><td>호스트 zenoh 환경을 맞춘다</td></tr>
-    <tr><td><code>/leap/joint_states</code> 주기 (16모터 피드백 비용)</td><td><code>ros2 topic hz</code></td><td>발행 주기를 낮춘다</td></tr>
-    <tr><td>UI에 <b>OMY F3M + LEAP</b>이 나타나는가</td><td>Cyclo 실행 후 Home</td><td>Cyclo 컨테이너 재시작</td></tr>
-    <tr><td>변환기가 <code>rh_r1_joint</code>를 걸러내는가 (22차원)</td><td>Convert 결과</td><td>config 팔 <code>joint_names</code> 확인</td></tr>
-    <tr><td>팔·손 <code>header.stamp</code> 대 bag 수신 시각</td><td>첫 에피소드</td><td>두 PC를 chrony로 맞춘다</td></tr>
+    <tr><td>녹화기가 SDK로 Robot PC(Jazzy) 팔 토픽을 받는가, 그 Hz</td><td>5-3 <code>check arm_state</code></td><td>Robot PC 컨테이너 중계 노드 (<code>streams/arm_zenoh.py</code>)</td></tr>
+    <tr><td>Paxini 한 보드에 센서 여러 개일 때 Hz, 모듈 이름</td><td>5-3 <code>check tactile_a</code></td><td><code>places</code></td></tr>
+    <tr><td>D405 프레임 시각 종류(<code>ts_domain</code>), 화면 방향</td><td>5-3, 5-4</td><td><code>dataset.time</code>, <code>rotation_deg</code></td></tr>
+    <tr><td>스트림 간 지연 (촉각↔전류, 손↔카메라)</td><td>5-5 <code>tap</code></td><td><code>dataset.latency_ms</code></td></tr>
+    <tr><td>허브의 ssh Ctrl+C가 컨테이너 프로세스까지 닿는가</td><td>6-3 zenoh 끄기</td><td><code>stop_grace_s</code>, tmux attach</td></tr>
+    <tr><td>LEAP 모터 빠짐 때 실제 로그 문구</td><td>6-5</td><td><code>devices.leap.events</code> 정규식</td></tr>
     <tr><td>LEAP을 단 채 pack/unpack, LEAP 하중</td><td>팔을 받치고 천천히</td><td>손을 떼고 접는다</td></tr>
     <tr><td>leader 트리거 쥔 상태 값</td><td>단계 2</td><td><code>leader_gripper.yaml</code> 갱신</td></tr>
   </table></div>
-  <p class="foot">자세한 내용: <code>user_pc/README.md</code> · <code>docs/field-test/2026-11-03-*.md</code> · <code>docs/data_preparation/omy_leap_cyclo_recording.md</code> · <code>docs/superpowers/specs/2026-10-29-ros-data-interface-design.md</code></p>
+  <p class="foot">자세한 내용: <code>user_pc/README.md</code> · <code>docs/field-test/2026-11-03-*.md</code> · <code>docs/data_preparation/recorder_usage.md</code> · <code>docs/data_preparation/control_hub_usage.md</code> · <code>docs/superpowers/specs/2026-10-29-ros-data-interface-design.md</code></p>
 </section>
 
 <div class="pager" id="pager">
@@ -671,7 +933,7 @@ ros2 topic hz /leap/joint_command /leap/joint_states     # 50 Hz 근처인지</c
   var current = 0;
 
   // localStorage는 이 브라우저에서만 남는 편의 기능이다. 막혀 있어도 페이지는 동작한다.
-  var KEY = 'manus-teleop-guide-v2';  // 체크박스 id가 순서 기반이라 단계를 추가하면 버전을 올린다
+  var KEY = 'manus-teleop-guide-v3';  // 체크박스 id가 순서 기반이라 단계를 추가하면 버전을 올린다
   var saved = {};
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { saved = {}; }
   function persist() { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} }
@@ -697,7 +959,8 @@ ros2 topic hz /leap/joint_command /leap/joint_states     # 50 Hz 근처인지</c
     var g = s.getAttribute('data-group');
     if (g !== lastGroup) {
       var h = document.createElement('div');
-      h.className = 'grp'; h.textContent = g; side.appendChild(h); lastGroup = g;
+      h.className = s.hasAttribute('data-temp') ? 'grp is-temp' : 'grp';
+      h.textContent = g; side.appendChild(h); lastGroup = g;
     }
     var b = document.createElement('button');
     b.type = 'button';

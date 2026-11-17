@@ -1,0 +1,569 @@
+# Control Hub 설정 (실제 장비용). 복사해서 hub.yaml 로 쓴다.
+#   cp config/hub.example.yaml config/hub.yaml
+#   control-hub validate --config config/hub.yaml
+#   control-hub serve --config config/hub.yaml        # http://localhost:8700
+#
+# 명령, 환경, 순서가 바뀌면 이 파일만 고치고 화면에서 "설정 다시 읽기"를 누른다.
+# 명령은 docs/manus_teleop_guide.html 과 docs/data_preparation/recorder_usage.md 를 그대로 옮긴 것이다.
+# "현장 확인" 표시가 있는 값은 실물에서 한 번 맞춰야 한다.
+#
+# {repo} 는 이 레포의 루트로 바뀐다. 다른 위치의 레포를 쓰려면 아래 줄을 켠다.
+# repo: ~/SHAPE_UP_Tactile
+
+ui: {host: 127.0.0.1, port: 8700}   # 0.0.0.0 이면 같은 망의 태블릿에서도 열린다. 로그인이 없다
+check_interval_s: 4
+
+hosts:
+  # 이름(omy-snpr44b1050.local)이 안 풀릴 때가 있어 IP 를 쓴다. 공유 모드에서 로봇은 10.42.0.241
+  robot: {ssh: root@10.42.0.241}
+  robot_container: {ssh: root@10.42.0.241, container: open_manipulator}   # 현장 확인: 컨테이너 이름
+
+envs:
+  # Robot PC 컨테이너 안. container.sh enter 로 들어간 셸의 .bashrc 가 하던 일을 여기서 매번 한다
+  robot_ros:
+    - source /opt/ros/jazzy/setup.bash
+    - export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp
+    - source /workspace/omy_ws/install/setup.bash
+  # User PC, 손만 (3, 4단계): Humble, zenoh 끔. Manus 노드와 leap_manus 는 반드시 같은 환경
+  teleop:
+    - export LEAP_ROS_DISTRO=humble OMY_ROBOT_IP=10.42.0.241 LEAP_NO_ZENOH=1
+    - export LEAP_MANUS_WS="{repo}/third_party/manus/ROS2 package"
+    - source "{repo}/user_pc/scripts/leap_aliases.sh"
+    - leap_env
+  # User PC, zenoh 켬 (2단계 leader 트리거): Robot PC 의 팔 토픽을 읽는다
+  teleop_zenoh:
+    - unset LEAP_NO_ZENOH
+    - export LEAP_ROS_DISTRO=humble OMY_ROBOT_IP=10.42.0.241
+    - export LEAP_MANUS_WS="{repo}/third_party/manus/ROS2 package"
+    - source "{repo}/user_pc/scripts/leap_aliases.sh"
+    - leap_env
+  # 녹화기: ROS 와 무관한 venv
+  recorder:
+    - unset PYTHONPATH ROS_DOMAIN_ID RMW_IMPLEMENTATION ZENOH_CONFIG_OVERRIDE
+    - cd "{repo}/recorder"
+    - source .venv/bin/activate
+
+# 모든 프로세스의 로그에 적용되는 힌트 (가이드 "문제 해결" 표)
+hints:
+  - {match: "zenohd: command not found", hint: "컨테이너 .bashrc 가 안 읽힌 셸이다. envs.robot_ros 의 source 줄을 확인한다"}
+  - {match: "Could not resolve hostname|No route to host|Connection timed out|Network is unreachable", hint: "Robot PC 에 닿지 않는다. 오른쪽 띠의 로봇 ping 부터 본다 (이더넷, 공유 모드)"}
+  - {match: "Permission denied \\(publickey", hint: "ssh 키가 등록되지 않았다. 터미널에서 ssh root@10.42.0.241 이 비밀번호 없이 되는지 확인한다"}
+  - {match: "banner exchange", hint: "ping 과 TCP 22 가 되어도 이 오류면 USB 랜 허브 문제다 (10/09: 허브 교체로 해결)"}
+  - {match: "No such container|is not running", hint: "Robot PC 에서 cd /data/docker/open_manipulator && ./docker/container.sh start (인터넷 필요)"}
+  - {match: "No module named 'manus_ros2_msgs'", hint: "LEAP_MANUS_WS 가 맞는지, Manus 워크스페이스를 colcon build 했는지 확인한다"}
+  - {match: "No module named '?rclpy", hint: "PYTHONPATH 가 ROS 경로를 덮어썼다. envs 의 leap_env 줄이 있는지 확인한다"}
+  - {match: "ModuleNotFoundError: No module named '?dynamixel_sdk", hint: "ROS 를 source 하지 않은 환경이다. sudo apt install ros-humble-dynamixel-sdk"}
+  - {match: "No module named '?serial", hint: "sudo apt install python3-serial"}
+
+processes:
+  # ------------------------------------------------------------------ Robot PC
+  zenohd:
+    title: zenoh 라우터
+    group: Robot PC
+    host: robot_container
+    env: robot_ros
+    cmd: ros2 run rmw_zenoh_cpp rmw_zenohd
+    ready: {check: zenoh_port}
+    help: |
+      Robot PC 컨테이너의 zenoh 라우터(:7447). 팔을 쓰는 동안 끄지 않는다.
+      컨테이너에 자동 실행 서비스가 있다. 이미 떠 있으면("zenoh :7447" 점검이 정상) 켜지 않고 그대로 쓴다.
+    hints:
+      - {match: "Address already in use", hint: "zenohd 가 이미 떠 있다. 그대로 쓰면 된다 (이 창은 닫는다)"}
+
+  arm:
+    title: 팔 bringup 손목 90° (omy_ai_wrist_flip)
+    group: Robot PC
+    host: robot_container
+    env: robot_ros
+    cmd: ros2 launch omy_leap_bringup omy_ai_wrist_flip.launch.py
+    requires: [zenoh_port]
+    conflicts: [arm_stock, pack, unpack]
+    ready: {log: "(?i)leader"}          # 현장 확인: leader 가 시작될 때 실제로 찍히는 줄에 맞춘다
+    stop_grace_s: 15
+    help: |
+      LEAP 90° 장착용(현재 기본). follower 시작 → home → ready 이동(약 20초) → leader 동기화.
+      누르는 즉시 팔이 움직인다. leader 손목은 0 근처로 잡는다.
+      먼저 "로봇 중복 실행 확인" 도구로 follower/leader 가 이미 떠 있지 않은지 본다.
+    confirm_start:
+      - 작업 공간을 비웠고 비상 정지 수단을 확인했다. 누르는 즉시 팔이 움직인다
+      - LEAP 은 주먹 상태다 (팔이 움직이는 동안 손은 주먹)
+      - leader 를 손으로 잡고 트리거를 쥐고 있다
+    confirm_stop:
+      - 팔을 손으로 받치고 있다 (끄면 팔이 처질 수 있다)
+    hints:
+      - {match: "BULK_READ_FAIL", ignore: true}     # 몇 초마다 찍히지만 허용 범위 (가이드)
+      - {match: "Multi-turn|0xc", hint: "Debug USB + Dynamixel Wizard 로 Clear 한다 (10/09 문서 부록 A). Factory Reset 금지"}
+      - {match: "package 'omy_leap_bringup' not found", hint: "컨테이너에 omy_leap_bringup 이 빌드되지 않았다. /workspace/omy_ws 에서 colcon build"}
+
+  arm_stock:
+    title: 팔 bringup 순정 (omy_ai)
+    group: Robot PC
+    host: robot_container
+    env: robot_ros
+    cmd: ros2 launch open_manipulator_bringup omy_ai.launch.py
+    requires: [zenoh_port]
+    conflicts: [pack, unpack]
+    ready: {log: "(?i)leader"}
+    stop_grace_s: 15
+    help: |
+      손목 offset 없이 켠다 (home 에서 joint6 0°). 지금의 90° 장착이면 손가락이 옆을 향한다.
+      녹화하면 rig.yaml 의 rig.mount 를 맞춘다 (wrist_flip 데이터와 섞지 않는다).
+    confirm_start:
+      - 작업 공간을 비웠고 비상 정지 수단을 확인했다. 누르는 즉시 팔이 움직인다
+      - LEAP 은 주먹 상태다
+      - leader 를 손으로 잡고 트리거를 쥐고 있다
+    confirm_stop:
+      - 팔을 손으로 받치고 있다
+    hints:
+      - {match: "BULK_READ_FAIL", ignore: true}
+
+  robot_precheck:
+    title: 로봇 중복 실행 확인
+    group: Robot PC
+    kind: tool
+    host: robot_container
+    env: robot_ros
+    cmd: 'echo "--- zenohd ---"; pgrep -a zenohd; echo "--- ros2 node list ---"; ros2 node list'
+    help: |
+      컨테이너의 자동 실행 서비스가 follower/leader 를 이미 띄웠는지 본다.
+      둘 다 비어 있으면 zenoh 라우터와 팔 bringup 을 켠다. 떠 있으면 그대로 쓰고 다시 켜지 않는다.
+
+  arm_controllers:
+    title: 컨트롤러 확인
+    group: Robot PC
+    kind: tool
+    host: robot_container
+    env: robot_ros
+    cmd: ros2 control list_controllers
+    help: arm_controller 와 joint_state_broadcaster 가 active 여야 한다.
+
+  leader_echo:
+    title: leader 값 한 번 읽기
+    group: Robot PC
+    kind: tool
+    host: robot_container
+    env: robot_ros
+    cmd: ros2 topic echo /leader/joint_trajectory --field points --once
+    help: 값 7개가 나온다. 마지막이 leader 트리거다.
+
+  pack:
+    title: 팔 접기 (pack)
+    group: Robot PC
+    kind: tool
+    host: robot_container
+    env: robot_ros
+    cmd: ros2 launch open_manipulator_bringup omy_3m_pack.launch.py
+    conflicts: [unpack]
+    help: |
+      home → pack ([0, 0, −150°, −30°, 0, 0], 각 10초). 끝나면 "끄기"로 닫는다.
+      omy_3m 은 끝단 없는 6축 모델이다. LEAP 을 단 채로 접을 때 손이 부딪히는지는 확인된 바 없다.
+    confirm_start:
+      - 팔 bringup 을 껐다 (동시에 실행하면 안 된다)
+      - LEAP 5V 를 껐고 케이블이 당기지 않는다
+      - 팔을 받치고 있거나 손을 뗐다. 손이 베이스·바닥에 부딪히지 않는지 지켜본다
+
+  unpack:
+    title: 팔 펴기 (unpack)
+    group: Robot PC
+    kind: tool
+    host: robot_container
+    env: robot_ros
+    cmd: ros2 launch open_manipulator_bringup omy_3m_unpack.launch.py
+    help: 접힌 자세에서 home(전부 0)으로 편다. 끝나면 "끄기"로 닫는다.
+    confirm_start:
+      - 팔 bringup 을 껐다 (동시에 실행하면 안 된다)
+      - 작업 공간을 비웠다
+
+  # ------------------------------------------------------------------ User PC: 손
+  manus:
+    title: Manus 노드
+    group: User PC
+    env: teleop
+    cmd: ros2 run manus_ros2 manus_data_publisher
+    requires: [manus_core_off]
+    ready: {log: "integrated mode"}
+    help: |
+      글러브 동글을 직접 열어 /manus_glove_0 을 약 120 Hz 로 낸다. 글러브를 착용하고 켠다.
+      MANUS Core Dashboard 가 켜져 있으면 동글을 못 잡는다.
+    hints:
+      - {match: "Resource busy|claimed by another program", hint: "MANUS Core Dashboard 가 동글을 잡고 있다. Dashboard 를 끄고 다시 켠다"}
+      - {match: "SDK license|No license found", hint: "먼저 Dashboard 가 꺼졌는지 본다. 꺼진 상태에서도 나면 라이선스에 Integrated 기능이 없다"}
+      - {match: "bad_alloc|tcp/10\\.42\\.0\\.241:7447", hint: "zenoh 환경이 남아 있다. envs.teleop 에 LEAP_NO_ZENOH=1 이 있는지 확인한다"}
+
+  leap_check:
+    title: LEAP 모터 확인 (leap_check)
+    group: User PC
+    kind: tool
+    env: teleop
+    cmd: leap_check
+    requires: [leap_port]
+    conflicts: [leap_manus, leap_leader, leap_zero]
+    help: |
+      ID 0~15 가 모두 응답하고 오류가 0 이어야 한다. LEAP 5V 를 편 손으로 켠 뒤에 한다.
+      편 손에서 1·5·9번(약 −85°) 말고는 0 근처(±15°)여야 한다.
+    hints:
+      - {match: "Missing or unresponsive", hint: "5V, USB, Dynamixel Wizard 가 포트를 잡고 있는지 본다. 일부 ID 만 빠지면 그 손가락 케이블을 다시 꽂는다"}
+      - {match: "Permission denied.*ttyUSB", hint: "sudo usermod -aG dialout $USER 후 재로그인 (임시: sudo chmod 666 /dev/ttyUSB0)"}
+
+  leap_manus:
+    title: Manus → LEAP 텔레옵 (leap_manus)
+    group: User PC
+    env: teleop
+    cmd: leap_manus --record-udp
+    flags:
+      - {id: dry_run, label: "dry-run (LEAP 을 건드리지 않고 로그만)", arg: --dry-run, default: true}
+      - {id: affine, label: "엄지 affine (진단용)", arg: "--thumb affine", default: false}
+    requires: [manus]
+    conflicts: [leap_leader, leap_zero]
+    ready: {log: "\\[teleop\\] live"}
+    help: |
+      글러브 → 리타게팅 → LEAP. 엄지 IK 가 기본이고 주먹이 safe-pose 다.
+      처음에는 dry-run 으로 "[teleop] live" 와 값 변화를 본 뒤, dry-run 을 끄고 다시 켠다.
+      --record-udp 로 녹화기에 손 값을 보낸다 (받는 쪽이 없어도 영향 없음).
+      manus_leap.yaml 은 시작할 때만 읽는다. 값을 바꾸면 껐다 켠다.
+    confirm_start:
+      - {text: "LEAP 5V 를 편 손으로 켰고 차단 수단이 손 닿는 곳에 있다", unless_flag: dry_run}
+      - {text: "손가락 주변에 손·케이블이 없다", unless_flag: dry_run}
+      - {text: "LEAP 모터 확인(leap_check)이 통과했다", unless_flag: dry_run}
+    confirm_stop:
+      - 손에 물체가 없다 (끄면 Torque OFF 로 손이 풀린다)
+    hints:
+      - {match: "(?i)fall(ing|s)? back to affine|using affine", hint: "키포인트를 못 찾아 엄지가 affine 으로 돈다. /manus_glove_0 의 손목 Invalid, 엄지 DIP 노드를 확인한다"}
+      - {match: "Run calibrate_motors", hint: "영점 파일(user_pc/config/hardware_motors.yaml)이 없다. 'LEAP 영점 기록' 도구를 먼저 한다"}
+      - {match: "manus_calibration", hint: "작업자 캘리브레이션 파일이 없다. '글러브 편 손/주먹 기록' 도구를 먼저 한다"}
+      - {match: "Missing or unresponsive", hint: "LEAP 5V 와 USB 를 본다. leap_check 를 먼저 돌린다"}
+
+  leap_leader:
+    title: leader 트리거 → LEAP (leap_leader)
+    group: User PC
+    env: teleop_zenoh
+    cmd: leap_leader
+    flags:
+      - {id: dry_run, label: "dry-run (LEAP 을 건드리지 않고 로그만)", arg: --dry-run, default: true}
+    requires: [zenoh_port]
+    conflicts: [leap_zero]
+    ready: {log: "\\[teleop\\] live"}
+    help: |
+      2단계(검증 끝): leader 트리거로 LEAP 을 열고 닫는다. 팔 + zenoh + LEAP 경로 확인용.
+      토픽이 0.5초 끊기면 hold, 3초 끊기면 안전 자세.
+    confirm_start:
+      - {text: "LEAP 5V 를 편 손으로 켰고 차단 수단이 손 닿는 곳에 있다", unless_flag: dry_run}
+    confirm_stop:
+      - 손에 물체가 없다 (끄면 Torque OFF 로 손이 풀린다)
+
+  leap_zero:
+    title: LEAP 영점 기록 (calibrate_motors)
+    group: 도구
+    kind: tool
+    env: teleop
+    cmd: python3 -m leap_teleop.tools.calibrate_motors
+    flags:
+      - {id: force, label: "기존 파일 덮어쓰기", arg: --force, default: false}
+    requires: [leap_port]
+    input: true
+    help: |
+      Torque OFF 상태에서 편 손의 모터 위치를 user_pc/config/hardware_motors.yaml 에 기록한다.
+      손을 완전히 편 자세로 잡고, 아래 입력 줄에 RECORD 를 쳐서 보낸다.
+    confirm_start:
+      - LEAP 을 손으로 완전히 편 자세로 잡고 있다
+
+  leap_glovecal:
+    title: 글러브 편 손/주먹 기록 (leap_glovecal)
+    group: 도구
+    kind: tool
+    env: teleop
+    cmd: leap_glovecal --force
+    requires: [manus]
+    input: true
+    help: |
+      작업자마다 한다. 글러브를 낀 손으로 한다. LEAP 은 필요 없다.
+      편 손은 충분히 쭉 편 채 "보내기"(Enter), 주먹은 엄지를 검지·중지 위로 감싼 채 "보내기".
+      마지막 줄 fist thumb 의 두 값 부호가 같아야 한다. 다르면 manus_leap.yaml 의 thumb_ik.flip_normal 을 바꾼다.
+      Manus SDK 캘리브레이션(.mcal)은 별도 Dashboard 에서 먼저 해 둔다.
+
+  manus_hz:
+    title: 글러브 토픽 주기
+    group: 도구
+    kind: tool
+    env: teleop
+    cmd: ros2 topic hz /manus_glove_0
+    requires: [manus]
+    help: 약 120 Hz 여야 한다. 확인했으면 "끄기"로 닫는다.
+
+  # ------------------------------------------------------------------ User PC: 센서와 녹화
+  recorder:
+    title: 녹화기 (tactile-rec)
+    group: User PC
+    env: recorder
+    cmd: tactile-rec record --config config/rig.yaml
+    confirm_stop: ["녹화 중이 아니다 (녹화 중에 끄면 그 에피소드는 멈추고 미저장으로 남는다)"]
+    # 확인 도구는 녹화기와 같은 장치(직렬 포트, 카메라, UDP 포트)를 연다. 같이 켜면 서로 값을 뺏는다
+    conflicts: [camera_ros, recorder_fake, check_hand, check_glove, check_tactile_a,
+                check_tactile_b, check_cam_wrist, check_cam_ext]
+    ready: {check: recorder_ui}
+    help: |
+      팔·손·촉각·카메라를 한 시간축으로 기록한다. 켜지면 오른쪽 띠의 "녹화기 열기"(:8800)로 간다.
+      녹화기가 카메라를 직접 연다. ROS 카메라 노드와 같이 켤 수 없다.
+      태스크·수집자는 녹화기 화면의 설정 페이지에서 바꾼다.
+    hints:
+      - {match: "open failed", hint: "ROS 카메라 노드가 켜져 있거나 rig.yaml 의 serial / router 가 틀렸다"}
+      - {match: "board modules do not match", hint: "rig.yaml 의 places 를 메시지에 나온 실제 모듈 이름에 맞춘다"}
+      - {match: "rig.yaml.*(No such file|not found)", hint: "recorder/config/rig.example.yaml 을 rig.yaml 로 복사한다"}
+
+  recorder_fake:
+    title: 녹화기 (가짜 신호)
+    group: User PC
+    env: recorder
+    cmd: tactile-rec record --config config/rig.fake.yaml
+    ready: {check: recorder_ui}
+    help: 실물 없이 녹화기 UI 와 녹화·변환을 돌려 본다. 결과는 recorder/data_fake/ 에 쌓인다.
+
+  camera_ros:
+    title: 손목 카메라 ROS 노드 (미리보기용)
+    group: User PC
+    env: teleop
+    cmd: >-
+      ros2 launch realsense2_camera rs_launch.py camera_namespace:=camera camera_name:=cam_wrist
+      enable_depth:=false depth_module.color_profile:=424x240x30
+    help: |
+      D405 를 ROS 토픽(/camera/cam_wrist/color/image_raw)으로 낸다. 녹화에는 쓰지 않는다. 녹화기를 켜기 전에 끈다.
+      OMY 를 다시 켜면 카메라가 USB 에서 사라진다. 다시 꽂는다.
+    hints:
+      - {match: "Failed to read busnum/devnum", ignore: true}    # 노트북 내장 센서 때문 (가이드)
+      - {match: "No RealSense devices were found", hint: "OMY 를 다시 켰으면 카메라 USB 를 다시 꽂는다"}
+
+  check_hand:
+    title: "스트림 확인: hand"
+    group: 도구
+    kind: tool
+    env: recorder
+    cmd: tactile-rec check hand --config config/rig.yaml
+    conflicts: [check_glove]           # 같은 UDP 포트를 듣는다: 둘이 패킷을 나눠 가진다
+    help: 텔레옵이 --record-udp 로 돌고 있을 때. 약 50 Hz, delay_ms 중앙값 1 ms 안팎.
+  check_glove:
+    title: "스트림 확인: glove"
+    group: 도구
+    kind: tool
+    env: recorder
+    cmd: tactile-rec check glove --config config/rig.yaml
+    help: 약 50 Hz, 노드 이름이 나와야 한다.
+  check_arm_state:
+    title: "스트림 확인: arm_state"
+    group: 도구
+    kind: tool
+    env: recorder
+    cmd: tactile-rec check arm_state --config config/rig.yaml
+    requires: [zenoh_port]
+    help: |
+      값이 오고 Hz 가 측정되면 그 값을 rig.yaml 의 hz 에 넣는다.
+      "open failed" 면 router 주소와 domain_id. 연결은 되는데 0개면 키가 Robot PC 와 안 맞는 것이다.
+  check_arm_action:
+    title: "스트림 확인: arm_action"
+    group: 도구
+    kind: tool
+    env: recorder
+    cmd: tactile-rec check arm_action --config config/rig.yaml
+    requires: [zenoh_port]
+    help: leader 를 움직이는 동안 돌린다. 값이 오고 source_stamps 가 있는지 본다.
+  check_tactile_a:
+    title: "스트림 확인: tactile_a"
+    group: 도구
+    kind: tool
+    env: recorder
+    cmd: tactile-rec check tactile_a --config config/rig.yaml
+    help: missed 0, meta.layout 의 모듈이 실제 배선과 같아야 한다.
+  check_tactile_b:
+    title: "스트림 확인: tactile_b"
+    group: 도구
+    kind: tool
+    env: recorder
+    cmd: tactile-rec check tactile_b --config config/rig.yaml
+    help: 두 번째 보드. missed 0, meta.layout 의 모듈이 실제 배선과 같아야 한다.
+  check_cam_wrist:
+    title: "스트림 확인: cam_wrist"
+    group: 도구
+    kind: tool
+    env: recorder
+    cmd: tactile-rec check cam_wrist --config config/rig.yaml
+    conflicts: [camera_ros]
+    help: 설정 fps 유지. ts_domain 이 0 이면 dataset.time 을 recv 로 둔다.
+  check_cam_ext:
+    title: "스트림 확인: cam_ext"
+    group: 도구
+    kind: tool
+    env: recorder
+    cmd: tactile-rec check cam_ext --config config/rig.yaml
+    help: |
+      rig.yaml 에 cam_ext 를 넣은 뒤에 쓴다 (serial 필수). 설정 fps 유지,
+      meta.serial 과 model 이 외부 카메라의 것인지 본다.
+
+checks:
+  robot_ping:
+    title: 로봇 ping
+    ping: 10.42.0.241
+    help: |
+      로봇 전원(LED 흰색)과 이더넷을 본다. USB 랜이 "getting IP configuration" 이면 한 번만:
+      nmcli connection modify "Wired connection 1" ipv4.method shared  (약 10초 뒤 로봇이 10.42.0.241)
+  robot_ssh:
+    title: 로봇 ssh
+    ssh: robot
+    help: 터미널에서 ssh root@10.42.0.241 이 비밀번호 없이 되는지 본다. banner exchange 타임아웃이면 USB 랜 허브 문제다.
+  zenoh_port:
+    title: "zenoh :7447"
+    tcp: "10.42.0.241:7447"
+    help: Robot PC 의 zenoh 라우터가 안 떠 있다. 실행 페이지에서 "zenoh 라우터"를 켠다.
+  manus_core_off:
+    title: MANUS Dashboard 꺼짐
+    no_process: MANUS_Core
+    help: MANUS Core Dashboard 를 끈다. 켜져 있으면 Manus 노드가 동글을 못 잡는다.
+  manus_dongle:
+    title: Manus 동글 USB
+    command: "lsusb | grep -Ei '3325:|1915:83fd'"      # 현장 확인: third_party/manus/70-manus-hid.rules 의 id
+    help: 동글을 다시 꽂는다. udev 규칙(third_party/manus/70-manus-hid.rules)이 /etc/udev/rules.d/ 에 있는지 본다.
+  leap_port:
+    title: LEAP USB (/dev/ttyUSB0)
+    serial: /dev/ttyUSB0
+    help: LEAP 의 FTDI USB 를 꽂는다. 번호가 다르면(ttyUSB1) 다른 USB-시리얼 장치를 뺀다.
+  realsense_usb:
+    title: 손목 카메라 USB (D405)
+    usb: "8086:0b5b"
+    warn_below_mbps: 5000
+    help: OMY 를 다시 켜면 카메라가 USB 에서 사라진다. 다시 꽂는다.
+  cam_ext_usb:
+    title: 외부 카메라 USB (D435i)
+    usb: "8086:0b3a"                                   # 현장 확인: 모델이 정해지면 id 를 맞춘다
+    warn_below_mbps: 5000
+    help: 외부 고정 카메라를 USB3 포트에 꽂는다.
+  paxini_port:
+    title: Paxini 보드 (/dev/ttyACM*)
+    serial: /dev/ttyACM*
+    help: Paxini 통신 보드 USB 를 꽂는다. 권한 오류면 dialout 그룹을 확인한다.
+  recorder_ui:
+    title: 녹화기 UI (:8800)
+    http: "http://127.0.0.1:8800/"
+    link: 녹화기 열기
+    help: 녹화기가 꺼져 있다. 실행 페이지에서 켠다.
+
+# 실행표. 가이드의 "켜는 순서": LEAP 5V(편 손) → Manus 노드 → zenohd → omy_ai_wrist_flip → leap_* → 녹화
+profiles:
+  - id: collect
+    title: 수집
+    help: 위에서부터 하나씩. 끌 때는 "전체 끄기" (역순).
+    steps:
+      - {section: 준비}
+      - {note: "로봇 전원 ON, LED 흰색, 이더넷 연결"}
+      - {note: "LEAP 편 손, 5V ON (차단 수단은 손 닿는 곳)"}
+      - {note: "글러브 착용, MANUS Dashboard 끔"}
+      - {section: 점검}
+      - manus
+      - leap_check
+      - robot_precheck
+      - zenohd
+      - {section: 팔}
+      - {note: "LEAP 주먹, leader 잡고 트리거"}
+      - [arm, arm_stock]          # 택일: 손목 90° (기본) / 순정
+      - {section: 손 + 녹화}
+      - leap_manus
+      - recorder
+  - id: arm_hand
+    title: 팔 + 손 (4단계)
+    help: 팔은 leader, 손은 글러브. 녹화 없이 텔레옵만 본다.
+    steps:
+      - {note: "로봇 전원 ON, LED 흰색. LEAP 5V 를 편 손으로 켠다"}
+      - manus
+      - leap_check
+      - robot_precheck
+      - zenohd
+      - {note: "LEAP 을 주먹으로 둔다. leader 를 손으로 잡고 트리거를 쥔다"}
+      - arm
+      - leap_manus
+  - id: hand_only
+    title: 손만 (3단계)
+    help: 팔 없이 Manus → LEAP 만. Robot PC 는 필요 없다.
+    steps:
+      - {note: "LEAP 을 편 손으로 두고 5V 를 켠다. 5V 차단 수단을 손 닿는 곳에 둔다"}
+      - {note: "글러브를 착용한다. MANUS Core Dashboard 는 끈다"}
+      - manus
+      - leap_glovecal
+      - leap_check
+      - leap_manus
+  - id: leader
+    title: leader 트리거 (2단계)
+    help: 팔 + zenoh + LEAP 경로 확인용. 이미 검증된 단계.
+    steps:
+      - {note: "로봇 전원 ON, LED 흰색. LEAP 5V 를 편 손으로 켠다"}
+      - robot_precheck
+      - zenohd
+      - {note: "LEAP 을 주먹으로 둔다. leader 를 손으로 잡고 트리거를 쥔다"}
+      - arm
+      - leap_leader
+  - id: sensors
+    title: 센서 확인
+    help: 녹화기 전체를 띄우기 전에 스트림을 하나씩 본다 (recorder_usage.md 5.1).
+    steps:
+      - check_hand
+      - check_glove
+      - check_arm_state
+      - check_arm_action
+      - check_tactile_a
+      - check_tactile_b
+      - check_cam_wrist
+      - {note: "외부 카메라를 달았으면 도구 목록의 '스트림 확인: cam_ext' 도 돌린다"}
+
+# 장치별 묶음. 홈 화면의 칸, 장치 페이지, 오류 위치가 이것으로 정해진다
+known_usb:
+  "0403:6014": "FTDI (LEAP?)"
+  "0403:6001": "FTDI"
+  "8086:0b5b": "RealSense D405"
+  "8086:0b3a": "RealSense D435i"
+  "1915:83fd": "Manus 동글"
+
+devices:
+  robot:
+    title: 로봇 PC
+    checks: [robot_ping, robot_ssh, zenoh_port]
+    processes: [zenohd]
+    tools: [robot_precheck]
+  arm:
+    title: 팔
+    recorder_stream: [arm_state, arm_action]
+    checks: [zenoh_port]
+    processes: [arm, arm_stock]
+    tools: [arm_controllers, leader_echo, check_arm_state, check_arm_action, pack, unpack]
+    events:
+      - {match: "Multi-turn|0xc", level: bad, text: "팔 모터 Multi-turn 오류"}
+  leap:
+    title: LEAP Hand
+    kind: leap
+    recorder_stream: hand
+    usb_id: "0403:6014"                # 현장 확인: LEAP 의 FTDI id
+    checks: [leap_port]
+    processes: [leap_manus, leap_leader]
+    tools: [leap_check, leap_zero, check_hand]
+    events:
+      - {match: "Missing or unresponsive DYNAMIXEL IDs: \\[?(?P<motors>[\\d, ]+)", level: bad, text: "모터 응답 없음: {motors}"}
+      - {match: "Torque-off was not acknowledged by (motor )?IDs:? [\\[(]?(?P<motors>[\\d, ]+)", level: bad, text: "토크 OFF 미확인: {motors}. 5V 차단"}
+      - {match: "Feedback unavailable for DYNAMIXEL ID (?P<motors>\\d+)", level: bad, text: "모터 {motors} 피드백 없음"}
+      - {match: "\\[leap\\] feedback read failed", level: warn, text: "LEAP 읽기 실패 (모터 번호 모름). leap_check 로 확인"}
+  glove:
+    title: 글러브
+    recorder_stream: glove
+    checks: [manus_core_off, manus_dongle]
+    processes: [manus]
+    tools: [leap_glovecal, manus_hz, check_glove]
+  tactile:
+    title: 촉각 (Paxini)
+    recorder_stream: [tactile_a, tactile_b]
+    checks: [paxini_port]
+    tools: [check_tactile_a, check_tactile_b]
+  cam_wrist:
+    title: 손목 카메라
+    recorder_stream: cam_wrist
+    checks: [realsense_usb]
+    processes: [camera_ros]
+    tools: [check_cam_wrist]
+  cam_ext:
+    title: 외부 카메라
+    recorder_stream: cam_ext
+    checks: [cam_ext_usb]
+    tools: [check_cam_ext]

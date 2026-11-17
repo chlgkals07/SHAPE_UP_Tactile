@@ -1,0 +1,408 @@
+"""Web UI server. A thin layer: every action is a Recorder method, every number comes from
+the Hub. No recording logic lives here.
+
+There is no login. Bind to 127.0.0.1 unless the lab network is trusted.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import shutil
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlsplit
+
+import numpy as np
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+from tactile_rec import live
+from tactile_rec.config import LABEL_PATTERN
+from tactile_rec.hub import Hub
+from tactile_rec.record import recover
+from tactile_rec.record.session import TMP_SUFFIX, Recorder, RecorderError, list_episodes
+from tactile_rec.tactile import taxel_xyz
+from tactile_rec.types import KIND_VIDEO
+
+STATIC = Path(__file__).parent / "static"
+STATE_HZ = 5.0
+TICK_HZ = 10.0
+
+
+class StartBody(BaseModel):
+    force: bool = False
+
+
+class SaveBody(BaseModel):
+    success: bool
+
+
+class MarkBody(BaseModel):
+    label: str = ""
+
+
+class SessionBody(BaseModel):
+    task: str
+    text: str = ""
+    operator: str
+    time_limit_s: float = 0.0
+
+
+class LabelBody(BaseModel):
+    session: str
+    episode: str
+    result: str
+
+
+def _list(values: np.ndarray, digits: int = 2) -> list[float | None]:
+    return [None if not np.isfinite(v) else round(float(v), digits) for v in values]
+
+
+def build_state(hub: Hub, recorder: Recorder) -> dict[str, Any]:
+    status = recorder.status()
+    streams = {}
+    for name, health in hub.health().items():
+        spec = hub.streams[name].spec
+        streams[name] = {
+            **health.to_json(), "nominal_hz": spec.nominal_hz, "required": spec.required,
+            "kind": spec.kind, "counters": hub.streams[name].counters(),
+        }
+    free = recorder._free_gb()
+    return {
+        "type": "state",
+        "recorder": status,
+        "streams": streams,
+        "problems": recorder.preflight() if status["state"] == "idle" else [],
+        "disk_free_gb": None if free is None else round(free, 1),
+        "tactile_zero": hub.last_zero(),
+    }
+
+
+def build_live(hub: Hub) -> dict[str, Any]:
+    """Latest values for the preview panels (tactile maps, hand bars, arm joints)."""
+    cfg = hub.config.dataset
+    out: dict[str, Any] = {"type": "live", "tactile": {}, "hand": None, "arm": None}
+    for place, values in live.tactile_now(hub).items():
+        out["tactile"][place] = {
+            "r": [round(float(v) * 0.1, 1) for v in values["resultant"]],  # fx, fy, fz in newtons
+            "fz": values["distributed"][:, 2].astype(int).tolist(),  # counts, 0.1 N each
+        }
+    hand = hub.streams.get(cfg.hand)
+    sample = hand.latest() if hand is not None else None
+    if sample is not None:
+        out["hand"] = {
+            "cmd": _list(sample.data["cmd"], 1), "pos": _list(sample.data["pos"], 1),
+            "cur": _list(sample.data["cur"], 0), "mode": int(sample.data["mode"]),
+        }
+    arm_state, arm_action = hub.streams.get(cfg.arm_state), hub.streams.get(cfg.arm_action)
+    state = arm_state.latest() if arm_state is not None else None
+    action = arm_action.latest() if arm_action is not None else None
+    if state is not None:
+        out["arm"] = {
+            "state": _list(state.data["pos"], 3),
+            "action": _list(action.data["pos"], 3) if action is not None else None,
+        }
+    return out
+
+
+def describe(hub: Hub) -> dict[str, Any]:
+    """Static description for the UI: streams, cameras, tactile layout and taxel positions."""
+    cameras, tactile = [], {}
+    for name, stream in hub.streams.items():
+        if stream.spec.kind == KIND_VIDEO:
+            meta = stream.spec.meta
+            rotation = int(meta.get("rotation_deg", 0))
+            width, height = int(meta.get("width", 4)), int(meta.get("height", 3))
+            if rotation in (90, 270):
+                width, height = height, width
+            # width / height of the upright picture, so the page can size the tile to fit it
+            cameras.append({"name": name, "rotation_deg": rotation, "width": width,
+                            "height": height})
+    for stream in hub.tactile_streams().values():
+        for module in (stream.spec.meta.get("layout") or {}).get("modules", []):
+            tactile[module["place"]] = {
+                "board": stream.name, "module": module["name"], "points": module["points"],
+                "model": module.get("model", ""), "xyz": taxel_xyz(module["points"]),
+            }
+    return {
+        "config": hub.config.to_json(),
+        "specs": {name: stream.spec.to_json() for name, stream in hub.streams.items()},
+        "cameras": cameras,
+        "tactile": tactile,
+        "tactile_order": list(hub.config.dataset.tactile_order),
+    }
+
+
+def _episode_row(session: str, path: Path, meta: dict[str, Any], pending: bool) -> dict[str, Any]:
+    flags = meta.get("flags", {})
+    return {
+        "session": session, "episode": path.name, "result": meta.get("result"),
+        "pending": pending,  # not saved yet: kept in its temporary folder
+        "cut_off": "end_ns" not in meta,  # the recorder died while recording
+        "duration_s": meta.get("duration_s"), "text": meta.get("text", ""),
+        "dropouts": flags.get("dropouts", {}), "forced": bool(flags.get("forced_start")),
+        "write_errors": flags.get("write_errors", {}),
+        "recovered": bool(flags.get("recovered")),
+        "max_gap_ms": max(
+            (s.get("stats", {}).get("max_gap_ms", 0) for s in meta["streams"].values()),
+            default=0,
+        ),
+    }
+
+
+def episode_rows(task_dir: Path, active: Path | None = None) -> list[dict[str, Any]]:
+    """Saved episodes and unsaved ones left on disk, newest first. `active` is the temporary
+    folder the recorder is using right now; it is not listed."""
+    rows = []
+    if not task_dir.is_dir():
+        return rows
+    for session_dir in sorted((p for p in task_dir.iterdir() if p.is_dir()), reverse=True):
+        found: list[tuple[Path, dict[str, Any], bool]] = []
+        for path in list_episodes(session_dir):
+            try:
+                meta = json.loads((path / "episode.json").read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            found.append((path, meta, False))
+        for path in recover.pending_episodes(session_dir):
+            meta = recover.describe(path)
+            if path != active and meta is not None:
+                found.append((path, meta, True))
+        for path, meta, pending in sorted(found, key=lambda item: item[0].name, reverse=True):
+            rows.append(_episode_row(session_dir.name, path, meta, pending))
+    return rows
+
+
+def create_app(hub: Hub, recorder: Recorder) -> FastAPI:
+    clients: set[WebSocket] = set()
+    notices: asyncio.Queue = asyncio.Queue()
+    loop_holder: dict[str, asyncio.AbstractEventLoop] = {}
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        loop_holder["loop"] = asyncio.get_running_loop()
+        task = asyncio.create_task(pump())
+        try:
+            yield
+        finally:
+            task.cancel()
+
+    app = FastAPI(title="Tactile Recorder", docs_url=None, redoc_url=None, lifespan=lifespan)
+
+    def on_recorder_event(kind: str, detail: dict[str, Any]) -> None:
+        # Called from whichever thread ran the recorder command; hop onto the event loop.
+        loop = loop_holder.get("loop")
+        if loop is not None:
+            message = {"type": "notice", "kind": kind, **detail}
+            loop.call_soon_threadsafe(notices.put_nowait, message)
+
+    recorder.add_listener(on_recorder_event)
+
+    async def broadcast(message: dict[str, Any]) -> None:
+        text = json.dumps(message)
+        for client in list(clients):
+            try:
+                await client.send_text(text)
+            except Exception:  # noqa: BLE001 - a closed browser tab
+                clients.discard(client)
+
+    async def pump() -> None:
+        """Tick the recorder and push state, live values and notices to every browser."""
+        tick, state_every = 0, max(1, round(TICK_HZ / STATE_HZ))
+        live_every = max(1, round(TICK_HZ / min(TICK_HZ, hub.config.ui.preview_hz)))
+        while True:
+            await asyncio.sleep(1.0 / TICK_HZ)
+            tick += 1
+            try:
+                await step(tick, state_every, live_every)
+            except asyncio.CancelledError:
+                raise
+            except Exception as error:  # noqa: BLE001 - one bad tick must not end the pump
+                print(f"[tactile-rec] ui pump error: {error!r}")
+
+    async def step(tick: int, state_every: int, live_every: int) -> None:
+        await asyncio.to_thread(recorder.tick)
+        while not notices.empty():
+            await broadcast(notices.get_nowait())
+        if tick % state_every == 0:
+            await asyncio.to_thread(hub.print_status_changes)  # with or without a browser
+        if not clients:
+            return
+        # Built in a worker thread: status() waits while stop() writes an episode, and
+        # that wait must not freeze the event loop (camera previews, other requests).
+        if tick % state_every == 0:
+            await broadcast(await asyncio.to_thread(build_state, hub, recorder))
+        if tick % live_every == 0:
+            await broadcast(await asyncio.to_thread(build_live, hub))
+
+    @app.middleware("http")
+    async def same_origin_only(request: Request, call_next):
+        """Refuse state-changing requests that another web page made the browser send.
+
+        A browser attaches an Origin header to cross-site POST / DELETE requests. If it names a
+        different host than the one this page was loaded from, the request did not come from
+        our own page.
+        """
+        if request.method not in ("GET", "HEAD", "OPTIONS"):
+            origin = request.headers.get("origin")
+            if origin and urlsplit(origin).netloc != request.headers.get("host"):
+                return JSONResponse({"detail": "cross-site request refused"}, status_code=403)
+        return await call_next(request)
+
+    def run(command, *args):
+        try:
+            return command(*args)
+        except RecorderError as error:
+            raise HTTPException(409, {"message": str(error), "problems": error.problems}) from error
+
+    # ---- pages ------------------------------------------------------------------------------
+
+    @app.get("/")
+    def index() -> FileResponse:
+        return FileResponse(STATIC / "index.html")
+
+    app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+    # ---- live data --------------------------------------------------------------------------
+
+    @app.get("/api/state")
+    def state() -> dict[str, Any]:
+        return build_state(hub, recorder)
+
+    @app.get("/api/describe")
+    def description() -> dict[str, Any]:
+        return describe(hub)
+
+    @app.websocket("/ws")
+    async def socket(websocket: WebSocket) -> None:
+        await websocket.accept()
+        clients.add(websocket)
+        try:
+            first = await asyncio.to_thread(build_state, hub, recorder)
+            await websocket.send_text(json.dumps(first))
+            while True:
+                await websocket.receive_text()  # the browser only listens; this detects close
+        except WebSocketDisconnect:
+            pass
+        finally:
+            clients.discard(websocket)
+
+    @app.get("/api/stream/{camera}")
+    async def stream(camera: str) -> StreamingResponse:
+        if camera not in hub.streams or hub.streams[camera].spec.kind != KIND_VIDEO:
+            raise HTTPException(404, f"no camera named {camera}")
+        period = 1.0 / hub.config.ui.preview_hz
+        width = hub.config.ui.preview_width
+
+        async def frames():
+            last = -1
+            while True:
+                frame = await asyncio.to_thread(live.preview_jpeg, hub, camera, width)
+                if frame is not None and frame[0] != last:
+                    last = frame[0]
+                    yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame[1] + b"\r\n")
+                await asyncio.sleep(period)
+
+        return StreamingResponse(frames(), media_type="multipart/x-mixed-replace; boundary=frame")
+
+    # ---- recording commands -----------------------------------------------------------------
+
+    @app.post("/api/record/start")
+    def start(body: StartBody) -> dict[str, Any]:
+        return {"episode": run(recorder.start, body.force)}
+
+    @app.post("/api/record/stop")
+    def stop() -> dict[str, Any]:
+        return {"summary": run(recorder.stop)}
+
+    @app.post("/api/record/save")
+    def save(body: SaveBody) -> dict[str, Any]:
+        return {"path": str(run(recorder.save, body.success))}
+
+    @app.post("/api/record/discard")
+    def discard() -> dict[str, Any]:
+        run(recorder.discard)
+        return {}
+
+    @app.post("/api/record/mark")
+    def mark(body: MarkBody) -> dict[str, Any]:
+        run(recorder.mark, body.label)
+        return {}
+
+    @app.post("/api/tactile/zero")
+    def zero() -> dict[str, Any]:
+        return {"streams": run(recorder.zero_tactile)}
+
+    @app.post("/api/session")
+    def session(body: SessionBody) -> dict[str, Any]:
+        run(recorder.set_session, body.task, body.text, body.operator)
+        run(recorder.set_time_limit, body.time_limit_s)
+        return recorder.status()
+
+    # ---- saved episodes ---------------------------------------------------------------------
+
+    def episode_path(session: str, episode: str) -> Path:
+        """A saved episode folder, or an unsaved one (`ep_NNNN.tmp`) the recorder is not
+        using."""
+        if not LABEL_PATTERN.match(session) or not LABEL_PATTERN.match(
+            episode.removesuffix(TMP_SUFFIX)
+        ):
+            raise HTTPException(400, "bad session or episode name")
+        path = recorder.task_dir / session / episode
+        if episode.endswith(TMP_SUFFIX):
+            if path == recorder.active_tmp_dir:
+                raise HTTPException(409, "the recorder is using this episode")
+            if recover.describe(path) is None:
+                raise HTTPException(404, "no such episode")
+        elif not (path / "episode.json").is_file():
+            raise HTTPException(404, "no such episode")
+        return path
+
+    @app.get("/api/episodes")
+    def episodes() -> dict[str, Any]:
+        return {
+            "task_dir": str(recorder.task_dir),
+            "episodes": episode_rows(recorder.task_dir, recorder.active_tmp_dir),
+        }
+
+    @app.post("/api/episodes/label")
+    def label(body: LabelBody) -> dict[str, Any]:
+        """Change the label of a saved episode, or keep an unsaved one under that label."""
+        if body.result not in ("success", "failure"):
+            raise HTTPException(400, "result must be success or failure")
+        folder = episode_path(body.session, body.episode)
+        if body.episode.endswith(TMP_SUFFIX):
+            try:
+                return {"episode": recover.keep(folder, body.result).name}
+            except (recover.RecoverError, OSError) as error:
+                raise HTTPException(409, str(error)) from error
+        path = folder / "episode.json"
+        meta = json.loads(path.read_text(encoding="utf-8"))
+        meta["result"] = body.result
+        path.write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        return {"episode": folder.name}
+
+    @app.delete("/api/episodes/{session}/{episode}")
+    def delete(session: str, episode: str) -> dict[str, Any]:
+        shutil.rmtree(episode_path(session, episode))
+        return {}
+
+    return app
+
+
+def serve(hub: Hub, recorder: Recorder) -> None:
+    import uvicorn
+
+    ui = hub.config.ui
+    print(f"[tactile-rec] open http://{'localhost' if ui.host == '0.0.0.0' else ui.host}:{ui.port}")
+    if ui.host not in ("127.0.0.1", "localhost"):
+        print("[tactile-rec] the UI is reachable from the network and has no login")
+    # Without the timeout uvicorn waits for open camera previews, which never end.
+    uvicorn.run(
+        create_app(hub, recorder), host=ui.host, port=ui.port, log_level="warning",
+        timeout_graceful_shutdown=ui.shutdown_timeout_s,
+    )

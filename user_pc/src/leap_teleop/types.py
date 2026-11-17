@@ -40,6 +40,9 @@ class HumanHand:
 
     angles: np.ndarray
     keypoints: np.ndarray | None = None
+    # Record-only: every raw skeleton node as ("Chain/Joint", (x, y, z, qx, qy, qz, qw)).
+    # Not used for control and not validated; the recorder stores it as sent.
+    nodes: tuple | None = None
 
     def __post_init__(self) -> None:
         angles = _finite_array(self.angles, (len(HUMAN_ANGLE_NAMES),), "angles")
