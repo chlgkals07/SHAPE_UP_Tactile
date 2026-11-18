@@ -26,6 +26,7 @@ Tactile RL Token 연구와 관련된 논문 정리 목록입니다. 논문을 �
 | [ViTaForce: Pairwise Visuo–Tactile–Force Representation Learning for Contact-Rich Imitation Learning](./ViTaForce.md) | CoRL | 2026 |
 | [Touch in the Wild: Learning Fine-Grained Manipulation with a Portable Visuo-Tactile Gripper](./Touch%20in%20the%20Wild.md) | NeurIPS | 2025 |
 | [VTAO-BiManip: Masked Visual-Tactile-Action Pre-training with Object Understanding for Bimanual Dexterous Manipulation](./VTAO-BiManip.md) | IROS | 2025 |
+| [Learning Heterogeneous Tactile Representation for General Dexterous Manipulation](./Lingbot-Touch.md) | arXiv | 2026 |
 
 ---
 
