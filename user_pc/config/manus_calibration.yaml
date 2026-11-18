@@ -1,0 +1,44 @@
+# Manus 글러브 사용자 캘리브레이션 (tools/calibrate_manus.py가 생성). 단위: 도.
+open:
+  ThumbSpread: -10.85
+  ThumbCMCStretch: 46.94
+  ThumbMCPStretch: -0.13
+  ThumbIPStretch: -11.0
+  IndexSpread: -6.9
+  IndexMCPStretch: -6.53
+  IndexPIPStretch: 0.0
+  IndexDIPStretch: -1.09
+  MiddleSpread: -2.76
+  MiddleMCPStretch: -5.14
+  MiddlePIPStretch: 0.02
+  MiddleDIPStretch: -3.06
+  RingSpread: -1.31
+  RingMCPStretch: -4.03
+  RingPIPStretch: 0.02
+  RingDIPStretch: -1.17
+  PinkySpread: -5.6
+  PinkyMCPStretch: -1.2
+  PinkyPIPStretch: -0.02
+  PinkyDIPStretch: -5.91
+closed:
+  ThumbSpread: 41.23
+  ThumbCMCStretch: 51.89
+  ThumbMCPStretch: 66.67
+  ThumbIPStretch: 14.19
+  IndexSpread: 9.92
+  IndexMCPStretch: 66.09
+  IndexPIPStretch: 124.41
+  IndexDIPStretch: 26.84
+  MiddleSpread: -1.09
+  MiddleMCPStretch: 69.89
+  MiddlePIPStretch: 110.95
+  MiddleDIPStretch: 60.03
+  RingSpread: -10.25
+  RingMCPStretch: 72.03
+  RingPIPStretch: 117.77
+  RingDIPStretch: 44.62
+  PinkySpread: -15.76
+  PinkyMCPStretch: 64.51
+  PinkyPIPStretch: 105.53
+  PinkyDIPStretch: 1.86
+scale: 1.5352
