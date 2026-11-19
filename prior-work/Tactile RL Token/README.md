@@ -9,6 +9,7 @@ Tactile RL Token 연구와 관련된 논문 정리 목록입니다. 논문을 �
 | [RL Token: Bootstrapping Online RL with Vision-Language-Action Models](./RL%20Token.md) | CoRL (Oral) | 2026 |
 | [TORL-VLA: Tactile Guided Online Reinforcement Learning for Contact-Rich Manipulation](./TORL-VLA.md) | arXiv | 2026 |
 | [ForceRFT: Refining VLA Actions through Force-Guided Residual Reinforcement Learning](./ForceRFT.md) | arXiv | 2026 |
+| [Visuo-Tactile Transformers for Manipulation](./VTT.md) | CoRL | 2022 |
 
 ## Tactile Reactive
 
@@ -27,6 +28,7 @@ Tactile RL Token 연구와 관련된 논문 정리 목록입니다. 논문을 �
 | [Touch in the Wild: Learning Fine-Grained Manipulation with a Portable Visuo-Tactile Gripper](./Touch%20in%20the%20Wild.md) | NeurIPS | 2025 |
 | [VTAO-BiManip: Masked Visual-Tactile-Action Pre-training with Object Understanding for Bimanual Dexterous Manipulation](./VTAO-BiManip.md) | IROS | 2025 |
 | [Learning Heterogeneous Tactile Representation for General Dexterous Manipulation](./Lingbot-Touch.md) | arXiv | 2026 |
+| [Visuo-Tactile Transformers for Manipulation](./VTT.md) | CoRL | 2022 |
 
 ---
 
