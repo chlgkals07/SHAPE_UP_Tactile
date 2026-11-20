@@ -79,17 +79,18 @@ class Executor:
         with self._lock:
             self._fail(now_ns, reason)
 
-    def tick(self, now_ns: int) -> None:
+    def tick(self, now_ns: int, grid_ns: int | None = None) -> None:
+        grid_ns = now_ns if grid_ns is None else grid_ns
         with self._lock:
             if self.state not in (RUNNING, HOLD):
                 return
             if self.chunks.fault:
                 self._fail(now_ns, self.chunks.fault)
                 return
-            if self.active is None and not self._adopt(now_ns):
+            if self.active is None and not self._adopt(now_ns, grid_ns):
                 self._hold(now_ns, "waiting for a chunk")
                 return
-            self._step(now_ns)
+            self._step(now_ns, grid_ns)
 
     def status(self, now_ns: int) -> dict:
         with self._lock:
@@ -106,9 +107,9 @@ class Executor:
                 },
             }
 
-    def _step(self, now_ns: int) -> None:
+    def _step(self, now_ns: int, grid_ns: int) -> None:
         assert self.active is not None
-        row = (now_ns - self.t_start_ns + self.dt_ns // 2) // self.dt_ns
+        row = (grid_ns - self.t_start_ns) // self.dt_ns
         for skipped in range(self.cursor, min(row, self.k)):
             self._late(now_ns, skipped)
         if row >= self.k:
@@ -125,7 +126,7 @@ class Executor:
             return
         self._send(now_ns, due_ns, row)
 
-    def _adopt(self, now_ns: int) -> bool:
+    def _adopt(self, now_ns: int, grid_ns: int) -> bool:
         chunk = self.chunks.take(now_ns)
         if chunk is None:
             return False
@@ -139,7 +140,7 @@ class Executor:
             self.last_problem = problems[0]
             self.chunks.request(now_ns)
             return False
-        self.active, self.adopted, self.t_start_ns, self.cursor = chunk, chunk, now_ns, 0
+        self.active, self.adopted, self.t_start_ns, self.cursor = chunk, chunk, grid_ns, 0
         self._enter(RUNNING, now_ns, f"chunk {chunk.chunk_id}")
         return True
 

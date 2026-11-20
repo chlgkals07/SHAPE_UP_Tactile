@@ -120,5 +120,5 @@ class Runner:
             if now_ns < next_ns:
                 self._stopping.wait((next_ns - now_ns) / 1e9)
                 continue
-            self.executor.tick(now_ns)
+            self.executor.tick(now_ns, next_ns)
             next_ns += dt_ns * ((now_ns - next_ns) // dt_ns + 1)
