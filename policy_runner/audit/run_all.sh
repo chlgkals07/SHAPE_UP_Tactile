@@ -20,7 +20,7 @@ no_comments() {
 }
 
 step "policy_runner acceptance" uv run --extra dev pytest tests/acceptance -q -p no:warnings
-step "leap_teleop" uv run --directory "$repo/user_pc" --extra dev pytest -q -p no:warnings
+step "leap_teleop" bash -c "cd '$repo/user_pc' && .venv/bin/python -m pytest -q -p no:warnings"
 step "control_hub" uv run --directory "$repo/control_hub" --extra dev pytest -q -p no:warnings
 step "ruff" uv run --extra dev ruff check src tests audit
 step "comments" no_comments
