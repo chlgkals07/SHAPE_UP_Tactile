@@ -16,6 +16,7 @@ import yaml
 ID_PATTERN = re.compile(r"^[a-z0-9_]+$")
 LOCAL = "local"
 PROCESS_KINDS = ("service", "tool")
+LINK_PAGES = ("rec", "policy")
 CHECK_KINDS = (
     "ping", "tcp", "file", "http", "ssh", "usb", "serial", "process", "no_process", "command",
 )
@@ -92,6 +93,7 @@ class Check:
     help: str = ""
     link: str = ""
     warn_below_mbps: int = 0  # usb: warn when it enumerated slower (a USB3 camera on USB2)
+    page: str = "rec"
 
 
 @dataclass(frozen=True)
@@ -334,7 +336,7 @@ def _check(cid: str, raw: Any, hosts: dict[str, Host]) -> Check:
     where = f"checks.{cid}"
     _check_id(cid, where)
     raw = _mapping(raw, where)
-    _known_keys(raw, {"title", "help", "link", "warn_below_mbps", *CHECK_KINDS}, where)
+    _known_keys(raw, {"title", "help", "link", "warn_below_mbps", "page", *CHECK_KINDS}, where)
     kinds = [k for k in CHECK_KINDS if k in raw]
     if len(kinds) != 1:
         raise _fail(where, f"점검 종류를 하나만 적습니다 ({', '.join(CHECK_KINDS)})")
@@ -344,8 +346,11 @@ def _check(cid: str, raw: Any, hosts: dict[str, Host]) -> Check:
         raise _fail(f"{where}.ssh", f"'{target}' 는 hosts 에 없습니다")
     if kind == "tcp" and ":" not in target:
         raise _fail(f"{where}.tcp", "'주소:포트' 형태여야 합니다")
+    page = str(raw.get("page", "rec"))
+    if page not in LINK_PAGES:
+        raise _fail(f"{where}.page", f"'{page}' 는 없는 페이지입니다 ({', '.join(LINK_PAGES)})")
     return Check(cid, str(raw.get("title", cid)), kind, target, str(raw.get("help", "")).strip(),
-                 str(raw.get("link", "")), int(raw.get("warn_below_mbps", 0)))
+                 str(raw.get("link", "")), int(raw.get("warn_below_mbps", 0)), page)
 
 
 def _events(value: Any, where: str) -> tuple[EventRule, ...]:

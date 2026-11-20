@@ -42,6 +42,11 @@ envs:
     - unset PYTHONPATH ROS_DOMAIN_ID RMW_IMPLEMENTATION ZENOH_CONFIG_OVERRIDE
     - cd "{repo}/recorder"
     - source .venv/bin/activate
+  # 정책 실행기: 녹화기와 같은 rig 를 열지만 자기 venv 를 쓴다
+  policy:
+    - unset PYTHONPATH ROS_DOMAIN_ID RMW_IMPLEMENTATION ZENOH_CONFIG_OVERRIDE
+    - cd "{repo}/policy_runner"
+    - source .venv/bin/activate
 
 # 모든 프로세스의 로그에 적용되는 힌트 (가이드 "문제 해결" 표)
 hints:
@@ -318,6 +323,52 @@ processes:
     ready: {check: recorder_ui}
     help: 실물 없이 녹화기 UI 와 녹화·변환을 돌려 본다. 결과는 recorder/data_fake/ 에 쌓인다.
 
+  # ------------------------------------------------------------------ User PC: 정책 실행
+  policy:
+    title: 정책 실행기 (policy-runner)
+    group: User PC
+    env: policy
+    cmd: policy-runner run config/runner.yaml
+    flags:
+      - {id: allow_hand, label: "손 UDP 허용 (runner.yaml 이 mode: hand 일 때)", arg: --allow-hand, default: false}
+    conflicts: [recorder, recorder_fake, camera_ros, check_hand, check_glove, check_tactile_a,
+                check_tactile_b, check_cam_wrist, check_cam_ext]
+    ready: {check: policy_ui}
+    help: |
+      rig 의 팔·손·카메라를 녹화기와 같은 규칙으로 정렬해 정책 서버에 보내고, 받은 chunk 를 30 Hz 로 실행한다.
+      켜지면 "정책" 페이지에서 시작/정지/리셋을 누른다. mode: dry_run 이면 아무 데도 보내지 않는다.
+      runner.yaml 은 policy_runner/config/runner.example.yaml 을 복사해 서버 주소와 manifest 를 맞춘다.
+    hints:
+      - {match: "manifest differs", hint: "서버의 체크포인트와 runner 의 manifest 가 다르다. 메시지에 나온 항목을 맞춘다"}
+      - {match: "cannot connect", hint: "정책 서버가 꺼져 있거나 주소가 틀렸다. policy-runner probe config/runner.yaml 로 먼저 확인한다"}
+      - {match: "start with --allow-hand", hint: "mode: hand 는 '손 UDP 허용' 을 켜야 시작된다"}
+
+  policy_fake_server:
+    title: 가짜 정책 서버 (hold)
+    group: User PC
+    env: policy
+    cmd: policy-runner fake-server --manifest config/manifest.example.yaml --delay-ms 150
+    help: 받은 state 를 그대로 50 행으로 돌려주는 서버. 실제 서버 없이 정책 실행기와 leap_policy 를 확인한다.
+
+  leap_policy:
+    title: 정책 → LEAP (leap_policy)
+    group: User PC
+    env: teleop
+    cmd: python3 -m leap_teleop.cli --source policy --safe-pose fist --record-udp
+    flags:
+      - {id: dry_run, label: "dry-run (LEAP 을 건드리지 않고 로그만)", arg: --dry-run, default: true}
+    conflicts: [leap_manus, leap_leader, leap_zero]
+    ready: {log: "\\[teleop\\] waiting"}
+    help: |
+      정책 실행기가 127.0.0.1:47810 으로 보내는 손 목표(deg)를 그대로 LEAP 에 보낸다. USB 는 이 프로세스만 연다.
+      목표가 0.5 초 끊기면 마지막 값을 유지하고, 3 초 끊기면 safe-pose(주먹)로 간다.
+      --record-udp 로 손 feedback 을 정책 실행기에 보낸다. 이것이 없으면 관측의 hand 가 비어 시작되지 않는다.
+    confirm_start:
+      - {text: "LEAP 5V 를 편 손으로 켰고 차단 수단이 손 닿는 곳에 있다", unless_flag: dry_run}
+      - {text: "손가락 주변에 손·케이블이 없다", unless_flag: dry_run}
+    confirm_stop:
+      - 손에 물체가 없다 (끄면 Torque OFF 로 손이 풀린다)
+
   camera_ros:
     title: 손목 카메라 ROS 노드 (미리보기용)
     group: User PC
@@ -443,6 +494,12 @@ checks:
     http: "http://127.0.0.1:8800/"
     link: 녹화기 열기
     help: 녹화기가 꺼져 있다. 실행 페이지에서 켠다.
+  policy_ui:
+    title: 정책 실행기 UI (:8810)
+    http: "http://127.0.0.1:8810/"
+    link: 정책 실행기 열기
+    page: policy
+    help: 정책 실행기가 꺼져 있다. 실행 페이지에서 켠다.
 
 # 실행표. 가이드의 "켜는 순서": LEAP 5V(편 손) → Manus 노드 → zenohd → omy_ai_wrist_flip → leap_* → 녹화
 profiles:
@@ -465,6 +522,22 @@ profiles:
       - {section: 손 + 녹화}
       - leap_manus
       - recorder
+  - id: policy
+    title: 정책 실행
+    help: 처음에는 runner.yaml 을 mode dry_run 으로, leap_policy 는 dry-run 으로 켠다.
+    steps:
+      - {section: 준비}
+      - {note: "로봇 전원 ON, LED 흰색, 이더넷 연결"}
+      - {note: "LEAP 편 손, 5V ON (차단 수단은 손 닿는 곳)"}
+      - {section: 점검}
+      - leap_check
+      - robot_precheck
+      - zenohd
+      - {section: 팔}
+      - [arm, arm_stock]
+      - {section: 손 + 정책}
+      - leap_policy
+      - policy
   - id: arm_hand
     title: 팔 + 손 (4단계)
     help: 팔은 leader, 손은 글러브. 녹화 없이 텔레옵만 본다.

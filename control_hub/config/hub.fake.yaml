@@ -101,6 +101,13 @@ processes:
     ready: {check: recorder_ui}
     help: 8809 포트에 빈 웹 서버를 띄운다. "녹화기 UI" 점검과 링크를 확인하는 용도.
 
+  policy:
+    title: 정책 실행기 (가짜)
+    group: User PC
+    cmd: 'echo "serving on :8819"; exec python3 -m http.server 8819 --bind 127.0.0.1'
+    ready: {check: policy_ui}
+    help: 8819 포트에 빈 웹 서버를 띄운다. "정책" 페이지가 열리는지 확인하는 용도.
+
   glovecal:
     title: 글러브 편 손/주먹 기록 (가짜)
     group: 도구
@@ -166,6 +173,12 @@ checks:
     http: "http://127.0.0.1:8809/"
     link: 녹화기 열기
     help: 녹화기를 켠다.
+  policy_ui:
+    title: 정책 실행기 UI (가짜 :8819)
+    http: "http://127.0.0.1:8819/"
+    link: 정책 실행기 열기
+    page: policy
+    help: 정책 실행기를 켠다.
 
 profiles:
   - id: collect

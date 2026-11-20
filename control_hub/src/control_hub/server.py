@@ -105,7 +105,8 @@ def describe(cfg: HubConfig, tmux: Tmux) -> dict[str, Any]:
         "processes": processes,
         "groups": list(dict.fromkeys(p.group for p in cfg.processes.values())),
         "checks": {c.id: {"id": c.id, "title": c.title, "kind": c.kind, "target": c.target,
-                          "help": c.help, "link": c.link} for c in cfg.checks.values()},
+                          "help": c.help, "link": c.link, "page": c.page}
+                   for c in cfg.checks.values()},
         "profiles": [
             {"id": p.id, "title": p.title, "help": p.help,
              "steps": [_step(s) for s in p.steps]}
