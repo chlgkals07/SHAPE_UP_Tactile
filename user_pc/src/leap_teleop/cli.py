@@ -16,6 +16,7 @@ from leap_teleop.config import (
     load_postures,
 )
 from leap_teleop.hand.base import HandDriver
+from leap_teleop.retarget.passthrough import passthrough
 from leap_teleop.retarget.scalar_posture import ScalarPostureRetargeter
 from leap_teleop.safety import StaleGuard
 from leap_teleop.sources.base import Source
@@ -27,7 +28,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog="leap-teleop",
         description="Drive a LEAP Hand v1 from the keyboard, the OMY leader gripper or a Manus glove.",
     )
-    parser.add_argument("--source", choices=("keyboard", "leader", "manus"), default="keyboard")
+    parser.add_argument(
+        "--source", choices=("keyboard", "leader", "manus", "policy"), default="keyboard"
+    )
     parser.add_argument("--port", default="/dev/ttyUSB0", help="LEAP Hand serial port")
     parser.add_argument(
         "--motor-calibration-file", type=Path, default=Path("config/hardware_motors.yaml")
@@ -66,11 +69,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--record-udp", nargs="?", const="127.0.0.1:47800", metavar="HOST:PORT",
         help="send hand + glove data to the tactile-rec hub over UDP (default 127.0.0.1:47800)",
     )
+    parser.add_argument(
+        "--policy-udp", default="127.0.0.1:47810", metavar="HOST:PORT",
+        help="where --source policy listens for hand targets from policy-runner",
+    )
     parser.add_argument("--dry-run", action="store_true", help="log targets, do not touch hardware")
     return parser
 
 
 def build_source(args: argparse.Namespace) -> Source:
+    if args.source == "policy":
+        from leap_teleop.sources.policy_udp import PolicyUdpSource
+
+        host, _, port = args.policy_udp.rpartition(":")
+        if not host or not port.isdigit():
+            raise ValueError("--policy-udp expects HOST:PORT, e.g. 127.0.0.1:47810")
+        return PolicyUdpSource(host, int(port))
     if args.source == "manus":
         from leap_teleop.sources.manus import Ros2ManusSource
 
@@ -87,6 +101,8 @@ def build_source(args: argparse.Namespace) -> Source:
 def build_retargeter(
     args: argparse.Namespace, open_pose, fist_pose
 ) -> Retargeter:
+    if args.source == "policy":
+        return passthrough
     if args.source != "manus":
         return ScalarPostureRetargeter(open_pose, fist_pose)
     from leap_teleop.kinematics import LEAP_URDF, load_chain
