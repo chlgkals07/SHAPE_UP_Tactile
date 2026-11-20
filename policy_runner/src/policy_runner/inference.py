@@ -78,7 +78,8 @@ class PolicyClient:
 
 class InferenceWorker:
     def __init__(self, client: PolicyClient, aligner: ObsAligner, prompt: str, clock: Clock,
-                 timeout_s: float, pred_horizon: int, retry_ns: int, trace: Trace):
+                 timeout_s: float, pred_horizon: int, retry_ns: int, max_failures: int,
+                 obs_fail_after_ns: int, trace: Trace):
         self.client = client
         self.aligner = aligner
         self.prompt = prompt
@@ -86,7 +87,11 @@ class InferenceWorker:
         self.timeout_s = timeout_s
         self.pred_horizon = pred_horizon
         self.retry_ns = retry_ns
+        self.max_failures = max_failures
+        self.obs_fail_after_ns = obs_fail_after_ns
         self.trace = trace
+        self._failures = 0
+        self._obs_bad_since: int | None = None
         self.fault = ""
         self.problems: deque[str] = deque(maxlen=10)
         self.last_obs_ages_ms: dict[str, float] = {}
@@ -123,10 +128,12 @@ class InferenceWorker:
     def clear(self) -> None:
         with self._wake:
             self._wanted, self._ready = None, None
+            self._failures, self._obs_bad_since = 0, None
 
     def clear_fault(self) -> None:
         with self._wake:
             self.fault = ""
+            self._failures, self._obs_bad_since = 0, None
 
     def status(self) -> dict[str, Any]:
         return {
@@ -165,8 +172,9 @@ class InferenceWorker:
                          picks={name: {"seq": p.seq, "t_ns": p.t_ns, "age_ns": p.age_ns}
                                 for name, p in obs.picks.items()})
         if not obs.ok:
-            self._note(obs.problems[0])
+            self._observation_failed(obs.t_obs_ns, obs.problems[0])
             return None
+        self._obs_bad_since = None
         self.trace.write("request", self.clock.now_ns(), obs_id=obs.obs_id)
         start = time.monotonic()
         try:
@@ -179,6 +187,7 @@ class InferenceWorker:
         problems = check_reply(reply, self.pred_horizon, ACTION_DIM)
         if problems:
             return self._failed(obs.obs_id, start, f"bad reply: {problems[0]}", fault=True)
+        self._failures = 0
         self.last_rtt_ms = (time.monotonic() - start) * 1000
         self.last_infer_ms = reply.get("server_timing", {}).get("infer_ms")
         self.trace.write("reply", self.clock.now_ns(), obs_id=obs.obs_id, ok=True, problems=[],
@@ -192,9 +201,20 @@ class InferenceWorker:
                          problems=[problem], rtt_ms=(time.monotonic() - start) * 1000,
                          infer_ms=None)
         self._note(problem)
+        self._failures += 1
         if fault:
             self.fault = problem
+        elif self._failures >= self.max_failures:
+            self.fault = f"{self._failures} requests failed in a row: {problem}"
         return None
+
+    def _observation_failed(self, t_obs_ns: int, problem: str) -> None:
+        self._note(problem)
+        if self._obs_bad_since is None:
+            self._obs_bad_since = t_obs_ns
+        elif t_obs_ns - self._obs_bad_since >= self.obs_fail_after_ns:
+            self.fault = (f"observation failing for {(t_obs_ns - self._obs_bad_since) / MS:.0f} ms:"
+                          f" {problem}")
 
     def _note(self, problem: str) -> None:
         if not self.problems or self.problems[-1] != problem:

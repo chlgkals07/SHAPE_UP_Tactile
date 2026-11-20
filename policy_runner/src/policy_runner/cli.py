@@ -5,8 +5,6 @@ import statistics
 import sys
 import time
 
-import numpy as np
-from tactile_rec import features
 from tactile_rec.hub import Hub
 
 from policy_runner import config as runner_config
@@ -14,7 +12,7 @@ from policy_runner import fake_server
 from policy_runner.chunk import check_reply
 from policy_runner.inference import ACTION_DIM, Disconnected, PolicyClient
 from policy_runner.manifest import Manifest
-from policy_runner.runner import Runner, StartError
+from policy_runner.runner import Runner, StartError, synthetic_request
 
 
 def load_or_exit(path: str, allow_hand: bool) -> runner_config.RunnerConfig:
@@ -38,7 +36,8 @@ def cmd_check(args: argparse.Namespace) -> int:
 def cmd_fake_server(args: argparse.Namespace) -> int:
     manifest = Manifest.load(args.manifest).to_dict()
     server = fake_server.start(args.host, args.port, metadata={"manifest": manifest},
-                               delay_ms=args.delay_ms, nan_every=args.nan_every,
+                               delay_ms=args.delay_ms, jitter_ms=args.jitter_ms,
+                               nan_every=args.nan_every, bad_shape_every=args.bad_shape_every,
                                stall_every=args.stall_every, drop_every=args.drop_every,
                                error_every=args.error_every)
     print(f"[fake-server] ws://{args.host}:{server.port} (hold policy, delay {args.delay_ms} ms)")
@@ -48,18 +47,6 @@ def cmd_fake_server(args: argparse.Namespace) -> int:
     except KeyboardInterrupt:
         server.stop()
     return 0
-
-
-def synthetic_request(cfg: runner_config.RunnerConfig) -> dict:
-    hub = Hub(cfg.rig)
-    images = {}
-    for name in cfg.cameras:
-        meta = hub.streams[name].spec.meta
-        shape = features.oriented_shape(int(meta["height"]), int(meta["width"]),
-                                        int(meta["rotation_deg"]))
-        images[name] = np.zeros(shape, dtype=np.uint8)
-    return {"state": np.zeros(ACTION_DIM, dtype=np.float32), "images": images,
-            "prompt": cfg.prompt}
 
 
 def cmd_probe(args: argparse.Namespace) -> int:
@@ -76,7 +63,7 @@ def cmd_probe(args: argparse.Namespace) -> int:
     print(f"metadata keys {sorted(metadata)}")
     for line in differences:
         print(f"manifest: {line}")
-    request = synthetic_request(cfg)
+    request = synthetic_request(cfg, Hub(cfg.rig))
     rtts, infers, problems = [], [], []
     for _ in range(args.count):
         start = time.monotonic()
@@ -128,7 +115,9 @@ def build_parser() -> argparse.ArgumentParser:
     fake.add_argument("--host", default="127.0.0.1")
     fake.add_argument("--port", type=int, default=8000)
     fake.add_argument("--delay-ms", type=float, default=0.0)
+    fake.add_argument("--jitter-ms", type=float, default=0.0)
     fake.add_argument("--nan-every", type=int, default=0)
+    fake.add_argument("--bad-shape-every", type=int, default=0)
     fake.add_argument("--stall-every", type=int, default=0)
     fake.add_argument("--drop-every", type=int, default=0)
     fake.add_argument("--error-every", type=int, default=0)

@@ -39,6 +39,9 @@ class RunnerConfig:
     hand_udp: tuple[str, int]
     ui: tuple[str, int]
     trace_dir: Path
+    warmup_timeout_s: float
+    max_failures: int
+    obs_fail_after_ms: float
 
     @property
     def dt_ns(self) -> int:
@@ -87,6 +90,9 @@ def parse(raw: dict[str, Any], base: Path, allow_hand: bool = False) -> RunnerCo
             hand_udp=(str(raw["hand_udp"]["host"]), int(raw["hand_udp"]["port"])),
             ui=(str(raw["ui"]["host"]), int(raw["ui"]["port"])),
             trace_dir=resolve(base, raw["trace"]["dir"]),
+            warmup_timeout_s=float(policy.get("warmup_timeout_s", 60)),
+            max_failures=int(policy.get("max_failures", 3)),
+            obs_fail_after_ms=float(observation.get("fail_after_ms", 1000)),
         )
     except (KeyError, TypeError, ValueError) as error:
         raise ConfigError([f"{type(error).__name__}: {error}"]) from error

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+import random
 import threading
 import time
 import traceback
@@ -25,6 +26,7 @@ class Faults:
     stall_every: int = 0
     drop_every: int = 0
     delay_ms: float = 0.0
+    jitter_ms: float = 0.0
     nan_every: int = 0
     bad_shape_every: int = 0
 
@@ -87,7 +89,8 @@ class FakeServer:
         if every(faults.drop_every, count):
             connection.close()
             return False
-        self.stopping.wait(faults.delay_ms / 1000)
+        self.stopping.wait((faults.delay_ms + random.Random(count).uniform(0, faults.jitter_ms))
+                           / 1000)
         start = time.monotonic()
         try:
             if every(faults.error_every, count):

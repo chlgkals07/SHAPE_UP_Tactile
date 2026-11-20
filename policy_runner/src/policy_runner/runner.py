@@ -4,19 +4,42 @@ import threading
 import time
 from typing import Any
 
+import numpy as np
+from tactile_rec import features
 from tactile_rec.hub import Hub
 
 from policy_runner.align_obs import ObsAligner
+from policy_runner.chunk import check_reply
 from policy_runner.commands.dry_run import DryRunCommand
 from policy_runner.commands.hand_udp import HandUdpCommand
 from policy_runner.config import RunnerConfig
 from policy_runner.executor import Executor
-from policy_runner.inference import Disconnected, InferenceWorker, PolicyClient
+from policy_runner.inference import (
+    ACTION_DIM,
+    Disconnected,
+    InferenceWorker,
+    InferTimeout,
+    PolicyClient,
+    ServerError,
+)
 from policy_runner.trace import Trace
+
+MS = 1_000_000
 
 
 class StartError(RuntimeError):
     pass
+
+
+def synthetic_request(cfg: RunnerConfig, hub: Hub) -> dict:
+    images = {}
+    for name in cfg.cameras:
+        meta = hub.streams[name].spec.meta
+        shape = features.oriented_shape(int(meta["height"]), int(meta["width"]),
+                                        int(meta["rotation_deg"]))
+        images[name] = np.zeros(shape, dtype=np.uint8)
+    return {"state": np.zeros(ACTION_DIM, dtype=np.float32), "images": images,
+            "prompt": cfg.prompt}
 
 
 class Runner:
@@ -30,6 +53,7 @@ class Runner:
         self.client = PolicyClient(cfg.endpoint, cfg.connect_timeout_s)
         self.worker = InferenceWorker(self.client, self.aligner, cfg.prompt, self.clock,
                                       cfg.infer_timeout_s, cfg.manifest.pred_horizon, cfg.dt_ns,
+                                      cfg.max_failures, int(cfg.obs_fail_after_ms * MS),
                                       self.trace)
         self.dry_run = DryRunCommand()
         self.commands: list[Any] = [self.dry_run]
@@ -43,6 +67,7 @@ class Runner:
                                         daemon=True)
         self.started = False
         self.server_manifest: dict[str, Any] = {}
+        self.warmup_ms: float | None = None
 
     def start(self) -> None:
         try:
@@ -55,10 +80,23 @@ class Runner:
         differences = self.cfg.manifest.differences(self.server_manifest)
         if differences:
             raise StartError("manifest differs from the server: " + "; ".join(differences))
+        self.warmup_ms = self.warm_up()
         self.hub.start()
         self.worker.start()
         self._ticker.start()
         self.started = True
+
+    def warm_up(self) -> float:
+        start = time.monotonic()
+        try:
+            reply = self.client.infer(synthetic_request(self.cfg, self.hub),
+                                      self.cfg.warmup_timeout_s)
+        except (InferTimeout, Disconnected, ServerError) as error:
+            raise StartError(f"warm-up request failed: {error}") from error
+        problems = check_reply(reply, self.cfg.manifest.pred_horizon, ACTION_DIM)
+        if problems:
+            raise StartError(f"warm-up reply: {problems[0]}")
+        return (time.monotonic() - start) * 1000
 
     def stop(self) -> None:
         self._stopping.set()
@@ -100,6 +138,7 @@ class Runner:
             "checkpoint": self.cfg.manifest.checkpoint,
             "server_checkpoint": self.server_manifest.get("checkpoint"),
             "prompt": self.cfg.prompt,
+            "warmup_ms": self.warmup_ms,
             "streams": {
                 name: {**health[name].to_json(), "obs_age_ms": obs_age_ms.get(name),
                        "max_age_ms": self.cfg.max_age_ms[name]}
