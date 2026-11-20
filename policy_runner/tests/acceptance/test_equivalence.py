@@ -52,15 +52,21 @@ def test_online_obs_matches_converted_episode(timed_rig, latency):
     episode, converted = record_and_convert(rig)
     online = online_at_grid(rig, converted)
     assert len(online) == converted.steps > 60
+    not_arrived = 0
     for step, obs in enumerate(online):
+        t = int(converted.grid_ns[step])
         assert obs.ok, (step, obs.problems)
         assert np.array_equal(obs.state, converted.arrays[features.KEY_STATE][step]), step
         for camera in CAMERAS:
-            offline = features.orient_image(
-                episode.frame(camera, int(converted.frames[camera][step])),
-                converted.rotations[camera],
-            )
+            recv = episode.arrays(camera)["t_recv_ns"]
+            frame = int(converted.frames[camera][step])
+            if recv[frame] > t:
+                not_arrived += 1
+                frame = int(np.searchsorted(recv, t, side="right")) - 1
+            offline = features.orient_image(episode.frame(camera, frame),
+                                            converted.rotations[camera])
             assert np.array_equal(obs.images[camera], offline), (step, camera)
+    assert (not_arrived > 0) == bool(latency)
 
 
 def sample_hub(episode: Episode, clock: FakeClock) -> Hub:
