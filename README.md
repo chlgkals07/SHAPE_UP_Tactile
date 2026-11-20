@@ -11,6 +11,7 @@ LEAP Hand를 기반으로 adaptive grasping과 tactile/proprioceptive manipulati
 
 ## 코드
 - [`user_pc/`](user_pc/README.md): LEAP Hand 텔레옵 구현 (키보드 / OMY leader 그리퍼 / Manus 글러브)
+- [`policy_runner/`](policy_runner/README.md): π0.5 정책 서버를 rig 에 붙이는 실행기 (관측 정렬, chunk 실행, 정책 UI). [평가 결과](docs/results/2026-11-21-policy-runner-eval.md)
 - [`third_party/paxini`](third_party/paxini/README.md): Paxini GEN3 촉각 센서 SDK (커뮤니티 래퍼)
 - `third_party/manus`: Manus SDK와 ROS 2 노드
 - `third_party/open_manipulator`: ROBOTIS OMY 서브모듈 (`git submodule update --init`)

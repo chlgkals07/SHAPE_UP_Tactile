@@ -29,6 +29,11 @@
 | 코드 규칙 (2026-11-21) | karpathy 식: 작은 순수 함수, 얇은 층, 위에서 아래로 읽힘, 이름으로 설명. **코멘트·docstring 없음**(라이선스 표기만 예외) | 기존 패키지의 docstring 형식 | 사용자 지시 |
 | UI (2026-11-21) | runner 가 자기 웹 UI(:8810)를 띄우고 Control Hub 에 "정책" 페이지(iframe)를 녹화 페이지와 같은 방식으로 추가. 내용: 서버 주소·checkpoint·상태·stream age·추론 지연·chunk 나이와 위치·최근 문제·arm/disarm/reset | Hub 안에 직접 구현 | 녹화기와 같은 구조. Hub 는 장치·프로그램을 import 하지 않는다 |
 | 손 모드 (2026-11-21) | `execution.mode: dry_run`(trace 만) / `hand`(leap_teleop 으로 UDP). `hand` 는 CLI `--allow-hand` 가 있어야 시작 | 한 모드 | 받는 쪽이 `--dry-run` 인지 runner 는 알 수 없다. 사람이 명시적으로 허용해야 한다 |
+| 동일성 판정 (2026-11-21) | `latency_ms` 가 있으면 offline 이 고른 프레임이 그 시각까지 도착했을 때만 bit 일치를 요구하고, 아니면 도착한 마지막 프레임과 비교 | 무조건 bit 일치 | offline 은 격자 뒤에 도착한 프레임을 쓸 수 있고 온라인은 못 쓴다. 고정 테스트를 `0060e86` 에서 고쳤다 |
+| 실행 격자 기준 (2026-11-21) | chunk 시작과 행 번호는 ticker 의 예정 격자 시각, 늦음은 실제 시각으로 잰다 (`tick(now, grid)`) | 실제 깬 시각 기준 | 실측 trace 에서 두 행이 23.318 ms 간격으로 나갔다 (`9b73f4a`) |
+| 의도적 버그 방식 (2026-11-21) | `audit/mutants.py` 의 문자열 치환 표 (정확히 한 번 일치, 항상 복원) | `.patch` 파일 | 패치가 엉뚱한 곳에 적용될 일이 없고 한 파일로 읽힌다 |
+| 실패 한도 (2026-11-21) | `policy.max_failures`(3) 연속 실패, `observation.fail_after_ms`(1000) 관측 실패 지속이면 FAULT. 시작 때 warm-up 1회(`policy.warmup_timeout_s` 60) | 무한 재시도 | §4 상태 기계. 고정 테스트 설정에 없는 키라 코드 기본값으로 읽는다 |
+| websockets (2026-11-21) | `websockets>=17.1`, `connect(..., legacy=True)`, Python ≥ 3.11 | context manager 연결 | 연결을 오래 유지한다. 17.1 부터 직접 연결은 `legacy=True` 가 필요하다 (설치된 17.4 소스에서 확인) |
 
 ## 1. 현재 코드에서 확인한 사실 (이 계획의 전제)
 
