@@ -88,7 +88,8 @@ def audit(events: list[dict]) -> list[str]:
                 if event["t_ns"] - last_send["t_ns"] < cfg["dt_ns"] - cfg["tick_jitter_ns"]:
                     problems.append(f"{where}: two sends closer than dt")
                 if (last_send["chunk_id"] == event["chunk_id"]
-                        and event["row"] == last_send["row"] + 1):
+                        and event["row"] == last_send["row"] + 1
+                        and len(action) == len(last_send["action"]) == ACTION_DIM):
                     step = max(abs(a - b) for a, b in zip(action, last_send["action"], strict=True))
                     if step > cfg["step_max_rad"] + 1e-6:
                         problems.append(f"{where}: step {step:.3f} rad between rows")
