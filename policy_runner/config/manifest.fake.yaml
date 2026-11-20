@@ -1,0 +1,13 @@
+schema_version: 1
+joint_names: [joint1, joint2, joint3, joint4, joint5, joint6, leap_index_mcp_side,
+  leap_index_mcp_flex, leap_index_pip_flex, leap_index_dip_flex, leap_middle_mcp_side,
+  leap_middle_mcp_flex, leap_middle_pip_flex, leap_middle_dip_flex, leap_ring_mcp_side,
+  leap_ring_mcp_flex, leap_ring_pip_flex, leap_ring_dip_flex, leap_thumb_cmc_side,
+  leap_thumb_cmc_flex, leap_thumb_mcp_flex, leap_thumb_ip_flex]
+fps: 30
+pred_horizon: 50
+mount: wrist_flip
+hand_action: sent
+cameras: [cam_wrist, cam_ext]
+checkpoint: fake-hold
+norm_stats_id: none

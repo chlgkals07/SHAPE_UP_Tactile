@@ -98,7 +98,7 @@ def parse(raw: dict[str, Any], base: Path, allow_hand: bool = False) -> RunnerCo
 
 def resolve(base: Path, value: str) -> Path:
     path = Path(value).expanduser()
-    return path if path.is_absolute() else base / path
+    return (path if path.is_absolute() else base / path).resolve()
 
 
 def check(cfg: RunnerConfig, allow_hand: bool) -> list[str]:

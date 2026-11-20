@@ -47,6 +47,7 @@ class Executor:
         self.trace = trace
         self.state = READY
         self.active: ActionChunk | None = None
+        self.adopted: ActionChunk | None = None
         self.t_start_ns = 0
         self.cursor = 0
         self.last_problem = ""
@@ -92,21 +93,22 @@ class Executor:
 
     def status(self, now_ns: int) -> dict:
         with self._lock:
-            chunk = self.active
+            chunk = self.adopted
             return {
                 "state": self.state,
                 "problem": self.last_problem,
                 "chunk": {
                     "id": chunk.chunk_id if chunk else 0,
                     "age_ms": (now_ns - chunk.t_obs_ns) / MS if chunk else None,
-                    "row": self.cursor if chunk else 0,
+                    "row": self.cursor,
                     "of": self.k,
+                    "active": self.active is not None,
                 },
             }
 
     def _step(self, now_ns: int) -> None:
         assert self.active is not None
-        row = (now_ns - self.t_start_ns) // self.dt_ns
+        row = (now_ns - self.t_start_ns + self.dt_ns // 2) // self.dt_ns
         for skipped in range(self.cursor, min(row, self.k)):
             self._late(now_ns, skipped)
         if row >= self.k:
@@ -137,7 +139,7 @@ class Executor:
             self.last_problem = problems[0]
             self.chunks.request(now_ns)
             return False
-        self.active, self.t_start_ns, self.cursor = chunk, now_ns, 0
+        self.active, self.adopted, self.t_start_ns, self.cursor = chunk, chunk, now_ns, 0
         self._enter(RUNNING, now_ns, f"chunk {chunk.chunk_id}")
         return True
 

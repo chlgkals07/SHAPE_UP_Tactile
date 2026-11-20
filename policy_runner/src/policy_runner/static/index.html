@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Policy Runner</title>
+<style>
+:root {
+  --ink: #16181d; --ink-2: #444a54; --muted: #6b717c; --line: #dfe1e5; --line-2: #eceef1;
+  --bg: #ffffff; --wash: #f6f6f7;
+  --ok: #1b7f3b; --warn: #a15c00; --bad: #c62828;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans KR", sans-serif;
+}
+main { max-width: 960px; margin: 0 auto; padding: 20px 16px 40px; display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+h1 { font-size: 22px; margin: 0; font-weight: 600; }
+h2 { font-size: 15px; margin: 0 0 8px; font-weight: 600; color: var(--ink-2); }
+.badge { font: 600 14px var(--mono); padding: 3px 10px; border-radius: 999px; border: 1px solid; }
+.READY { color: var(--ink-2); } .RUNNING { color: var(--ok); }
+.HOLD { color: var(--warn); } .FAULT { color: var(--bad); }
+.buttons { margin-left: auto; display: flex; gap: 8px; }
+button {
+  font: 600 15px system-ui, sans-serif; padding: 8px 18px; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--wash); color: var(--ink); cursor: pointer;
+}
+button:disabled { opacity: .4; cursor: default; }
+#arm { background: var(--ok); color: #fff; border-color: var(--ok); }
+#disarm { background: var(--bad); color: #fff; border-color: var(--bad); }
+section { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; }
+dt { color: var(--muted); } dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line); }
+th, td { padding: 4px 6px; } td { border-bottom: 1px solid var(--line-2); }
+td:first-child { font-family: var(--mono); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+ul { margin: 0; padding-left: 18px; font: 14px/1.6 var(--mono); }
+.muted { color: var(--muted); }
+#offline { color: var(--bad); display: none; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>정책 실행기</h1>
+    <span id="state" class="badge">…</span>
+    <span id="mode" class="muted"></span>
+    <span id="offline">실행기에 연결할 수 없음</span>
+    <div class="buttons">
+      <button id="arm">시작</button>
+      <button id="disarm">정지</button>
+      <button id="reset">리셋</button>
+    </div>
+  </header>
+  <div class="grid">
+    <section>
+      <h2>서버</h2>
+      <dl>
+        <dt>주소</dt><dd id="endpoint"></dd>
+        <dt>체크포인트</dt><dd id="checkpoint"></dd>
+        <dt>서버 체크포인트</dt><dd id="server_checkpoint"></dd>
+        <dt>프롬프트</dt><dd id="prompt"></dd>
+      </dl>
+    </section>
+    <section>
+      <h2>추론</h2>
+      <dl>
+        <dt>연결</dt><dd id="connected"></dd>
+        <dt>왕복</dt><dd id="rtt"></dd>
+        <dt>서버 추론</dt><dd id="infer"></dd>
+        <dt>chunk</dt><dd id="chunk"></dd>
+        <dt>chunk 나이</dt><dd id="chunk_age"></dd>
+        <dt>보낸 행</dt><dd id="sent"></dd>
+      </dl>
+    </section>
+  </div>
+  <section>
+    <h2>입력 stream</h2>
+    <table>
+      <thead><tr><th>stream</th><th>상태</th><th class="num">Hz</th>
+        <th class="num">마지막 수신</th><th class="num">관측 나이 / 한도</th></tr></thead>
+      <tbody id="streams"></tbody>
+    </table>
+  </section>
+  <section>
+    <h2>최근 문제</h2>
+    <ul id="problems"></ul>
+    <p class="muted" id="trace"></p>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
