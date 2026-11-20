@@ -23,6 +23,12 @@
 | openpi 쪽 이름 | `omy_leap_policy.py` 의 `OmyLeapInputs`/`OmyLeapOutputs`, config `pi05_omy_leap` | `ShapeUpInputs`, `pi05_shape_up` | 위와 같음. `rig.name`/`robot_type` 이 `omy_f3m_leap` |
 | 실행 방식 | 겹치지 않는 chunk (요청 1개 in-flight, K개 실행 후 다음 요청) | 중첩 추론, RTC | 시간 의미와 장치 연결부터 검증. 대기 구간은 trace 로 측정 |
 | 브랜치 | `feat/policy-runner` (main `8c635ae` 에서) | — | |
+| 이미지 (2026-11-21) | 실행 중 프레임도 녹화기와 같은 JPEG 왕복(`cv2.imencode` quality = `record.jpeg_quality` → `cv2.imdecode`)을 거친 뒤 `orient_image` | 원본 프레임 그대로 | 학습 이미지는 `.mjpeg` 에서 디코드한 프레임이다. 같은 왕복을 하면 온라인 이미지가 학습 이미지와 bit 단위로 같아진다 |
+| 필수 stream (2026-11-21) | config 에 따로 두지 않는다. `dataset.arm_state`, `dataset.hand`, manifest 의 카메라가 필수다 | `observation.required` 목록 | 같은 정보를 두 곳에 두지 않는다 |
+| 실행 격자 (2026-11-21) | Executor 는 arm 시각부터 1/fps 격자에서만 돈다. chunk 는 도착 뒤 첫 tick 에 채택한다. 다 쓴 tick 에서 다음 요청 | 도착 즉시 새 격자 | 시각이 단순하다. 대가로 사이클이 `K + ceil(L/dt)` tick 으로 가이드 식보다 최대 1 tick 길다 |
+| 코드 규칙 (2026-11-21) | karpathy 식: 작은 순수 함수, 얇은 층, 위에서 아래로 읽힘, 이름으로 설명. **코멘트·docstring 없음**(라이선스 표기만 예외) | 기존 패키지의 docstring 형식 | 사용자 지시 |
+| UI (2026-11-21) | runner 가 자기 웹 UI(:8810)를 띄우고 Control Hub 에 "정책" 페이지(iframe)를 녹화 페이지와 같은 방식으로 추가. 내용: 서버 주소·checkpoint·상태·stream age·추론 지연·chunk 나이와 위치·최근 문제·arm/disarm/reset | Hub 안에 직접 구현 | 녹화기와 같은 구조. Hub 는 장치·프로그램을 import 하지 않는다 |
+| 손 모드 (2026-11-21) | `execution.mode: dry_run`(trace 만) / `hand`(leap_teleop 으로 UDP). `hand` 는 CLI `--allow-hand` 가 있어야 시작 | 한 모드 | 받는 쪽이 `--dry-run` 인지 runner 는 알 수 없다. 사람이 명시적으로 허용해야 한다 |
 
 ## 1. 현재 코드에서 확인한 사실 (이 계획의 전제)
 
@@ -166,10 +172,9 @@ policy:
   connect_timeout_s: 5
   infer_timeout_ms: 2000                # 측정 후 확정
 observation:
-  required: [cam_wrist, arm_state, hand]   # cam_ext 는 설치 후 추가
-  collect_optional: [tactile_a]
-  obs_max_age_ms: {cam_wrist: 100, arm_state: 20, hand: 60}   # 측정 후 확정
-  obs_max_skew_ms: 100
+  max_age_ms: {cam_wrist: 100, arm_state: 20, hand: 60}   # 필수 stream 마다 하나. 측정 후 확정
+  max_skew_ms: 100
+ui: {host: 127.0.0.1, port: 8810}
 execution:
   mode: dry_run                          # dry_run | hand_only (E 단계 전까지 dry_run 만 허용)
   exec_horizon: 10                       # K
@@ -329,6 +334,81 @@ STOPPED → STARTING → READY ──(arm)──→ RUNNING ──→ HOLD ─�
 - OMY 명령 경로: follower controller 가 듣는 topic, leader 없이 follower 만 켜는 launch, zenoh-ros2-sdk publisher 사용 가능 여부. 모두 UNVERIFIED.
 - 손 hold/release: 정책 모드에서 `StaleGuard` release(3 s 뒤 safe pose)가 쥔 물체를 놓친다. `--release-timeout`·`--safe-pose` 값 또는 policy 전용 동작을 E 전에 정한다.
 - 팔 action 정의: 학습 action 은 leader `/leader/joint_trajectory`(7값 중 앞 6) 다. follower 에 같은 값을 목표로 주는 것이 같은 의미인지 D 에서 확인한다.
+
+## 7. 평가 (자율 구현 전에 고정)
+
+구현보다 먼저 아래 ①②를 커밋한다. 그 commit 이 **freeze commit** 이다. 구현 중에 `policy_runner/tests/acceptance/`, `policy_runner/audit/audit_trace.py`, `policy_runner/audit/MUTANTS.md` 를 고치지 않는다. 마지막에 `git diff --stat <freeze> -- <세 경로>` 가 비어 있어야 한다.
+
+### ① 수락 테스트 (`policy_runner/tests/acceptance/`)
+
+공개 인터페이스(§3 계약, 아래 API)만 쓴다.
+
+```python
+policy_runner.config.load(path) -> RunnerConfig            # ConfigError(problems)
+policy_runner.manifest.Manifest.load(path); .mismatches(rig) -> list[str]
+policy_runner.align_obs.ObsAligner(hub, rig, max_age_ms, max_skew_ms).align(t_obs_ns) -> AlignedObs
+policy_runner.align_obs.to_request(obs, prompt) -> dict
+policy_runner.wire.packb(obj) / unpackb(bytes)
+policy_runner.inference.PolicyClient(endpoint, connect_timeout_s).infer(obs, timeout_s)
+    # ServerError, InferTimeout, Disconnected
+policy_runner.chunk.check_reply(reply, pred_horizon, action_dim) -> list[str]
+policy_runner.fake_server.start(port=0, **faults) -> FakeServer(.port, .stop())
+policy_runner.executor.Executor(dt_ns, exec_horizon, limits, chunks, measured, commands, trace)
+    .arm(now_ns) .disarm(now_ns) .reset(now_ns) .tick(now_ns) .state
+    # chunks: request(now_ns, ) / take(now_ns) -> ActionChunk | None / fault -> str
+policy_runner.trace.Trace(path)   # jsonl, 이벤트 스키마는 audit_trace.py 의 docstring 이 아닌 SCHEMA 상수
+```
+
+| 묶음 | 테스트 |
+|---|---|
+| config·manifest | respread·원격 src·K 범위·manifest 불일치 거부 |
+| 정렬 | 미래 샘플 미사용, 오래된 stream·skew·누락(0 채움 없음)·손 feedback 없는 샘플·촉각 없음 |
+| 동일성 | fake rig 녹화 → `convert_episode` 와 state·이미지 bit 일치 (latency 설정 포함). 11/17 실데이터 재생: state 불일치가 있다면 전부 "offline 이 아직 도착하지 않은 샘플을 쓴 경우"로 설명된다 |
+| 통신 | dtype·shape 보존, 문자열 오류, timeout 뒤 늦은 응답 미사용, 끊김 |
+| fake server | metadata 먼저, `/healthz`, NaN·shape·error·drop·stall 주입 |
+| 응답 검사 | NaN·shape·H 불일치·actions 없음 거부 |
+| Executor | dt 당 1행, catch-up 없음, 오래된 chunk 버림, 첫 행·이웃 행 제한, READY 에서 명령 없음, FAULT 는 reset 만, K 행 초과 없음 |
+| 시뮬레이션 | K ∈ {10, 25} × L ∈ {150, 280, 990} ms, 60 s, FakeClock: chunk 수·행 수·HOLD tick 수가 `K + ceil(L/dt)` 정수 식과 정확히 같다 (아래 표) |
+| 끝까지 | fake rig + fake server 스레드 3 s 실시간: trace 가 감사기를 통과, chunk ≥ 1 |
+| 손 | `hand` 모드는 `--allow-hand` 없이 거부, UDP 패킷이 rad→deg·`HAND_JOINTS` 순서 |
+| leap_teleop | policy source 가 패킷을 Reading 으로, 나쁜 패킷 버림, 조용하면 StaleGuard hold |
+| Hub | `page: policy` 점검이 정책 페이지, 기존 설정(`page` 없음)은 녹화 페이지 |
+
+시뮬레이션 기대값 (fps 30, dt = 33 333 333 ns, 60 s = 1800 tick, Python 계산):
+
+| K | L | 대기 tick | 사이클 | 가이드 식 | HOLD | chunk | 행 |
+|---|---|---|---|---|---|---|---|
+| 10 | 150 ms | 5 | 500.0 ms | 483.3 ms | 33.3 % | 120 | 1200 |
+| 10 | 280 ms | 9 | 633.3 ms | 613.3 ms | 47.4 % | 95 | 945 |
+| 10 | 990 ms | 30 | 1333.3 ms | 1323.3 ms | 75.0 % | 45 | 450 |
+| 25 | 150 ms | 5 | 1000.0 ms | 983.3 ms | 16.7 % | 60 | 1500 |
+| 25 | 280 ms | 9 | 1133.3 ms | 1113.3 ms | 26.5 % | 53 | 1323 |
+| 25 | 990 ms | 30 | 1833.3 ms | 1823.3 ms | 54.5 % | 33 | 810 |
+
+### ② trace 감사기 (`policy_runner/audit/audit_trace.py`)
+
+runner 를 import 하지 않는다. trace jsonl 만 읽고 위반을 줄마다 출력, 위반이 있으면 exit 1. 감사기 자체도 위반마다 하나씩 만든 가짜 trace 로 시험한다.
+
+1. `send.action` 이 22개, 전부 유한
+2. 모든 `send` 의 chunk 가 채택(`chunk.adopted`)됐고, 채택 시각 − `t_obs_ns` ≤ `chunk_max_delay_ns`
+3. `obs.picks[*].t_ns` ≤ `obs.t_obs_ns`
+4. 연속 `send` 간격 ≥ dt − jitter, `send.t_ns − send.due_ns` ≤ jitter
+5. 같은 chunk 의 이웃 `send` 변화 ≤ `step_max_rad`, 채택 chunk 의 `max|row0 − measured|` ≤ `first_row_max_rad`
+6. `send` 는 상태가 RUNNING 일 때만
+7. FAULT 뒤에는 `state READY reason=reset` 전까지 `send` 없음
+8. chunk 당 `send` ≤ K, `row` < K
+
+### ③ 의도적 버그 (`policy_runner/audit/MUTANTS.md` 에 목록 고정, 패치는 구현 뒤 `audit/mutants/*.patch`)
+
+M1 정렬이 `latest()` 사용 · M2 손 feedback 필터 제거 · M3 timeout 뒤 연결 유지 · M4 응답 NaN 검사 제거 · M5 tick 이 밀린 행을 몰아 보냄 · M6 행 예정 시각을 응답 도착 기준으로 · M7 K 대신 H 행 실행 · M8 손 UDP 에 rad 그대로 · M9 JPEG 왕복 제거 · M10 READY 에서 명령 전송. 각 패치를 적용하면 수락 테스트나 감사기 중 하나 이상이 실패해야 한다. 통과하는 패치가 있으면 평가 실패.
+
+### ④ 기계적 검사
+
+recorder·control_hub·user_pc 기존 테스트 통과, `git diff --stat main -- recorder` 비어 있음, `rg "serial|pyrealsense|LeapHand|dynamixel" policy_runner/src` 0, `rg policy_runner recorder control_hub` 0, `ruff check policy_runner`, `policy_runner/src` 에 `#` 코멘트·docstring 없음(`wire.py` 라이선스 머리말 제외).
+
+### ⑤ 보고
+
+`policy_runner/audit/run_all.sh` 가 ①~④ 를 돌리고 `docs/results/YYYY-MM-DD-policy-runner-eval.md` 에 표로 쓴다. 실시간 dry-run tick 지연(p50/p95/p99/max)은 보고만 하고 기준으로 쓰지 않는다.
 
 ## 6. 사람이 해야 하는 것 (실행 전)
 

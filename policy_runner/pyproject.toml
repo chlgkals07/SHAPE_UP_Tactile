@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "policy-runner"
+version = "0.1.0"
+description = "Runs a pi0.5 policy server against the OMY/LEAP rig: aligned observations in, timed joint targets out"
+requires-python = ">=3.10"
+dependencies = [
+    "tactile-rec",
+    "numpy",
+    "PyYAML",
+    "msgpack>=1.0.5",
+    "websockets>=13",
+    "fastapi",
+    "uvicorn[standard]",
+]
+
+[project.optional-dependencies]
+rig = ["tactile-rec[arm,camera,tactile]"]
+dev = ["pytest", "ruff", "httpx"]
+
+[project.scripts]
+policy-runner = "policy_runner.cli:main"
+
+[tool.uv.sources]
+tactile-rec = { path = "../recorder", editable = true }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+policy_runner = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["policy_runner"]
+known-local-folder = ["conftest", "audit_trace"]
