@@ -12,6 +12,7 @@
 
 ## 다음 할 일
 
+0. (우선, 2026-11-22) 시작·끝 맞추기: 정책 시작 전 초기 자세로 옮기고, 끝나면 정해진 자세로 돌아가기 (Cyclo Intelligence 의 Slow Start 참고). 그리고 LEAP 손 제어기 정리(hold·FAULT·release 반응).
 1. Ubuntu User PC 에서 `./audit/run_all.sh` 와 60 s soak 를 다시 돈다. tmux 테스트와 tick 정밀도가 이 Mac 과 다를 수 있다. late 비율과 예정 대비 지연 p99 를 결과 문서에 추가한다.
 2. User PC 에서 ssh 터널로 `probe` 를 돌려 망 지연을 잰다. User PC 에 GPU 서버 ssh key 가 필요하다.
 3. 영상이 있는 실데이터 수집 → norm stats → 학습. checkpoint 를 바꾸면 서버의 `OMY_LEAP_CHECKPOINT_ID`/`OMY_LEAP_NORM_STATS_ID` 와 실행기 manifest 를 같이 바꾼다. 그 뒤 실제 센서 dry-run(C3).
