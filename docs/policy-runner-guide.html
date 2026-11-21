@@ -155,16 +155,17 @@ svg .fill-line { fill: var(--line); }
     <a href="#system"><span class="num">2</span>시스템 구성</a>
     <a href="#cycle"><span class="num">3</span>한 사이클의 흐름</a>
     <a href="#websocket"><span class="num">4</span>WebSocket 프로토콜</a>
-    <a href="#observe"><span class="num">5</span>관측 만들기</a>
-    <a href="#execute"><span class="num">6</span>chunk 실행</a>
-    <a href="#hand"><span class="num">7</span>손으로 보내기</a>
-    <a href="#failure"><span class="num">8</span>실패 처리</a>
-    <a href="#ui"><span class="num">9</span>UI 와 Control Hub</a>
-    <a href="#files"><span class="num">10</span>추가·변경 파일</a>
-    <a href="#config"><span class="num">11</span>설정</a>
-    <a href="#eval"><span class="num">12</span>평가</a>
-    <a href="#run"><span class="num">13</span>실행 방법</a>
-    <a href="#next"><span class="num">14</span>한계와 다음 단계</a>
+    <a href="#server"><span class="num">5</span>서버 쪽 (openpi-RLT)</a>
+    <a href="#observe"><span class="num">6</span>관측 만들기</a>
+    <a href="#execute"><span class="num">7</span>chunk 실행</a>
+    <a href="#hand"><span class="num">8</span>손으로 보내기</a>
+    <a href="#failure"><span class="num">9</span>실패 처리</a>
+    <a href="#ui"><span class="num">10</span>UI 와 Control Hub</a>
+    <a href="#files"><span class="num">11</span>추가·변경 파일</a>
+    <a href="#config"><span class="num">12</span>설정</a>
+    <a href="#eval"><span class="num">13</span>평가</a>
+    <a href="#run"><span class="num">14</span>실행 방법</a>
+    <a href="#next"><span class="num">15</span>한계와 다음 단계</a>
   </div>
 </nav>
 <main>
@@ -172,12 +173,12 @@ svg .fill-line { fill: var(--line); }
 <header class="hero">
   <div class="eyebrow">SHAPE_UP · policy_runner</div>
   <h1>정책 실행기: π0.5 추론에서 하드웨어 실행까지</h1>
-  <p class="lead">GPU 서버의 π0.5 정책과 OMY 팔 + LEAP 손 rig 사이에서 일하는 프로그램이다. 센서 값을 학습 데이터와 같은 모양으로 묶어 WebSocket 으로 보내고, 돌아온 50 행짜리 action chunk 를 30 Hz 격자에 맞춰 실행한다. 이 문서는 전체 흐름, 각 단계를 그렇게 만든 이유, 실제로 추가한 파일과 코드를 설명한다.</p>
+  <p class="lead">GPU 서버의 π0.5 정책과 OMY 팔 + LEAP 손 rig 사이에서 일하는 프로그램이다. 서버 쪽 짝(openpi-RLT 의 <code>pi05_omy_leap</code> config)은 5절에서 설명한다. 센서 값을 학습 데이터와 같은 모양으로 묶어 WebSocket 으로 보내고, 돌아온 50 행짜리 action chunk 를 30 Hz 격자에 맞춰 실행한다. 이 문서는 전체 흐름, 각 단계를 그렇게 만든 이유, 실제로 추가한 파일과 코드를 설명한다.</p>
   <div class="meta">
     <span>작성 2026-11-21</span>
-    <span>브랜치 <code>feat/policy-runner</code> (main <code>8c635ae</code> 에서)</span>
-    <span>구현 범위: Stage A + B <span class="tag done">완료</span> · Stage C <span class="tag plan">계획</span></span>
-    <span>평가 결과 <a href="results/2026-11-21-policy-runner-eval.md">docs/results/2026-11-21-policy-runner-eval.md</a></span>
+    <span>브랜치 <code>feat/policy-runner</code> (main <code>8c635ae</code> 에서) · 서버 연결 <code>feat/policy-runner-server-smoke</code> + openpi-RLT <code>feat/omy-leap</code></span>
+    <span>구현 범위: Stage A + B <span class="tag done">완료</span> · Stage C 서버 연결 <span class="tag done">완료</span> · 학습 <span class="tag plan">계획</span></span>
+    <span>평가 결과 <a href="results/2026-11-21-policy-runner-eval.md">실행기</a> · <a href="results/2026-11-21-server-smoke.md">GPU 서버 smoke</a></span>
   </div>
 </header>
 
@@ -197,7 +198,7 @@ svg .fill-line { fill: var(--line); }
 <tr><th>단계</th><th>내용</th><th>상태</th></tr>
 <tr><td>A. 관측 정렬</td><td>녹화기(<code>tactile_rec</code>)의 버퍼에서 학습 데이터와 bit 단위로 같은 state·이미지를 만든다</td><td><span class="tag done">완료</span></td></tr>
 <tr><td>B. 가짜 서버 + dry-run</td><td>openpi 와 같은 프로토콜의 가짜 서버, 추론 스레드, chunk 실행기, trace, 웹 UI, CLI, Hub 정책 페이지, LEAP 손 경로</td><td><span class="tag done">완료</span></td></tr>
-<tr><td>C. 실제 π0.5 연결</td><td>GPU 서버 지연 측정, openpi-RLT 에 우리 입출력 변환 추가, 실제 checkpoint 로 dry-run</td><td><span class="tag plan">계획</span></td></tr>
+<tr><td>C. 실제 π0.5 연결</td><td>openpi-RLT 에 우리 입출력 변환·config·manifest 추가 (<code>feat/omy-leap</code>). 학습 안 한 pi05_base 로 serving 하고, GPU 서버 안에서 실행기 probe·dry-run 으로 연결 확인. 학습한 checkpoint 로 실제 rig dry-run 은 남음</td><td><span class="tag done">연결 완료</span> <span class="tag plan">학습 계획</span></td></tr>
 <tr><td>D 이후</td><td>팔 명령 경로, 실물 손 hold/release 동작</td><td><span class="tag plan">미정</span></td></tr>
 </table></div>
 
@@ -232,9 +233,9 @@ svg .fill-line { fill: var(--line); }
   <rect x="290" y="40" width="190" height="52" rx="8" class="box"/>
   <text x="302" y="60" font-weight="600" font-size="13">serve_policy.py</text>
   <text x="302" y="80" font-size="11.5" class="muted">WebsocketPolicyServer :8000</text>
-  <rect x="500" y="40" width="180" height="52" rx="8" class="box-plan"/>
+  <rect x="500" y="40" width="180" height="52" rx="8" class="box-ok"/>
   <text x="512" y="60" font-weight="600" font-size="13">π0.5 + OmyLeap 변환</text>
-  <text x="512" y="80" font-size="11.5" class="muted">pi05_omy_leap (계획)</text>
+  <text x="512" y="80" font-size="11.5" class="muted">pi05_omy_leap (5절)</text>
   <line x1="480" y1="66" x2="498" y2="66" class="ln"/>
 
   <rect x="285" y="112" width="690" height="378" rx="12" class="zone"/>
@@ -305,7 +306,7 @@ svg .fill-line { fill: var(--line); }
   <text x="744" y="405" font-size="11.5" class="muted">USB 는 leap_teleop 만 연다</text>
   <line x1="845" y1="350" x2="845" y2="366" class="ln-ok" marker-end="url(#ah-ok)"/>
 </svg>
-<figcaption>데이터는 아래에서 위로(장치 → Hub → 정렬 → 추론) 올라가고, chunk 는 오른쪽(실행 → 출력)으로 나간다. 점선 상자는 Stage C 에서 GPU 서버에 추가할 부분이다. 정책 실행기는 녹화기와 같은 Hub 로 장치를 연다. 그래서 녹화기와 동시에 켤 수 없다 (Hub 설정의 <code>conflicts</code>).</figcaption>
+<figcaption>데이터는 아래에서 위로(장치 → Hub → 정렬 → 추론) 올라가고, chunk 는 오른쪽(실행 → 출력)으로 나간다. GPU 서버의 초록 상자(<code>pi05_omy_leap</code>)는 Stage C 에서 openpi-RLT 에 추가한 config 다(5절). 정책 실행기는 녹화기와 같은 Hub 로 장치를 연다. 그래서 녹화기와 동시에 켤 수 없다 (Hub 설정의 <code>conflicts</code>).</figcaption>
 </figure>
 
 <h3>프로세스와 포트</h3>
@@ -475,14 +476,8 @@ svg .fill-line { fill: var(--line); }
 </div>
 </div>
 
-<div class="callout plan"><div class="t">Stage C 에서 서버 쪽에 넣을 변환 (계획, 미구현)</div>
-<p>π0.5 모델 안에서는 action 차원이 32, horizon 이 50 이고, 이미지 슬롯은 <code>base_0_rgb</code>, <code>left_wrist_0_rgb</code>, <code>right_wrist_0_rgb</code> 이다(openpi-RLT 소스에서 확인). openpi-RLT 에 <code>omy_leap_policy.py</code> 를 추가해 다음처럼 바꿀 계획이다.</p>
-<ul>
-<li><code>OmyLeapInputs</code>: <code>cam_ext → base_0_rgb</code>, <code>cam_wrist → left_wrist_0_rgb</code>. 없는 슬롯은 0 이미지에 mask False.</li>
-<li><code>OmyLeapOutputs</code>: <code>actions[:, :22]</code>.</li>
-<li>serving 할 때 policy metadata 에 <code>manifest</code> 를 넣는다. 실행기는 시작할 때 이것을 대조한다.</li>
-</ul>
-<p>지금 우리 요청 모양을 그대로 이해하는 서버는 가짜 서버뿐이다.</p>
+<div class="callout why"><div class="t">서버 쪽 변환은 openpi-RLT <code>feat/omy-leap</code> 에 있다</div>
+<p>π0.5 모델 안에서는 action 차원이 32, horizon 이 50 이고, 이미지 슬롯은 <code>base_0_rgb</code>, <code>left_wrist_0_rgb</code>, <code>right_wrist_0_rgb</code> 다. 위 요청을 이 모양으로 바꾸고 응답을 (50, 22) 절대 목표로 되돌리는 <code>OmyLeapInputs</code>/<code>OmyLeapOutputs</code>, 그리고 metadata 의 <code>manifest</code> 는 <a href="#server">5절</a>에서 설명한다. 같은 GPU 서버 안에서 실행기 <code>probe</code> 와 <code>run</code> 으로 연결을 확인했다(<a href="#eval">13절</a>).</p>
 </div>
 
 <h3>클라이언트를 직접 만든 이유</h3>
@@ -521,7 +516,158 @@ svg .fill-line { fill: var(--line); }
 </ol>
 
 <!-- ============================================================ 5 -->
-<h2 id="observe"><span class="n">5</span>관측 만들기 (<code>align_obs.py</code>)</h2>
+<h2 id="server"><span class="n">5</span>서버 쪽: openpi-RLT <code>pi05_omy_leap</code></h2>
+
+<p>openpi 서버 코드(<code>serve_policy.py</code>, <code>WebsocketPolicyServer</code>)는 그대로 둔다. 바꿀 것은 서버가 쓰는 <b>정책 config</b> 하나다. config 에는 세 가지를 정의했다. 실행기 요청을 π0.5 입력으로 바꾸는 방법, 모델 출력을 실행기가 기대하는 (50, 22) 절대 목표로 되돌리는 방법, 실행기가 시작할 때 대조할 manifest 다. 코드는 openpi-RLT 브랜치 <code>feat/omy-leap</code> (<code>9ddc9f1</code>, main <code>70fea7b</code> 기반) 에 있다.</p>
+
+<div class="tablewrap"><table>
+<tr><th>파일</th><th class="num">줄</th><th>내용</th></tr>
+<tr><td><code>src/openpi/policies/omy_leap_policy.py</code> <span class="tag new">새</span></td><td class="num">132</td><td><code>OmyLeapInputs</code>, <code>OmyLeapOutputs</code>, <code>JOINT_NAMES</code>(22), <code>make_manifest()</code></td></tr>
+<tr><td><code>src/openpi/training/config.py</code> <span class="tag mod">변경</span></td><td class="num">+84</td><td><code>LerobotOmyLeapDataConfig</code> (repack · 변환 · delta), <code>TrainConfig(name="pi05_omy_leap")</code>, <code>OMY_LEAP_*</code> 환경변수</td></tr>
+<tr><td><code>src/openpi/policies/omy_leap_policy_test.py</code> <span class="tag new">새</span></td><td class="num">148</td><td>테스트 7개. 실행기와 같은 모양의 요청으로 전체 변환 경로를 확인한다</td></tr>
+</table></div>
+
+<h3>요청 하나가 서버 안에서 지나가는 길</h3>
+<p><code>create_trained_policy</code> 가 만드는 변환 순서를 그대로 그렸다. 추론할 때는 repack 을 쓰지 않으므로, 실행기 요청 dict 가 <code>OmyLeapInputs</code> 로 바로 들어간다.</p>
+
+<figure>
+<svg viewBox="0 0 980 410" role="img" aria-label="서버 변환 경로">
+  <g font-size="12">
+    <text x="20" y="22" font-weight="700" font-size="13">입력 (policy.infer 안)</text>
+    <rect x="20" y="34" width="150" height="64" rx="8" class="box-acc"/>
+    <text x="32" y="56" font-weight="600" font-size="12.5">실행기 요청</text>
+    <text x="32" y="74" class="mono" font-size="10.5">state f32[22]</text>
+    <text x="32" y="89" class="mono" font-size="10.5">images · prompt</text>
+    <line x1="170" y1="66" x2="188" y2="66" class="ln" marker-end="url(#ah)"/>
+
+    <rect x="190" y="34" width="170" height="64" rx="8" class="box-ok"/>
+    <text x="202" y="56" font-weight="600" font-size="12.5">OmyLeapInputs</text>
+    <text x="202" y="74" font-size="11" class="muted">카메라 → 이미지 슬롯 3개</text>
+    <text x="202" y="89" font-size="11" class="muted">빈 슬롯 = 0, mask False</text>
+    <line x1="360" y1="66" x2="378" y2="66" class="ln" marker-end="url(#ah)"/>
+
+    <rect x="380" y="34" width="150" height="64" rx="8" class="box-ok"/>
+    <text x="392" y="56" font-weight="600" font-size="12.5">DeltaActions</text>
+    <text x="392" y="74" font-size="11" class="muted">22축 mask</text>
+    <text x="392" y="89" font-size="11" class="muted">(학습 때만 actions 있음)</text>
+    <line x1="530" y1="66" x2="548" y2="66" class="ln" marker-end="url(#ah)"/>
+
+    <rect x="550" y="34" width="150" height="64" rx="8" class="box"/>
+    <text x="562" y="56" font-weight="600" font-size="12.5">Normalize</text>
+    <text x="562" y="74" font-size="11" class="muted">quantile (q01, q99)</text>
+    <text x="562" y="89" font-size="11" class="muted">norm_stats.json</text>
+    <line x1="700" y1="66" x2="718" y2="66" class="ln" marker-end="url(#ah)"/>
+
+    <rect x="720" y="34" width="240" height="64" rx="8" class="box"/>
+    <text x="732" y="56" font-weight="600" font-size="12.5">model transforms (openpi 기존)</text>
+    <text x="732" y="74" font-size="11" class="muted">ResizeImages 224×224 · TokenizePrompt</text>
+    <text x="732" y="89" font-size="11" class="muted">(state 도 토큰으로) · Pad 22 → 32</text>
+    <line x1="840" y1="98" x2="840" y2="150" class="ln" marker-end="url(#ah)"/>
+
+    <rect x="700" y="152" width="260" height="56" rx="8" class="box"/>
+    <text x="712" y="174" font-weight="600" font-size="12.5">π0.5 (pi05_base 가중치)</text>
+    <text x="712" y="194" class="mono" font-size="10.5">actions (50, 32) · 정규화된 delta</text>
+
+    <text x="20" y="246" font-weight="700" font-size="13">출력 (output_transforms)</text>
+    <line x1="840" y1="208" x2="840" y2="262" class="ln" marker-end="url(#ah)"/>
+    <rect x="720" y="264" width="240" height="64" rx="8" class="box"/>
+    <text x="732" y="286" font-weight="600" font-size="12.5">Unnormalize</text>
+    <text x="732" y="304" font-size="11" class="muted">앞 22차원만 · state 도 되돌림</text>
+    <line x1="720" y1="296" x2="702" y2="296" class="ln" marker-end="url(#ah)"/>
+
+    <rect x="550" y="264" width="150" height="64" rx="8" class="box-ok"/>
+    <text x="562" y="286" font-weight="600" font-size="12.5">AbsoluteActions</text>
+    <text x="562" y="304" font-size="11" class="muted">actions += state</text>
+    <text x="562" y="319" font-size="11" class="muted">(22축)</text>
+    <line x1="550" y1="296" x2="532" y2="296" class="ln" marker-end="url(#ah)"/>
+
+    <rect x="380" y="264" width="150" height="64" rx="8" class="box-ok"/>
+    <text x="392" y="286" font-weight="600" font-size="12.5">OmyLeapOutputs</text>
+    <text x="392" y="304" class="mono" font-size="10.5">actions[:, :22]</text>
+    <line x1="380" y1="296" x2="172" y2="296" class="ln-acc" marker-end="url(#ah-acc)"/>
+
+    <rect x="20" y="264" width="150" height="64" rx="8" class="box-acc"/>
+    <text x="32" y="286" font-weight="600" font-size="12.5">실행기 응답</text>
+    <text x="32" y="304" class="mono" font-size="10.5">actions (50, 22)</text>
+    <text x="32" y="319" class="mono" font-size="10.5">+ server_timing</text>
+
+    <rect x="20" y="352" width="18" height="14" rx="3" class="box-ok"/>
+    <text x="46" y="364">이번에 추가한 변환 (<tspan class="mono">feat/omy-leap</tspan>)</text>
+    <rect x="300" y="352" width="18" height="14" rx="3" class="box"/>
+    <text x="326" y="364">openpi 에 원래 있던 변환</text>
+    <rect x="520" y="352" width="18" height="14" rx="3" class="box-acc"/>
+    <text x="546" y="364">policy_runner 와의 경계 (WebSocket)</text>
+    <text x="20" y="394" font-size="11.5" class="muted">모양: 요청 state 22 → 모델 32 → 응답 22. 모델 출력은 정규화된 delta 지만, 응답은 항상 절대 관절 목표(rad)다.</text>
+  </g>
+</svg>
+<figcaption>초록 상자가 이번에 추가한 부분이다. 나머지는 openpi 에 원래 있던 단계라, 다른 로봇 config(agilex, aloha)와 같은 방식으로 돈다.</figcaption>
+</figure>
+
+<h3>실행기의 기대와 서버 구현</h3>
+<div class="tablewrap"><table>
+<tr><th>policy_runner 쪽</th><th>서버에서 맞춘 곳</th><th>어긋나면</th></tr>
+<tr><td><code>to_request</code> 가 <code>{state, images: {cam_wrist}, prompt}</code> 를 보낸다</td><td><code>OmyLeapInputs</code> 가 이 키 이름을 그대로 읽는다. <code>prompt</code> 가 없으면 <code>task</code> 를 쓴다</td><td>서버 예외 → 텍스트 프레임 → <code>ServerError</code> → FAULT</td></tr>
+<tr><td>실제 rig 는 <code>cam_wrist</code> 하나다</td><td><code>cam_ext</code> 가 없으면 <code>base_0_rgb</code> 를 0 이미지 + mask False 로 채운다. 예외를 내지 않는다 (agilex 와 다른 점). <code>cam_wrist</code> 는 필수다</td><td>agilex 처럼 예외를 내면 외부 카메라 없는 rig 에서는 아예 돌지 않는다</td></tr>
+<tr><td><code>check_reply</code>: (50, 22), float, 유한값</td><td><code>action_horizon=50</code>, <code>OmyLeapOutputs</code> 가 32 → 22 로 자른다</td><td>FAULT</td></tr>
+<tr><td>첫 행이 측정 state 와 0.15 rad 이내여야 채택한다</td><td>delta 로 학습하고 <code>AbsoluteActions</code> 로 <code>state +</code> 를 되돌린다. 출력은 측정 state 를 기준으로 한 값이 된다</td><td>chunk 를 버리고 HOLD (안전 쪽)</td></tr>
+<tr><td><code>Manifest.differences</code>: 9개 키 집합 전체 비교, 여분 키도 불일치</td><td><code>policy_metadata = {"manifest": make_manifest(...)}</code>. 키 9개만, 값은 <code>JOINT_NAMES</code> 와 config 에서 만든다</td><td><code>StartError</code>, 시작하지 않음</td></tr>
+<tr><td>warm-up 한도 <code>warmup_timeout_s: 60</code></td><td>새로 띄운 서버의 첫 요청(JIT)은 36.3 s (Blackwell, 1회 측정)</td><td>시작 실패. 여유가 크지 않다 <span class="tag unv">주의</span></td></tr>
+</table></div>
+
+<h3>이미지 슬롯</h3>
+<div class="tablewrap"><table>
+<tr><th>π0.5 슬롯</th><th>rig 카메라</th><th>mask</th></tr>
+<tr><td><code>base_0_rgb</code></td><td><code>cam_ext</code> (아직 설치 안 함)</td><td>있으면 True, 없으면 0 이미지(224×224) + False</td></tr>
+<tr><td><code>left_wrist_0_rgb</code></td><td><code>cam_wrist</code> (D405, 회전 보정 후 424×240)</td><td>True (필수)</td></tr>
+<tr><td><code>right_wrist_0_rgb</code></td><td>—</td><td>항상 0 이미지 + False</td></tr>
+</table></div>
+<p>224×224 resize 는 openpi 의 <code>ResizeImages</code> 가 한다. 실행기는 학습 데이터와 bit 단위로 같은 원본 크기를 보내고, 서버가 학습 때와 같은 방식으로 줄인다. 학습 때 LeRobot 이 이미지를 float CHW 로 줄 수 있어서, <code>_parse_image</code> 가 uint8 HWC 로 바꾼다 (agilex 와 같은 코드).</p>
+
+<h3>delta 학습, 절대값 출력</h3>
+<pre><code><span class="cm"># config.py · LerobotOmyLeapDataConfig.create (발췌)</span>
+<span class="kw">if</span> self.use_delta_joint_actions:                       <span class="cm"># 기본 True</span>
+    mask = _transforms.make_bool_mask(self.delta_action_dims) <span class="cm"># 기본 22 = 팔 6 + 손 16</span>
+    data_transforms = data_transforms.push(
+        inputs=[_transforms.DeltaActions(mask)],     <span class="cm"># 학습: action − state</span>
+        outputs=[_transforms.AbsoluteActions(mask)], <span class="cm"># 추론: action + state</span>
+    )</code></pre>
+<p>팔 action 은 leader 팔 값이고 state 는 follower 팔 값이라 둘 사이에 오프셋이 있다. 손 action 은 모터에 쓴 값(<code>sent</code>)이라, 물체를 쥐면 측정값과 차이가 생긴다. 그래서 측정 state 에 대한 상대값으로 학습하는 편이 자연스럽다고 봤다. 어느 쪽이 나은지는 학습해서 비교해야 하므로 플래그(<code>use_delta_joint_actions</code>, <code>delta_action_dims=6</code> 이면 팔만)로 남겼다. 실행기 계약은 어느 쪽이든 같다. <code>Group.push</code> 는 출력 변환을 앞에 넣으므로, <code>AbsoluteActions</code> 는 32차원 출력에서 먼저 돌고 그다음 22차원으로 잘린다.</p>
+
+<h3>manifest</h3>
+<pre><code><span class="cm"># config.py · TrainConfig(name="pi05_omy_leap")</span>
+policy_metadata={
+    <span class="st">"manifest"</span>: omy_leap_policy.make_manifest(
+        cameras=[<span class="st">"cam_wrist"</span>],
+        checkpoint=OMY_LEAP_CHECKPOINT_ID,   <span class="cm"># 기본 "pi05_base-untrained"</span>
+        norm_stats_id=OMY_LEAP_NORM_STATS_ID, <span class="cm"># 기본 "omy_leap_sync_test_20261117"</span>
+        pred_horizon=50,
+    )
+},</code></pre>
+<p><code>make_manifest</code> 는 실행기 <code>manifest.yaml</code> 과 같은 9개 키를 만든다: <code>schema_version 1</code>, <code>joint_names</code> 22개, <code>fps 30</code>, <code>pred_horizon 50</code>, <code>mount wrist_flip</code>, <code>hand_action sent</code>, <code>cameras</code>, <code>checkpoint</code>, <code>norm_stats_id</code>. 앞의 일곱 개는 rig 와 데이터셋이 정하는 값이고, 실행기는 이것을 rig 설정과도 대조한다. 마지막 두 개는 어떤 가중치와 정규화로 serving 하는지를 나타내는 이름표다. <code>policy_metadata</code> 는 config 에 고정된 값이라, 서버를 띄우는 디렉터리를 바꿔도 따라 바뀌지 않는다. 그래서 checkpoint 를 바꿀 때는 <code>OMY_LEAP_CHECKPOINT_ID</code>, <code>OMY_LEAP_NORM_STATS_ID</code> 환경변수(또는 config 기본값)와 실행기 <code>manifest.yaml</code> 을 같이 바꾼다.</p>
+
+<h3>녹화 데이터와의 연결</h3>
+<p>학습할 때는 같은 config 가 녹화기 변환 결과(LeRobot v2.1)를 읽는다. 키 이름은 녹화기 변환기(<code>tactile_rec.convert</code>)가 정한다.</p>
+<div class="tablewrap"><table>
+<tr><th>LeRobot 키 (녹화기가 씀)</th><th>repack 뒤 (학습)</th><th>실행기 요청 (추론)</th></tr>
+<tr><td><code>observation.state</code> (22)</td><td><code>state</code></td><td><code>state</code> (<code>ObsAligner</code>, 변환기와 같은 규칙)</td></tr>
+<tr><td><code>observation.images.cam_wrist</code></td><td><code>images.cam_wrist</code></td><td><code>images.cam_wrist</code> (JPEG 왕복 + <code>orient_image</code>)</td></tr>
+<tr><td><code>action</code> (22: leader 팔 + 손 <code>sent</code>)</td><td><code>actions</code> (50 행 chunk)</td><td>— (응답으로 돌아옴)</td></tr>
+<tr><td><code>task_index</code> → task 문자열</td><td><code>prompt</code> (<code>prompt_from_task=True</code>)</td><td><code>prompt</code> = rig <code>session.text</code></td></tr>
+<tr><td><code>observation.tactile.*</code>, <code>observation.hand_current</code></td><td>고르지 않음</td><td>보내지 않음 (π0.5 기준선은 촉각을 쓰지 않음)</td></tr>
+</table></div>
+<p>카메라 이름은 <code>LerobotOmyLeapDataConfig.cameras</code> (기본 <code>("cam_wrist",)</code>) 에서 repack 구조를 만든다. <code>cam_ext</code> 를 달면 config 의 <code>cameras</code> 와 manifest 의 <code>cameras</code> 에 같이 넣는다. 녹화기 변환은 openpi venv 에서 <code>PYTHONPATH=recorder/src</code> 로 돌린다. 녹화기를 그 환경에 설치하지 않아도 되므로 "레포 하나에 환경 하나" 규칙을 지킨다.</p>
+
+<h3>학습 없이 serving 하기 (지금 쓰는 checkpoint)</h3>
+<pre><code>/workspace/users/hamin/checkpoints/pi05_omy_leap/pi05_base-untrained/
+├── params -&gt; …/openpi-assets/checkpoints/pi05_base/params      <span class="cm"># 팀에 받아져 있는 pi05_base (12 GB)</span>
+└── assets/local/omy_leap_sync_test/norm_stats.json            <span class="cm"># asset_id = repo_id</span></code></pre>
+<p><code>create_trained_policy</code> 는 <code>params/</code> 와 <code>assets/&lt;asset_id&gt;/norm_stats.json</code> 만 읽는다. 그래서 학습한 checkpoint 와 같은 모양으로 디렉터리를 조립하면 그대로 로드된다. 출력은 의미 없는 값이지만 프로토콜, 모양, 지연, manifest 를 확인할 수 있다. norm stats 는 11/17 <code>2035</code> 에피소드(1634 frame)로 계산했다.</p>
+<div class="callout warn"><div class="t">샘플 에피소드에는 영상이 없다</div>
+<p>git 에 들어 있는 11/17 샘플에는 <code>cam_wrist</code> 타임스탬프(<code>.npz</code>)만 있고 영상(<code>.mjpeg</code>)은 없다. 그래서 <code>cameras: []</code> rig 로 state/action 만 변환했다. norm stats 는 <code>compute_norm_stats.py</code> 에서 <code>OmyLeapInputs</code> 단계만 뺀 일회용 스크립트로 계산했다. 같은 data loader, 같은 <code>DeltaActions</code>, 같은 <code>RunningStats</code> 를 쓴다. 스크립트는 checkpoint 옆에 있다. 영상이 있는 실데이터는 원래 스크립트(<code>compute_norm_stats.py --config-name pi05_omy_leap</code>)를 쓴다. <code>1852</code> 에피소드는 팔 state 가 6.4 s 끊겨서 변환기가 거부했다.</p>
+</div>
+
+<!-- ============================================================ 6 -->
+<h2 id="observe"><span class="n">6</span>관측 만들기 (<code>align_obs.py</code>)</h2>
 
 <p>정책은 녹화기가 만든 데이터셋으로 학습한다. 데이터셋의 한 행은 오프라인 변환기(<code>convert_episode</code>)가 만든다. 변환기는 30 Hz 격자의 각 시각 t 에서, stream 마다 "시각이 t 이하인 가장 최근 샘플"을 고른다. 실행 중에도 같은 규칙으로 고르면 정책이 본 적 있는 입력을 받는다.</p>
 
@@ -610,8 +756,8 @@ svg .fill-line { fill: var(--line); }
 <p>11/17 실제 녹화 두 에피소드도 재생했다. 손 state 불일치는 모두 "오프라인이 아직 도착하지 않은 손 샘플을 쓴 경우"로 설명되어야 하고, 비율은 5% 미만이어야 한다. 이 기준도 통과했다.</p>
 </div>
 
-<!-- ============================================================ 6 -->
-<h2 id="execute"><span class="n">6</span>chunk 실행 (<code>executor.py</code>)</h2>
+<!-- ============================================================ 7 -->
+<h2 id="execute"><span class="n">7</span>chunk 실행 (<code>executor.py</code>)</h2>
 
 <figure>
 <svg viewBox="0 0 980 270" role="img" aria-label="상태 기계">
@@ -688,8 +834,8 @@ svg .fill-line { fill: var(--line); }
         self.executor.tick(now_ns, next_ns)
         next_ns += dt_ns * ((now_ns - next_ns) // dt_ns + 1)</code></pre>
 
-<!-- ============================================================ 7 -->
-<h2 id="hand"><span class="n">7</span>손으로 보내기</h2>
+<!-- ============================================================ 8 -->
+<h2 id="hand"><span class="n">8</span>손으로 보내기</h2>
 
 <p><code>execution.mode</code> 가 <code>hand</code> 이고 CLI 에 <code>--allow-hand</code> 가 있을 때만 손으로 보낸다. 실행기는 받는 쪽 <code>leap_teleop</code> 이 dry-run 인지 실물인지 알 수 없다. 그래서 사람이 명시적으로 허용해야 한다.</p>
 
@@ -717,8 +863,8 @@ svg .fill-line { fill: var(--line); }
 <p>정책 모드에서 3 s 뒤 release 하면 손에 쥔 물체를 놓친다. 실물 손 모드를 쓰기 전에 <code>--release-timeout</code> 과 <code>--safe-pose</code> 값을 정해야 한다. 팔 명령 경로는 아직 없다. <code>mode: hand</code> 는 손만 보낸다.</p>
 </div>
 
-<!-- ============================================================ 8 -->
-<h2 id="failure"><span class="n">8</span>실패 처리</h2>
+<!-- ============================================================ 9 -->
+<h2 id="failure"><span class="n">9</span>실패 처리</h2>
 <p>실패마다 "다시 해 볼 만한 것"과 "사람이 봐야 하는 것"으로 나눴다. 다시 해 볼 만한 것은 HOLD 에서 재시도하고, 사람이 봐야 하는 것은 FAULT 로 멈춘다.</p>
 <div class="tablewrap"><table>
 <tr><th>상황</th><th>감지</th><th>결과</th></tr>
@@ -757,8 +903,8 @@ svg .fill-line { fill: var(--line); }
 <li>FAULT 에서는 reset 으로만 빠져나왔다.</li>
 </ul>
 
-<!-- ============================================================ 9 -->
-<h2 id="ui"><span class="n">9</span>UI 와 Control Hub</h2>
+<!-- ============================================================ 10 -->
+<h2 id="ui"><span class="n">10</span>UI 와 Control Hub</h2>
 <p>실행기는 자기 웹 UI(:8810)를 띄운다. Control Hub 는 녹화 페이지와 같은 방식으로 이 UI 를 "정책" 페이지에 iframe 으로 보여 준다. Hub 는 장치나 실행기 코드를 import 하지 않고, 프로세스를 켜고 끄며 화면만 붙인다.</p>
 <div class="two">
 <div>
@@ -783,8 +929,8 @@ svg .fill-line { fill: var(--line); }
 </div>
 </div>
 
-<!-- ============================================================ 10 -->
-<h2 id="files"><span class="n">10</span>추가·변경한 파일</h2>
+<!-- ============================================================ 11 -->
+<h2 id="files"><span class="n">11</span>추가·변경한 파일</h2>
 <p>main <code>8c635ae</code> 대비 57 파일, +4087 / −16 줄 (<code>uv.lock</code> 제외). <span class="tag new">새 파일</span> <span class="tag mod">변경</span> 코드 규칙: 작은 함수와 얇은 층, 이름으로 설명하고 코멘트·docstring 은 쓰지 않는다(<code>wire.py</code> 라이선스 머리말만 예외). 이 규칙은 <code>run_all.sh</code> 가 기계적으로 검사한다.</p>
 
 <h3><code>policy_runner/src/policy_runner/</code> — 실행기 본체</h3>
@@ -831,16 +977,26 @@ svg .fill-line { fill: var(--line); }
 <tr><td>문서 <span class="tag new">새</span>/<span class="tag mod">변경</span></td><td class="num"></td><td>계획(결정 표 포함), 평가 결과, <code>policy_runner/README.md</code>, <code>PROGRESS.md</code>, 루트·user_pc README, 이 문서</td></tr>
 </table></div>
 
+<h3>서버 연결 (<code>feat/policy-runner-server-smoke</code>, openpi-RLT <code>feat/omy-leap</code>)</h3>
+<div class="tablewrap"><table>
+<tr><th>파일</th><th class="num">줄</th><th>역할</th></tr>
+<tr><td>openpi-RLT <code>src/openpi/policies/omy_leap_policy.py</code> <span class="tag new">새</span></td><td class="num">132</td><td>요청 → π0.5 입력, 출력 → (50, 22), manifest 생성 (5절)</td></tr>
+<tr><td>openpi-RLT <code>src/openpi/training/config.py</code> <span class="tag mod">변경</span></td><td class="num">+84</td><td><code>LerobotOmyLeapDataConfig</code>, <code>pi05_omy_leap</code></td></tr>
+<tr><td>openpi-RLT <code>src/openpi/policies/omy_leap_policy_test.py</code> <span class="tag new">새</span></td><td class="num">148</td><td>변환·전체 경로·manifest 테스트 7개</td></tr>
+<tr><td><code>policy_runner/config/{rig,manifest,runner}.server-smoke.yaml</code> <span class="tag new">새</span></td><td class="num">30 + 13 + 13</td><td>GPU 서버 안에서 실행기를 돌리는 설정. 가짜 rig 에서 <code>cam_ext</code> 만 뺐고, manifest 는 서버 config 와 같은 값</td></tr>
+<tr><td><code>docs/results/2026-11-21-server-smoke.md</code> <span class="tag new">새</span></td><td class="num"></td><td>smoke 조건, 결과, 재현 명령</td></tr>
+</table></div>
+
 <h3>이름을 바꾼 이유</h3>
 <p>배포 가이드 초안의 <code>shape_policy</code>, <code>ShapeUpInputs</code>, <code>PlanBuffer</code> 대신 다음 이름을 썼다.</p>
 <ul>
 <li><code>policy_runner</code>, <code>ObsAligner</code>/<code>AlignedObs</code>, <code>ActionChunk</code>, <code>pred_horizon</code>(H)/<code>exec_horizon</code>(K).</li>
-<li>openpi 쪽은 로봇 이름을 따르는 관례(<code>AlohaInputs</code>)에 맞춰 <code>OmyLeapInputs</code>/<code>OmyLeapOutputs</code>, config <code>pi05_omy_leap</code> 으로 할 계획이다.</li>
+<li>openpi 쪽은 로봇 이름을 따르는 관례(<code>AlohaInputs</code>)에 맞춰 <code>OmyLeapInputs</code>/<code>OmyLeapOutputs</code>, config <code>pi05_omy_leap</code> 으로 했다.</li>
 </ul>
 <p>프로젝트 이름보다 하는 일과 로봇이 이름에 드러나게 했다.</p>
 
-<!-- ============================================================ 11 -->
-<h2 id="config"><span class="n">11</span>설정 (<code>runner.yaml</code>)</h2>
+<!-- ============================================================ 12 -->
+<h2 id="config"><span class="n">12</span>설정 (<code>runner.yaml</code>)</h2>
 <pre><code>rig: ../../recorder/config/rig.example.yaml   <span class="cm"># 장치·시각 규칙·fps·프롬프트는 녹화기 설정을 그대로 쓴다</span>
 manifest: manifest.example.yaml               <span class="cm"># checkpoint 학습 조건</span>
 policy: {endpoint: 'ws://127.0.0.1:8000', connect_timeout_s: 5, infer_timeout_ms: 1000,
@@ -854,10 +1010,10 @@ execution: {mode: dry_run, exec_horizon: 10, chunk_max_delay_ms: 500, tick_jitte
 hand_udp: {host: 127.0.0.1, port: 47810}
 ui: {host: 127.0.0.1, port: 8810}
 trace: {dir: ../traces}</code></pre>
-<p>모든 한도는 코드에 박지 않고 설정에 둔다. 지금 값은 첫 출발점이다. 특히 <code>infer_timeout_ms</code>, <code>chunk_max_delay_ms</code>, K 는 Stage C 에서 실제 π0.5 지연을 잰 뒤 다시 정한다. <code>warmup_timeout_s</code>, <code>max_failures</code>, <code>fail_after_ms</code> 는 고정 테스트 설정보다 나중에 생겨서 코드에서 기본값(60, 3, 1000)으로도 읽는다.</p>
+<p>모든 한도는 코드에 박지 않고 설정에 둔다. 지금 값은 첫 출발점이다. 특히 <code>infer_timeout_ms</code>, <code>chunk_max_delay_ms</code>, K 는 실제 π0.5 지연을 보고 정한다. GPU 서버 안에서 잰 RTT 는 p50 74 ms, p99 84 ms 라 지금 값(1000 ms, 500 ms, K 10 = 333 ms)으로 여유가 있다. ssh 터널을 거친 User PC 의 지연은 아직 재지 않았다. <code>warmup_timeout_s</code>, <code>max_failures</code>, <code>fail_after_ms</code> 는 고정 테스트 설정보다 나중에 생겨서 코드에서 기본값(60, 3, 1000)으로도 읽는다.</p>
 
-<!-- ============================================================ 12 -->
-<h2 id="eval"><span class="n">12</span>평가</h2>
+<!-- ============================================================ 13 -->
+<h2 id="eval"><span class="n">13</span>평가</h2>
 <p>평가 방법은 구현보다 먼저 정해 commit 했다(<code>14e415b</code>): 수락 테스트, trace 감사기, 의도적 버그 목록. 이렇게 하면 구현에 맞춰 시험을 느슨하게 고칠 수 없다. 고정 기준을 바꾼 곳은 두 군데이고, 각각 따로 commit 하고 이유를 기록했다.</p>
 <ul>
 <li>latency 가 있을 때의 동일성 판정: 구현이 불가능한 기대를 하고 있었다.</li>
@@ -881,12 +1037,25 @@ trace: {dir: ../traces}</code></pre>
 </table></div>
 <p>자세한 수치, trace 파일 이름, 한계는 <a href="results/2026-11-21-policy-runner-eval.md">평가 결과 문서</a>에 있다.</p>
 
+<h3>GPU 서버 smoke: 실제 openpi 서버 ↔ 실행기</h3>
+<p>학습 안 한 pi05_base 를 <code>pi05_omy_leap</code> 으로 serving 하고, 같은 GPU 서버(RTX PRO 6000 Blackwell)에서 실행기를 <code>runner.server-smoke.yaml</code> 로 돌렸다. 정책 품질이 아니라 연결 계약을 보는 시험이다.</p>
+<div class="tablewrap"><table>
+<tr><th>시험</th><th>결과</th></tr>
+<tr><td>openpi 단위 테스트 / 실행기 수락 테스트 (Linux)</td><td>7 passed / 83 passed</td></tr>
+<tr><td>조립한 checkpoint 로드</td><td>그대로 로드됨, <code>/healthz</code> 까지 16–20 s</td></tr>
+<tr><td><code>probe --count 50</code></td><td>manifest 차이 없음. 응답 50개 모두 (50, 22) float 유한값. RTT 중앙값 71.5 ms, 서버 infer 68.5 ms</td></tr>
+<tr><td>새 서버 첫 요청 (JIT)</td><td><b>36.3 s</b> (1회). cuDNN conv 알고리즘 탐색이 오래 걸린다. <code>probe</code> 기본 <code>--timeout-ms 30000</code> 으로는 시간 초과</td></tr>
+<tr><td><code>run</code> dry_run 60 s + <code>soak.py</code></td><td>감사기 4207 events, 0 problems. 요청 601, 응답 실패 0, FAULT 0. RTT p50 73.9 / p99 84.0 / max 87.9 ms</td></tr>
+<tr><td>chunk 채택</td><td>600개 전부 거부, HOLD 100 %. "first row is 1.445 rad from the measured state". 학습 안 한 가중치라 예상한 결과이고, 채택 검사가 의도대로 막았다</td></tr>
+</table></div>
+<p>자세한 내용은 <a href="results/2026-11-21-server-smoke.md">GPU 서버 smoke 결과</a>에 있다.</p>
+
 <div class="callout warn"><div class="t">이 Mac 에서만 잰 tick 정밀도</div>
 <p>실행기 없이 1/30 s 대기만 150번 해 보니 <code>Event.wait</code> 는 p50 9.35 ms, <code>time.sleep</code> 은 p50 8.55 ms 늦었다. 백그라운드 프로세스의 타이머 병합으로 보인다. 고장 주입 실험의 late 3.7% 는 이 기계의 대기 오차가 10 ms 한도에 닿은 결과로 본다. 실제로 돌릴 Ubuntu User PC 에서는 재지 않았다 <span class="tag unv">미검증</span>.</p>
 </div>
 
-<!-- ============================================================ 13 -->
-<h2 id="run"><span class="n">13</span>실행 방법</h2>
+<!-- ============================================================ 14 -->
+<h2 id="run"><span class="n">14</span>실행 방법</h2>
 
 <h3>A. 하드웨어 없이 (가짜 rig + 가짜 서버)</h3>
 <pre><code>cd policy_runner
@@ -905,27 +1074,36 @@ uv run python audit/summary.py traces/&lt;파일&gt;.jsonl</code></pre>
 <li>손까지 보려면 <code>execution.mode: hand</code> 로 바꾸고 "손 UDP 허용"을 켠다. <code>leap_policy</code> 는 처음에는 dry-run 으로 둔다.</li>
 </ol>
 
-<h3>C. 실제 π0.5 <span class="tag plan">계획</span></h3>
-<pre><code><span class="cm"># GPU 서버 (openpi-RLT)</span>
-uv run scripts/serve_policy.py --port 8000 policy:checkpoint --policy.config=pi05_omy_leap --policy.dir=&lt;ckpt&gt;
-<span class="cm"># User PC: 포트를 망에 열지 않고 ssh 터널로</span>
+<h3>C. 실제 π0.5 서버</h3>
+<h4>C-1. GPU 서버 안에서 연결 확인 (smoke, 확인함)</h4>
+<pre><code><span class="cm"># 터미널 1: openpi-RLT feat/omy-leap</span>
+OPENPI_DATA_HOME=/workspace/users/hamin/cache/openpi XLA_PYTHON_CLIENT_MEM_FRACTION=0.3 \
+  uv run scripts/serve_policy.py --port 8000 policy:checkpoint --policy.config=pi05_omy_leap \
+  --policy.dir=/workspace/users/hamin/checkpoints/pi05_omy_leap/pi05_base-untrained
+<span class="cm"># 터미널 2: SHAPE_UP_Tactile policy_runner</span>
+uv run policy-runner probe config/runner.server-smoke.yaml --count 50 --timeout-ms 600000   <span class="cm"># 첫 요청 JIT 36 s</span>
+uv run policy-runner run config/runner.server-smoke.yaml
+uv run python audit/soak.py --seconds 60</code></pre>
+<p><code>XLA_PYTHON_CLIENT_MEM_FRACTION=0.3</code> 은 GPU 를 같이 쓰는 팀원을 위해 jax 가 VRAM 을 30 %(약 30 GB)만 잡게 한다.</p>
+<h4>C-2. User PC 에서 <span class="tag plan">계획</span></h4>
+<pre><code><span class="cm"># User PC: 포트를 망에 열지 않고 ssh 터널로 (User PC 에 GPU 서버 ssh key 필요)</span>
 ssh -N -L 8000:127.0.0.1:8000 &lt;gpu-server&gt;
 curl -s http://127.0.0.1:8000/healthz
-uv run policy-runner probe config/runner.yaml --count 100   <span class="cm"># 첫 요청과 나머지의 왕복 시간</span>
+uv run policy-runner probe config/runner.yaml --count 100 --timeout-ms 600000
 uv run policy-runner run config/runner.yaml</code></pre>
-<p><code>pi05_omy_leap</code> config 와 <code>OmyLeapInputs/Outputs</code> 는 아직 없다(C2). 지금 <code>probe</code> 는 우리 rig 모양의 요청만 보내므로, ALOHA checkpoint 로 지연부터 재는 C1 에는 바로 쓸 수 없다.</p>
+<p><code>runner.yaml</code> 의 manifest 에는 서버 config 와 같은 <code>checkpoint</code> / <code>norm_stats_id</code> 를 쓴다. 지금은 <code>pi05_base-untrained</code> / <code>omy_leap_sync_test_20261117</code> 이다. 서버를 막 띄운 경우에는 첫 요청을 먼저 <code>probe</code> 로 보내 JIT 을 끝내 두면 <code>run</code> 의 warm-up 60 s 에 걸리지 않는다.</p>
 
-<!-- ============================================================ 14 -->
-<h2 id="next"><span class="n">14</span>한계와 다음 단계</h2>
+<!-- ============================================================ 15 -->
+<h2 id="next"><span class="n">15</span>한계와 다음 단계</h2>
 <div class="tablewrap"><table>
 <tr><th>순서</th><th>할 일</th><th>이유</th></tr>
 <tr><td>1</td><td>Ubuntu User PC 에서 <code>run_all.sh</code> 와 60 s soak 를 다시 돌린다</td><td>tmux 테스트와 tick 정밀도가 Mac 과 다를 수 있다</td></tr>
-<tr><td>2</td><td>C1: 실제 π0.5 지연 측정 (<code>probe --example aloha</code> 를 추가할지, openpi 의 예제 클라이언트로 잴지 결정)</td><td>timeout, chunk 나이 한도, K 를 실측으로 정한다</td></tr>
-<tr><td>3</td><td>C2: openpi-RLT 에 <code>OmyLeapInputs/Outputs</code>, <code>pi05_omy_leap</code>, metadata 에 manifest</td><td>우리 데이터로 학습한 checkpoint 를 serving</td></tr>
-<tr><td>4</td><td>C3: 실제 checkpoint 로 실제 센서 dry-run</td><td>출력이 (50, 22), 유한하고, 첫 행과 state 의 차이 분포를 trace 로 본다</td></tr>
+<tr><td>2</td><td>User PC 에서 ssh 터널로 <code>probe</code> (C-2)</td><td>GPU 서버 안 RTT 74 ms 에 망 지연이 얼마나 더해지는지 본다. User PC 에 ssh key 가 필요하다</td></tr>
+<tr><td>3</td><td>영상이 있는 실데이터 수집 → norm stats → 학습 (full 또는 LoRA, delta 범위 비교)</td><td>지금 서버는 학습 안 한 가중치라 chunk 가 모두 거부된다. 학습하면 <code>OMY_LEAP_CHECKPOINT_ID</code> / <code>NORM_STATS_ID</code> 와 실행기 manifest 를 같이 바꾼다</td></tr>
+<tr><td>4</td><td>C3: 학습한 checkpoint 로 실제 센서 dry-run</td><td>첫 행과 state 의 차이 분포, 채택 비율을 trace 로 본다. JIT 36 s 와 warm-up 60 s 의 여유도 다시 본다</td></tr>
 <tr><td>5</td><td>손 hold/release 값, 팔 명령 경로 (D)</td><td>쥔 물체를 놓지 않게. follower topic 과 zenoh publisher 는 미검증</td></tr>
 </table></div>
-<p>아직 하지 않은 것을 분명히 적어 둔다. 실제 π0.5 서버, 실제 rig 의 카메라·Paxini·zenoh 팔, 전원이 들어간 LEAP 으로는 아직 돌리지 않았다. 지금까지의 확인은 가짜 rig, 가짜 서버, <code>leap_teleop --dry-run</code> 까지다.</p>
+<p>아직 하지 않은 것을 분명히 적어 둔다. 실제 π0.5 서버와는 GPU 서버 안에서 학습 안 한 가중치로만 붙어 봤다. 학습한 checkpoint, User PC 에서의 ssh 터널 연결, 실제 rig 의 카메라·Paxini·zenoh 팔, 전원이 들어간 LEAP 으로는 아직 돌리지 않았다.</p>
 
 </main>
 </div>
