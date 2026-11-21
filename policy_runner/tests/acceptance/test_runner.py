@@ -71,12 +71,16 @@ def test_ui_state_and_buttons(files, server):
         client = TestClient(make_app(runner))
         state = client.get("/api/state").json()
         for key in ("state", "endpoint", "checkpoint", "streams", "infer", "chunk", "problems",
-                    "mode"):
+                    "mode", "ticks", "hand"):
             assert key in state
         assert state["state"] == "READY"
         assert client.post("/api/arm").status_code == 200
         time.sleep(1.0)
-        assert client.get("/api/state").json()["state"] in ("RUNNING", "HOLD")
+        running = client.get("/api/state").json()
+        assert running["state"] in ("RUNNING", "HOLD")
+        assert running["ticks"]["send"] + running["ticks"]["hold"] > 0
+        assert running["hand"]["mode"] == "live"
+        assert running["hand"]["lag_deg"] is not None
         assert client.post("/api/disarm").status_code == 200
         assert client.get("/api/state").json()["state"] == "READY"
         assert "<html" in client.get("/").text.lower()

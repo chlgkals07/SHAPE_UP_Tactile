@@ -212,7 +212,7 @@ $PY -m leap_teleop.cli --source manus --safe-pose fist --thumb affine
 $PY -m leap_teleop.cli --source policy --safe-pose fist --record-udp --dry-run
 ```
 
-`policy_runner` 가 `127.0.0.1:47810`(`--policy-udp HOST:PORT`)으로 보내는 손 목표(deg, 16개)를 그대로 LEAP 에 보낸다. 목표가 0.5 초 끊기면 마지막 값을 유지하고, 3 초 끊기면 safe pose 로 간다. `--record-udp` 로 보내는 손 feedback 이 정책 관측의 hand 가 된다.
+`policy_runner` 가 `127.0.0.1:47810`(`--policy-udp HOST:PORT`)으로 보내는 손 목표(deg, 16개)를 그대로 LEAP 에 보낸다. 목표가 0.5 초 끊기면 마지막 값을 유지하고, `--release-timeout`(기본 3 초, Hub 정책 프로그램은 5 초) 끊기면 safe pose 로 간다. `--record-udp` 로 보내는 손 feedback 이 정책 관측의 hand 가 된다.
 
 ## 단축 함수 (선택)
 긴 명령은 `scripts/leap_aliases.sh`의 함수로 줄일 수 있다. `source`한 셸에서 ROS, zenoh, `PYTHONPATH`를 한 번에 잡고 `user_pc/`로 이동한다. 인자는 그대로 전달된다.

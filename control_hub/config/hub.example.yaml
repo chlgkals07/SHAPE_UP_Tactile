@@ -354,14 +354,15 @@ processes:
     title: 정책 → LEAP (leap_policy)
     group: User PC
     env: teleop
-    cmd: python3 -m leap_teleop.cli --source policy --safe-pose fist --record-udp
+    cmd: python3 -m leap_teleop.cli --source policy --safe-pose fist --release-timeout 5 --record-udp
     flags:
       - {id: dry_run, label: "dry-run (LEAP 을 건드리지 않고 로그만)", arg: --dry-run, default: true}
     conflicts: [leap_manus, leap_leader, leap_zero]
     ready: {log: "\\[teleop\\] waiting"}
     help: |
       정책 실행기가 127.0.0.1:47810 으로 보내는 손 목표(deg)를 그대로 LEAP 에 보낸다. USB 는 이 프로세스만 연다.
-      목표가 0.5 초 끊기면 마지막 값을 유지하고, 3 초 끊기면 safe-pose(주먹)로 간다.
+      목표가 0.5 초 끊기면 마지막 값을 유지하고, 5 초 끊기면 safe-pose(주먹)로 간다.
+      5 초는 정책 실행기의 연속 실패 FAULT(약 3.1 초)보다 늦게 잡은 값이다.
       --record-udp 로 손 feedback 을 정책 실행기에 보낸다. 이것이 없으면 관측의 hand 가 비어 시작되지 않는다.
     confirm_start:
       - {text: "LEAP 5V 를 편 손으로 켰고 차단 수단이 손 닿는 곳에 있다", unless_flag: dry_run}

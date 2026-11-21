@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 from tactile_rec import features
 from tactile_rec.hub import Hub
+from tactile_rec.streams.specs import HAND_MODES
 
 from policy_runner.align_obs import ObsAligner
 from policy_runner.chunk import check_reply
@@ -40,6 +41,11 @@ def synthetic_request(cfg: RunnerConfig, hub: Hub) -> dict:
         images[name] = np.zeros(shape, dtype=np.uint8)
     return {"state": np.zeros(ACTION_DIM, dtype=np.float32), "images": images,
             "prompt": cfg.prompt}
+
+
+def finite_max(values: np.ndarray) -> float | None:
+    values = values[np.isfinite(values)]
+    return float(values.max()) if values.size else None
 
 
 class Runner:
@@ -115,6 +121,19 @@ class Runner:
         self.worker.clear_fault()
         self.executor.reset(self.clock.now_ns())
 
+    def hand_status(self, now_ns: int) -> dict[str, Any]:
+        sample = self.hub.streams[self.cfg.rig.dataset.hand].latest()
+        if sample is None:
+            return {"mode": None, "age_ms": None, "limited_deg": None, "lag_deg": None}
+        data = sample.data
+        code = int(data["mode"])
+        return {
+            "mode": HAND_MODES[code] if 0 <= code < len(HAND_MODES) else "unknown",
+            "age_ms": (now_ns - sample.t_recv_ns) / MS,
+            "limited_deg": finite_max(np.abs(data["cmd"] - data["sent"])),
+            "lag_deg": finite_max(np.abs(data["sent"] - data["pos"])),
+        }
+
     def status(self) -> dict[str, Any]:
         now_ns = self.clock.now_ns()
         executor = self.executor.status(now_ns)
@@ -139,6 +158,8 @@ class Runner:
             },
             "infer": infer,
             "chunk": executor["chunk"],
+            "ticks": executor["ticks"],
+            "hand": self.hand_status(now_ns),
             "sent": self.dry_run.status(),
             "problems": problems[-10:],
             "trace": str(self.trace_path),

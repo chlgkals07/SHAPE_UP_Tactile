@@ -39,12 +39,14 @@ class Executor:
         self.t_start_ns = 0
         self.cursor = 0
         self.last_problem = ""
+        self.ticks = {"send": 0, "late": 0, "hold": 0}
         self._lock = threading.Lock()
         trace.write("config", 0, dt_ns=dt_ns, exec_horizon=exec_horizon)
 
     def arm(self, now_ns: int) -> None:
         with self._lock:
             if self.state == READY:
+                self.ticks = dict.fromkeys(self.ticks, 0)
                 self._enter(HOLD, now_ns, "arm")
                 self.chunks.request(now_ns)
 
@@ -82,6 +84,7 @@ class Executor:
             return {
                 "state": self.state,
                 "problem": self.last_problem,
+                "ticks": dict(self.ticks),
                 "chunk": {
                     "id": chunk.chunk_id if chunk else 0,
                     "age_ms": (now_ns - chunk.t_obs_ns) / MS if chunk else None,
@@ -127,15 +130,18 @@ class Executor:
             return
         self.trace.write("send", now_ns, due_ns=due_ns, chunk_id=self.active.chunk_id, row=row,
                          action=action)
+        self.ticks["send"] += 1
 
     def _late(self, now_ns: int, row: int) -> None:
         assert self.active is not None
         self.trace.write("late", now_ns, due_ns=self.t_start_ns + row * self.dt_ns,
                          chunk_id=self.active.chunk_id, row=row)
+        self.ticks["late"] += 1
 
     def _hold(self, now_ns: int, reason: str) -> None:
         self._enter(HOLD, now_ns, reason)
         self.trace.write("hold", now_ns)
+        self.ticks["hold"] += 1
 
     def _fail(self, now_ns: int, reason: str) -> None:
         self.active = None

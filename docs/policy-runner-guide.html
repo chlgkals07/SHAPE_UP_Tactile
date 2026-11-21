@@ -865,7 +865,7 @@ policy_metadata={
 <p>마지막 목표를 받은 지 0.5 s 가 지나면 <code>hold</code>(마지막 값 유지), 3 s 가 지나면 <code>release</code>(safe pose)로 간다. 실행기를 disarm 하거나 실행기가 죽어도 손은 이 규칙으로 멈춘다. 실측 로그: <code>waiting</code> → arm → <code>live</code>(최대 59.7°) → disarm → <code>hold</code> → <code>release</code>(0°).</p>
 </div>
 <div class="callout warn"><div class="t">아직 정하지 않은 것</div>
-<p>정책 모드에서 3 s 뒤 release 하면 손에 쥔 물체를 놓친다. 실물 손 모드를 쓰기 전에 <code>--release-timeout</code> 과 <code>--safe-pose</code> 값을 정해야 한다. 팔 명령 경로는 아직 없다. <code>mode: hand</code> 는 손만 보낸다.</p>
+<p>Hub 의 정책 → LEAP 프로그램은 <code>--release-timeout 5 --safe-pose fist</code> 로 띄운다. 기본값 3 s 로는 연속 timeout 3번(3066.7 ms)이 FAULT 가 되기 전에 손이 먼저 풀렸다. 5 s 면 실행기 FAULT 가 먼저 뜨고, 그동안 LEAP 는 마지막 목표를 유지한다. 실물로는 확인하지 않았다 <span class="tag unv">미검증</span>. 손이 어떻게 반응할지(hold·release 규칙)는 LEAP 제어기에서 다시 정한다. 팔 명령 경로는 아직 없다. <code>mode: hand</code> 는 손만 보낸다.</p>
 </div>
 
 <!-- ============================================================ 9 -->
@@ -914,7 +914,7 @@ policy_metadata={
 <h4>실행기 UI (<code>ui.py</code>, <code>static/</code>)</h4>
 <div class="tablewrap"><table>
 <tr><th>경로</th><th>내용</th></tr>
-<tr><td><code>GET /api/state</code></td><td>상태, 모드, 서버 주소, checkpoint(설정·서버), 프롬프트, warm-up 시간, stream 상태·나이·한도, 추론(연결·RTT·infer_ms), chunk(id·나이·행 위치), 보낸 행 수, 최근 문제, trace 경로</td></tr>
+<tr><td><code>GET /api/state</code></td><td>상태, 모드, 서버 주소, checkpoint(설정·서버), 프롬프트, warm-up 시간, stream 상태·나이·한도, 추론(연결·RTT·infer_ms), chunk(id·나이·행 위치), 보낸 행 수, arm 뒤 tick 집계(보냄·late·hold), LEAP 손(hand stream 의 live/hold/release, feedback 나이, LEAP 가 줄인 양 max|cmd−sent|, 명령–실측 차이 max|sent−pos|, deg), 최근 문제, trace 경로</td></tr>
 <tr><td><code>POST /api/arm</code></td><td>시작: READY → HOLD + 요청</td></tr>
 <tr><td><code>POST /api/disarm</code></td><td>정지: READY 로</td></tr>
 <tr><td><code>POST /api/reset</code></td><td>FAULT 해제</td></tr>
