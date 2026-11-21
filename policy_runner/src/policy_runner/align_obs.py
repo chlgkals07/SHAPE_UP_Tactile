@@ -121,13 +121,6 @@ class ObsAligner:
             return []
         return [f"skew {skew_ns / MS:.0f} ms across streams (limit {self.max_skew_ns / MS:.0f})"]
 
-    def measured(self, t_ns: int) -> np.ndarray | None:
-        arm = self.pick(self.arm, t_ns, any_sample)
-        hand = self.pick(self.hand, t_ns, has_hand_feedback)
-        if arm is None or hand is None:
-            return None
-        return self.state({self.arm: arm, self.hand: hand})
-
     def state(self, chosen: dict[str, tuple[Sample, Pick]]) -> np.ndarray | None:
         if self.arm not in chosen or self.hand not in chosen:
             return None

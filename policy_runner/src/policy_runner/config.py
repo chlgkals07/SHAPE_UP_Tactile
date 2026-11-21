@@ -84,8 +84,6 @@ def parse(raw: dict[str, Any], base: Path, allow_hand: bool = False) -> RunnerCo
             limits=Limits(
                 chunk_max_delay_ns=int(float(execution["chunk_max_delay_ms"]) * MS),
                 tick_jitter_ns=int(float(execution["tick_jitter_ms"]) * MS),
-                first_row_max_rad=float(execution["first_row_max_rad"]),
-                step_max_rad=float(execution["step_max_rad"]),
             ),
             hand_udp=(str(raw["hand_udp"]["host"]), int(raw["hand_udp"]["port"])),
             ui=(str(raw["ui"]["host"]), int(raw["ui"]["port"])),

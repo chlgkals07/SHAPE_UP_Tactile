@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -18,8 +18,6 @@ MS = 1_000_000
 class Limits:
     chunk_max_delay_ns: int
     tick_jitter_ns: int
-    first_row_max_rad: float
-    step_max_rad: float
 
 
 class ChunkSource(Protocol):
@@ -36,13 +34,11 @@ class Command(Protocol):
 
 class Executor:
     def __init__(self, dt_ns: int, exec_horizon: int, limits: Limits, chunks: ChunkSource,
-                 measured: Callable[[], np.ndarray | None], commands: Sequence[Command],
-                 trace: Trace):
+                 commands: Sequence[Command], trace: Trace):
         self.dt_ns = dt_ns
         self.k = exec_horizon
         self.limits = limits
         self.chunks = chunks
-        self.measured = measured
         self.commands = list(commands)
         self.trace = trace
         self.state = READY
@@ -54,9 +50,7 @@ class Executor:
         self._lock = threading.Lock()
         trace.write("config", 0, dt_ns=dt_ns, exec_horizon=exec_horizon,
                     chunk_max_delay_ns=limits.chunk_max_delay_ns,
-                    tick_jitter_ns=limits.tick_jitter_ns,
-                    first_row_max_rad=limits.first_row_max_rad,
-                    step_max_rad=limits.step_max_rad)
+                    tick_jitter_ns=limits.tick_jitter_ns)
 
     def arm(self, now_ns: int) -> None:
         with self._lock:
@@ -130,12 +124,10 @@ class Executor:
         chunk = self.chunks.take(now_ns)
         if chunk is None:
             return False
-        measured = self.measured()
-        problems = self._problems(chunk, now_ns, measured)
+        problems = self._problems(chunk, now_ns)
         self.trace.write("chunk", now_ns, chunk_id=chunk.chunk_id, obs_id=chunk.obs_id,
                          t_obs_ns=chunk.t_obs_ns, t_reply_ns=chunk.t_reply_ns,
-                         adopted=not problems, problems=problems, row0=chunk.actions[0],
-                         measured=measured)
+                         adopted=not problems, problems=problems)
         if problems:
             self.last_problem = problems[0]
             self.chunks.request(now_ns)
@@ -144,26 +136,12 @@ class Executor:
         self._enter(RUNNING, now_ns, f"chunk {chunk.chunk_id}")
         return True
 
-    def _problems(self, chunk: ActionChunk, now_ns: int,
-                  measured: np.ndarray | None) -> list[str]:
-        problems = []
+    def _problems(self, chunk: ActionChunk, now_ns: int) -> list[str]:
         age_ns = now_ns - chunk.t_obs_ns
         if age_ns > self.limits.chunk_max_delay_ns:
-            problems.append(f"chunk {chunk.chunk_id} is {age_ns / MS:.0f} ms old "
-                            f"(limit {self.limits.chunk_max_delay_ns / MS:.0f})")
-        rows = chunk.actions[: self.k]
-        if measured is None:
-            problems.append("no measured state to compare the first row with")
-        else:
-            gap = float(np.max(np.abs(rows[0] - measured)))
-            if gap > self.limits.first_row_max_rad:
-                problems.append(f"first row is {gap:.3f} rad from the measured state "
-                                f"(limit {self.limits.first_row_max_rad})")
-        if len(rows) > 1:
-            step = float(np.max(np.abs(np.diff(rows, axis=0))))
-            if step > self.limits.step_max_rad:
-                problems.append(f"rows step {step:.3f} rad (limit {self.limits.step_max_rad})")
-        return problems
+            return [f"chunk {chunk.chunk_id} is {age_ns / MS:.0f} ms old "
+                    f"(limit {self.limits.chunk_max_delay_ns / MS:.0f})"]
+        return []
 
     def _send(self, now_ns: int, due_ns: int, row: int) -> None:
         assert self.active is not None

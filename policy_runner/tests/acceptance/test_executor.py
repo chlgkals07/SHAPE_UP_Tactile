@@ -8,7 +8,6 @@ import numpy as np
 import pytest
 from tactile_rec.clock import FakeClock
 
-from policy_runner.chunk import ActionChunk
 from policy_runner.executor import Executor, Limits
 from policy_runner.trace import Trace
 
@@ -23,8 +22,7 @@ STATE = np.linspace(-0.5, 0.5, 22).astype(np.float32)
 
 
 def limits(**overrides) -> Limits:
-    values = {"chunk_max_delay_ns": 500 * MS, "tick_jitter_ns": 10 * MS,
-              "first_row_max_rad": 0.15, "step_max_rad": 0.05}
+    values = {"chunk_max_delay_ns": 500 * MS, "tick_jitter_ns": 10 * MS}
     values.update(overrides)
     return Limits(**values)
 
@@ -38,7 +36,7 @@ class Bench:
         self.trace_path = tmp_path / "trace.jsonl"
         self.trace = Trace(self.trace_path)
         self.executor = Executor(DT, k, limits(**limit_overrides), self.chunks,
-                                 lambda: self.measured, [self.command], self.trace)
+                                 [self.command], self.trace)
         self.t0 = self.clock.now_ns()
         self.ticks = 0
 
@@ -113,38 +111,6 @@ def test_stale_chunk_is_discarded(tmp_path):
     adopted = [e for e in bench.events() if e["ev"] == "chunk"]
     assert adopted and not adopted[0]["adopted"]
     assert len(bench.chunks.requests) >= 2
-
-
-def test_first_row_far_from_state_is_rejected(tmp_path):
-    bench = Bench(tmp_path, k=10, latency_ms=50)
-    bench.chunks.measured = lambda: STATE + 0.3
-    bench.executor.arm(bench.now())
-    bench.step(5)
-    assert bench.command.rows == []
-    assert bench.executor.state == "HOLD"
-
-
-def test_large_step_inside_a_chunk_is_rejected(tmp_path):
-    bench = Bench(tmp_path, k=10, latency_ms=50)
-
-    def jumpy():
-        rows = np.tile(STATE, (50, 1))
-        rows[3:] += 0.1
-        return rows
-
-    original = bench.chunks.take
-
-    def take(now_ns):
-        chunk = original(now_ns)
-        if chunk is None:
-            return None
-        return ActionChunk(chunk.chunk_id, chunk.obs_id, chunk.t_obs_ns, chunk.t_reply_ns,
-                           jumpy().astype(np.float32))
-
-    bench.chunks.take = take
-    bench.executor.arm(bench.now())
-    bench.step(5)
-    assert bench.command.rows == []
 
 
 def test_fault_needs_explicit_reset(tmp_path):

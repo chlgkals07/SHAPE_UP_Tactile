@@ -60,7 +60,6 @@ class Runner:
         if cfg.mode == "hand":
             self.commands.append(HandUdpCommand(*cfg.hand_udp, cfg.rig.dataset.arm_dof))
         self.executor = Executor(cfg.dt_ns, cfg.exec_horizon, cfg.limits, self.worker,
-                                 lambda: self.aligner.measured(self.clock.now_ns()),
                                  self.commands, self.trace)
         self._stopping = threading.Event()
         self._ticker = threading.Thread(target=self._tick_forever, name="policy-ticks",

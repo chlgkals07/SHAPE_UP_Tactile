@@ -3,7 +3,8 @@
 ## 현재 (2026-11-21, `feat/policy-runner` + `feat/policy-runner-server-smoke`, merge 전)
 
 - Stage A (관측 정렬), Stage B (가짜 서버·dry-run·UI·CLI) 구현 완료. `leap_teleop --source policy` 와 Control Hub "정책" 페이지까지 구현했다.
-- 고정 평가 통과: 수락 테스트 83, leap_teleop 170, 의도적 버그 12/12. control_hub 1 실패는 Linux 전용 `/proc` 테스트다(main 과 동일). [결과](../docs/results/2026-11-21-policy-runner-eval.md)
+- 동작 검사(첫 행–측정 상태, 행 사이 차이)로 chunk 를 거부하던 것을 뺐다. 관절 범위·속도 제한은 LEAP 드라이버(clip·slew)가 맡는다. [결정](../docs/superpowers/plans/2026-11-20-policy-runner.md)
+- 평가 통과: 수락 테스트 78 (동작 검사 테스트를 지우기 전 83), leap_teleop 170, 의도적 버그 11/11 (M11 삭제). control_hub 1 실패는 Linux 전용 `/proc` 테스트다(main 과 동일). [결과](../docs/results/2026-11-21-policy-runner-eval.md)
 - 실제 프로세스로 확인한 것: 가짜 rig + 가짜 서버 60 s (고장 주입 포함) 감사기 0 위반, 손 UDP → leap_teleop dry-run 의 live/hold/release, Hub iframe 화면.
 - Stage C 서버 연결: openpi-RLT `feat/omy-leap` 에 `OmyLeapInputs/Outputs` 와 `pi05_omy_leap` (metadata 에 manifest) 를 추가했다. 학습 안 한 pi05_base 로 serving 하고 GPU 서버 안에서 `probe`·`run` 으로 연결을 확인했다. manifest 일치, 응답 601/601 정상, 감사기 0 위반, RTT p50 74 ms, 첫 요청 JIT 36 s. chunk 는 학습 안 한 가중치라 모두 첫 행 검사로 거부됐다. [결과](../docs/results/2026-11-21-server-smoke.md)
 
@@ -24,4 +25,5 @@
 
 - chunk 시작 시각을 실제 깬 시각으로 잡았다. 그러자 행 간격이 dt − jitter 보다 짧아졌다(23.318 ms). 격자 시각으로 바꿨다 (`9b73f4a`).
 - 지터 대응으로 행 번호를 반올림했다. 격자 기준으로 바꾸면서 필요 없어져 되돌렸다.
+- chunk 를 첫 행–측정 상태(0.15 rad)·행 사이(0.05 rad) 한도로 거부했다. 한도가 데이터 근거 없이 정한 값이었고 11/17 시연이 자주 넘어서, 정상 동작을 막을 수 있었다. 거부를 빼고 장치 제어기에 맡겼다.
 - 고정 동일성 테스트의 latency 경우가 아직 도착하지 않은 프레임을 요구했다. 도착한 프레임 기준으로 바꿨다 (`0060e86`).

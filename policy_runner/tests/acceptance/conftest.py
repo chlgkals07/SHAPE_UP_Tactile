@@ -80,7 +80,7 @@ def runner_dict(**overrides: Any) -> dict[str, Any]:
                                        "hand": 100},
                         "max_skew_ms": 200},
         "execution": {"mode": "dry_run", "exec_horizon": 10, "chunk_max_delay_ms": 500,
-                      "tick_jitter_ms": 10, "first_row_max_rad": 0.15, "step_max_rad": 0.05},
+                      "tick_jitter_ms": 10},
         "hand_udp": {"host": "127.0.0.1", "port": 47810},
         "ui": {"host": "127.0.0.1", "port": 8810},
         "trace": {"dir": "traces"},

@@ -8,14 +8,12 @@ from pathlib import Path
 ACTION_DIM = 22
 
 SCHEMA = {
-    "config": ["dt_ns", "exec_horizon", "chunk_max_delay_ns", "tick_jitter_ns",
-               "first_row_max_rad", "step_max_rad"],
+    "config": ["dt_ns", "exec_horizon", "chunk_max_delay_ns", "tick_jitter_ns"],
     "state": ["state", "reason"],
     "obs": ["obs_id", "t_obs_ns", "ok", "problems", "picks"],
     "request": ["obs_id"],
     "reply": ["obs_id", "ok", "problems", "rtt_ms"],
-    "chunk": ["chunk_id", "obs_id", "t_obs_ns", "t_reply_ns", "adopted", "problems", "row0",
-              "measured"],
+    "chunk": ["chunk_id", "obs_id", "t_obs_ns", "t_reply_ns", "adopted", "problems"],
     "send": ["due_ns", "chunk_id", "row", "action"],
     "late": ["due_ns", "chunk_id", "row"],
     "hold": [],
@@ -59,13 +57,6 @@ def audit(events: list[dict]) -> list[str]:
             adopted[event["chunk_id"]] = event
             if event["t_ns"] - event["t_obs_ns"] > cfg["chunk_max_delay_ns"]:
                 problems.append(f"{where}: chunk {event['chunk_id']} adopted too late")
-            if event["measured"] is None:
-                problems.append(f"{where}: chunk {event['chunk_id']} adopted without a state")
-            else:
-                gap = max(abs(a - b) for a, b in zip(event["row0"], event["measured"], strict=True))
-                if gap > cfg["first_row_max_rad"] + 1e-6:
-                    problems.append(f"{where}: chunk {event['chunk_id']} first row {gap:.3f} rad "
-                                    "from the measured state")
         elif kind == "send":
             action = event["action"]
             if len(action) != ACTION_DIM or not all(math.isfinite(v) for v in action):
@@ -84,15 +75,9 @@ def audit(events: list[dict]) -> list[str]:
                 problems.append(f"{where}: chunk {event['chunk_id']} sent more than K rows")
             if event["t_ns"] - event["due_ns"] > cfg["tick_jitter_ns"]:
                 problems.append(f"{where}: sent {event['t_ns'] - event['due_ns']} ns late")
-            if last_send is not None:
-                if event["t_ns"] - last_send["t_ns"] < cfg["dt_ns"] - cfg["tick_jitter_ns"]:
-                    problems.append(f"{where}: two sends closer than dt")
-                if (last_send["chunk_id"] == event["chunk_id"]
-                        and event["row"] == last_send["row"] + 1
-                        and len(action) == len(last_send["action"]) == ACTION_DIM):
-                    step = max(abs(a - b) for a, b in zip(action, last_send["action"], strict=True))
-                    if step > cfg["step_max_rad"] + 1e-6:
-                        problems.append(f"{where}: step {step:.3f} rad between rows")
+            if (last_send is not None
+                    and event["t_ns"] - last_send["t_ns"] < cfg["dt_ns"] - cfg["tick_jitter_ns"]):
+                problems.append(f"{where}: two sends closer than dt")
             last_send = event
     return problems
 
