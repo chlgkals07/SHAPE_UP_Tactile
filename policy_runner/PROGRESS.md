@@ -1,6 +1,6 @@
 # policy_runner 진행 상황
 
-## 현재 (2026-11-21, `feat/policy-runner` + `feat/policy-runner-server-smoke`, merge 전)
+## 현재 (2026-11-22, `feat/policy-runner`, main merge 전. 서버 smoke 브랜치는 여기로 합쳤다)
 
 - Stage A (관측 정렬), Stage B (가짜 서버·dry-run·UI·CLI) 구현 완료. `leap_teleop --source policy` 와 Control Hub "정책" 페이지까지 구현했다.
 - 동작 검사(첫 행–측정 상태, 행 사이 차이)로 chunk 를 거부하던 것을 뺐다. 관절 범위·속도 제한은 LEAP 드라이버(clip·slew)가 맡는다. [결정](../docs/superpowers/plans/2026-11-20-policy-runner.md)

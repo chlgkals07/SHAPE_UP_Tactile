@@ -11,7 +11,7 @@
 | config | `pi05_omy_leap`: π0.5, action_horizon 50, `discrete_state_input=True`, 22축 delta 학습 / 절대값 출력 |
 | 가중치 | `pi05_base` params (학습 안 함). checkpoint 디렉터리 = `params` symlink + `assets/local/omy_leap_sync_test/norm_stats.json` |
 | norm stats | 11/17 `2026-11-17_2035_hamin/ep_0001` 1634 frame. `1852` 에피소드는 변환기가 거부함 (arm_state 6.4 s 끊김). sha256 앞자리 `e50848eb5795` |
-| 실행기 | `feat/policy-runner-server-smoke`, `config/runner.server-smoke.yaml` (가짜 rig, `cam_wrist` 만, dry_run, K 10) |
+| 실행기 | `feat/policy-runner-server-smoke` (2026-11-22 에 `feat/policy-runner` 로 합침), `config/runner.server-smoke.yaml` (가짜 rig, `cam_wrist` 만, dry_run, K 10) |
 | manifest | `cameras: [cam_wrist]`, `checkpoint: pi05_base-untrained`, `norm_stats_id: omy_leap_sync_test_20261117` |
 
 샘플 에피소드에는 카메라 영상(`cam_wrist.mjpeg`)이 없다 (git 에 타임스탬프만 있음). 그래서 `cameras: []` rig 로 state/action 만 변환했고, norm stats 는 `compute_norm_stats.py` 에서 `OmyLeapInputs` (이미지 슬롯 매핑) 단계만 뺀 일회용 스크립트로 계산했다. 같은 data loader, 같은 `DeltaActions`, 같은 `RunningStats` 를 쓴다. 스크립트와 rig 파일은 서버 `/workspace/users/hamin/checkpoints/pi05_omy_leap/` 에 있다. 실데이터는 영상이 있으므로 원래 스크립트를 쓰면 된다.

@@ -176,7 +176,7 @@ svg .fill-line { fill: var(--line); }
   <p class="lead">GPU 서버의 π0.5 정책과 OMY 팔 + LEAP 손 rig 사이에서 일하는 프로그램이다. 서버 쪽 짝(openpi-RLT 의 <code>pi05_omy_leap</code> config)은 5절에서 설명한다. 센서 값을 학습 데이터와 같은 모양으로 묶어 WebSocket 으로 보내고, 돌아온 50 행짜리 action chunk 를 30 Hz 격자에 맞춰 실행한다. 이 문서는 전체 흐름, 각 단계를 그렇게 만든 이유, 실제로 추가한 파일과 코드를 설명한다.</p>
   <div class="meta">
     <span>작성 2026-11-21</span>
-    <span>브랜치 <code>feat/policy-runner</code> (main <code>8c635ae</code> 에서) · 서버 연결 <code>feat/policy-runner-server-smoke</code> + openpi-RLT <code>feat/omy-leap</code></span>
+    <span>브랜치 <code>feat/policy-runner</code> (main <code>8c635ae</code> 에서) · 서버 연결 openpi-RLT <code>feat/omy-leap</code></span>
     <span>구현 범위: Stage A + B <span class="tag done">완료</span> · Stage C 서버 연결 <span class="tag done">완료</span> · 학습 <span class="tag plan">계획</span></span>
     <span>평가 결과 <a href="results/2026-11-21-policy-runner-eval.md">실행기</a> · <a href="results/2026-11-21-server-smoke.md">GPU 서버 smoke</a></span>
   </div>
@@ -980,7 +980,7 @@ policy_metadata={
 <tr><td>문서 <span class="tag new">새</span>/<span class="tag mod">변경</span></td><td class="num"></td><td>계획(결정 표 포함), 평가 결과, <code>policy_runner/README.md</code>, <code>PROGRESS.md</code>, 루트·user_pc README, 이 문서</td></tr>
 </table></div>
 
-<h3>서버 연결 (<code>feat/policy-runner-server-smoke</code>, openpi-RLT <code>feat/omy-leap</code>)</h3>
+<h3>서버 연결 (<code>feat/policy-runner</code>, openpi-RLT <code>feat/omy-leap</code>)</h3>
 <div class="tablewrap"><table>
 <tr><th>파일</th><th class="num">줄</th><th>역할</th></tr>
 <tr><td>openpi-RLT <code>src/openpi/policies/omy_leap_policy.py</code> <span class="tag new">새</span></td><td class="num">132</td><td>요청 → π0.5 입력, 출력 → (50, 22), manifest 생성 (5절)</td></tr>
