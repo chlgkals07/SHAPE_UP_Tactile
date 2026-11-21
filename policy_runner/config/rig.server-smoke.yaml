@@ -1,0 +1,33 @@
+# GPU 서버 smoke 용 가짜 rig. rig.fake.yaml 에서 cam_ext 만 뺐다(실제 rig 와 같은 카메라 구성).
+#   uv run policy-runner probe config/runner.server-smoke.yaml
+rig: {name: fake_rig_wrist_only, mount: wrist_flip}
+data_root: ./data_fake
+
+session: {task: demo_task, text: "Pick up the cup", operator: tester}
+record: {preroll_s: 1.0, time_limit_s: 0, jpeg_quality: 95, min_free_gb: 1}
+
+streams:
+  arm_state:  {type: fake, like: arm_state, hz: 100}
+  arm_action: {type: fake, like: arm_action, hz: 100}
+  hand:       {type: fake, like: hand, hz: 50}
+  glove:      {type: fake, like: glove, hz: 50, required: false}
+  tactile_a:
+    type: fake
+    like: tactile
+    hz: 90
+    places: {Thumb-Tip: thumb_tip, Thumb-Middle: thumb_pad, Index-Tip: index_tip, Index-Middle: index_pad}
+  tactile_b:
+    type: fake
+    like: tactile
+    hz: 90
+    places: {Middle-Tip: middle_tip, Middle-Middle: middle_pad, Ring-Tip: ring_tip, Ring-Middle: ring_pad}
+  cam_wrist:  {type: fake, like: camera, hz: 30, width: 424, height: 240, rotation_deg: 90}
+
+dataset:
+  fps: 30
+  hand_action: sent
+  tactile: [tactile_a, tactile_b]
+  cameras: [cam_wrist]
+  time: {hand: src, tactile_a: respread, tactile_b: respread}
+
+ui: {host: 127.0.0.1, port: 8800, preview_hz: 15, preview_width: 800}
