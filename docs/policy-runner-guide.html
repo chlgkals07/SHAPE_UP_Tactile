@@ -1010,7 +1010,7 @@ execution: {mode: dry_run, exec_horizon: 10, chunk_max_delay_ms: 500, tick_jitte
 hand_udp: {host: 127.0.0.1, port: 47810}
 ui: {host: 127.0.0.1, port: 8810}
 trace: {dir: ../traces}</code></pre>
-<p>모든 한도는 코드에 박지 않고 설정에 둔다. 지금 값은 첫 출발점이다. 특히 <code>infer_timeout_ms</code>, <code>chunk_max_delay_ms</code>, K 는 실제 π0.5 지연을 보고 정한다. GPU 서버 안에서 잰 RTT 는 p50 74 ms, p99 84 ms 라 지금 값(1000 ms, 500 ms, K 10 = 333 ms)으로 여유가 있다. ssh 터널을 거친 User PC 의 지연은 아직 재지 않았다. <code>warmup_timeout_s</code>, <code>max_failures</code>, <code>fail_after_ms</code> 는 고정 테스트 설정보다 나중에 생겨서 코드에서 기본값(60, 3, 1000)으로도 읽는다.</p>
+<p>모든 한도는 코드에 박지 않고 설정에 둔다. 지금 값은 첫 출발점이다. 특히 <code>infer_timeout_ms</code>, <code>chunk_max_delay_ms</code>, K 는 실제 π0.5 지연을 보고 정한다. GPU 서버 안에서 잰 RTT 는 p50 74 ms, p99 84 ms 라 지금 값(1000 ms, 500 ms, K 10 = 333 ms)으로 여유가 있다. Mac 에서 ssh 터널로 잰 RTT 는 p50 125 ms, p99 319 ms 다. timeout 은 여유가 있지만 p99 가 K 10 에 가까워서, 학습한 checkpoint 로 다시 잰 뒤 K 를 정한다. <code>warmup_timeout_s</code>, <code>max_failures</code>, <code>fail_after_ms</code> 는 고정 테스트 설정보다 나중에 생겨서 코드에서 기본값(60, 3, 1000)으로도 읽는다.</p>
 
 <!-- ============================================================ 13 -->
 <h2 id="eval"><span class="n">13</span>평가</h2>
@@ -1050,6 +1050,34 @@ trace: {dir: ../traces}</code></pre>
 </table></div>
 <p>자세한 내용은 <a href="results/2026-11-21-server-smoke.md">GPU 서버 smoke 결과</a>에 있다.</p>
 
+<h3>Mac 에서 ssh 터널로 연결: 망이 더하는 지연</h3>
+<p>같은 서버와 같은 checkpoint 에 Mac(가짜 rig)에서 <code>ssh -N -L 8000:127.0.0.1:8000 gpu</code> 로 붙었다. User PC 가 실제로 쓸 경로와 같은 모양이다. 서버 안에서 돌린 결과와 나란히 놓았다.</p>
+<div class="tablewrap"><table>
+<tr><th>항목</th><th class="num">서버 안</th><th class="num">Mac + 터널</th><th class="num">차이</th></tr>
+<tr><td>빈 요청 왕복 (<code>/healthz</code>, 10회 중앙값)</td><td class="num">—</td><td class="num">22.6 ms</td><td class="num"></td></tr>
+<tr><td>새 서버 첫 요청 (JIT)</td><td class="num">36.3 s</td><td class="num">36.7 s</td><td class="num"></td></tr>
+<tr><td><code>probe</code> RTT 중앙값</td><td class="num">71.5 ms</td><td class="num">117.2 ms</td><td class="num">+45.7 ms</td></tr>
+<tr><td>서버 infer 중앙값</td><td class="num">68.5 ms</td><td class="num">70.7 ms</td><td class="num"></td></tr>
+<tr><td><code>run</code> 60 s RTT p50</td><td class="num">73.9 ms</td><td class="num">125.1 ms</td><td class="num">+51.2 ms</td></tr>
+<tr><td><code>run</code> 60 s RTT p99 / max</td><td class="num">84.0 / 87.9 ms</td><td class="num">318.7 / 477.5 ms</td><td class="num">p99 +234.7 ms</td></tr>
+<tr><td>요청 수 / 응답 실패 / FAULT / 감사기</td><td class="num">601 / 0 / 0 / 0</td><td class="num">395 / 0 / 0 / 0</td><td class="num"></td></tr>
+</table></div>
+
+<div class="callout"><div class="t">RTT 란</div>
+<p>round-trip time. 실행기가 요청을 보내기 시작한 순간부터 응답을 다 받은 순간까지의 시간이다. 실행기 쪽 시계로 잰다(trace 의 <code>reply.rtt_ms</code>). 그 안에는 다음이 다 들어 있다.</p>
+<ul>
+<li>요청 직렬화(msgpack)와 업로드. 요청 하나는 약 305 KB 다. 대부분 이미지(424×240×3 바이트)다.</li>
+<li>서버 추론. <code>infer_ms</code> 로 따로 오고, 약 70 ms 다.</li>
+<li>응답 다운로드. (50, 22) float 라 약 4 KB 로 작다.</li>
+</ul>
+<p>그래서 <b>RTT − infer_ms 가 통신에 쓴 시간</b>이다. <code>probe</code> 중앙값으로 보면 서버 안에서는 3.0 ms(71.5 − 68.5), Mac + 터널에서는 46.5 ms(117.2 − 70.7)다.</p>
+</div>
+
+<div class="callout why"><div class="t">해석: 망을 거치면 중앙값으로 약 50 ms 가 더해진다</div>
+<p>서버를 "거쳐서" 느려지는 것이 아니다. 서버 추론 시간은 두 경우 모두 약 70 ms 로 같다. 더해진 약 50 ms 는 Mac ↔ GPU 서버 사이 망과 ssh 터널의 비용이다. 빈 요청 왕복이 22.6 ms 이므로 나머지 약 25–30 ms 는 305 KB 이미지 업로드로 추정한다 (분해는 미검증). 중앙값보다 꼬리가 더 문제다. p99 가 318.7 ms 로 K 10 행(333 ms)에 가깝다. 그래서 같은 망이면 HOLD 가 늘고, 가끔 늦은 chunk 가 나올 수 있다.</p>
+<p>요청 수가 601 → 395 로 준 것도 이 때문이다. 학습 안 한 가중치라 chunk 가 모두 거부되고, 사이클이 "응답 대기 tick + 1" 이 되어서 대기가 길어진 만큼 요청이 줄었다. 실제 User PC 의 망은 Mac 과 다를 수 있다 <span class="tag unv">미검증</span>.</p>
+</div>
+
 <div class="callout warn"><div class="t">이 Mac 에서만 잰 tick 정밀도</div>
 <p>실행기 없이 1/30 s 대기만 150번 해 보니 <code>Event.wait</code> 는 p50 9.35 ms, <code>time.sleep</code> 은 p50 8.55 ms 늦었다. 백그라운드 프로세스의 타이머 병합으로 보인다. 고장 주입 실험의 late 3.7% 는 이 기계의 대기 오차가 10 ms 한도에 닿은 결과로 본다. 실제로 돌릴 Ubuntu User PC 에서는 재지 않았다 <span class="tag unv">미검증</span>.</p>
 </div>
@@ -1085,25 +1113,26 @@ uv run policy-runner probe config/runner.server-smoke.yaml --count 50 --timeout-
 uv run policy-runner run config/runner.server-smoke.yaml
 uv run python audit/soak.py --seconds 60</code></pre>
 <p><code>XLA_PYTHON_CLIENT_MEM_FRACTION=0.3</code> 은 GPU 를 같이 쓰는 팀원을 위해 jax 가 VRAM 을 30 %(약 30 GB)만 잡게 한다.</p>
-<h4>C-2. User PC 에서 <span class="tag plan">계획</span></h4>
-<pre><code><span class="cm"># User PC: 포트를 망에 열지 않고 ssh 터널로 (User PC 에 GPU 서버 ssh key 필요)</span>
-ssh -N -L 8000:127.0.0.1:8000 &lt;gpu-server&gt;
+<h4>C-2. 다른 PC 에서 ssh 터널로 (Mac 으로 확인함, User PC 는 <span class="tag plan">계획</span>)</h4>
+<pre><code><span class="cm"># 포트를 망에 열지 않고 ssh 터널로 (그 PC 에 GPU 서버 ssh key 필요. Mac 은 ~/.ssh/config 의 gpu 별칭)</span>
+ssh -N -L 8000:127.0.0.1:8000 gpu
 curl -s http://127.0.0.1:8000/healthz
 uv run policy-runner probe config/runner.yaml --count 100 --timeout-ms 600000
 uv run policy-runner run config/runner.yaml</code></pre>
 <p><code>runner.yaml</code> 의 manifest 에는 서버 config 와 같은 <code>checkpoint</code> / <code>norm_stats_id</code> 를 쓴다. 지금은 <code>pi05_base-untrained</code> / <code>omy_leap_sync_test_20261117</code> 이다. 서버를 막 띄운 경우에는 첫 요청을 먼저 <code>probe</code> 로 보내 JIT 을 끝내 두면 <code>run</code> 의 warm-up 60 s 에 걸리지 않는다.</p>
+<p>서버를 비대화형 ssh 로 띄울 때는 <code>uv</code> 가 PATH 에 없다. worktree 의 <code>.venv/bin/python scripts/serve_policy.py …</code> 로 띄운다. smoke checkpoint 의 <code>params</code> 는 <code>/workspace/teams/tactile/data/checkpoints/openpi-assets/checkpoints/pi05_base/params</code> 를 가리킨다(이전 경로가 없어져 2026-11-21 에 바꿨다).</p>
 
 <!-- ============================================================ 15 -->
 <h2 id="next"><span class="n">15</span>한계와 다음 단계</h2>
 <div class="tablewrap"><table>
 <tr><th>순서</th><th>할 일</th><th>이유</th></tr>
 <tr><td>1</td><td>Ubuntu User PC 에서 <code>run_all.sh</code> 와 60 s soak 를 다시 돌린다</td><td>tmux 테스트와 tick 정밀도가 Mac 과 다를 수 있다</td></tr>
-<tr><td>2</td><td>User PC 에서 ssh 터널로 <code>probe</code> (C-2)</td><td>GPU 서버 안 RTT 74 ms 에 망 지연이 얼마나 더해지는지 본다. User PC 에 ssh key 가 필요하다</td></tr>
+<tr><td>2</td><td>User PC 에서 ssh 터널로 <code>probe</code> (C-2)</td><td>Mac 에서는 망이 RTT 중앙값에 약 50 ms, p99 에 약 235 ms 를 더했다. User PC 망에서 다시 잰다. User PC 에 ssh key 가 필요하다. 꼬리가 크면 이미지 크기나 K 를 다시 본다</td></tr>
 <tr><td>3</td><td>영상이 있는 실데이터 수집 → norm stats → 학습 (full 또는 LoRA, delta 범위 비교)</td><td>지금 서버는 학습 안 한 가중치라 chunk 가 모두 거부된다. 학습하면 <code>OMY_LEAP_CHECKPOINT_ID</code> / <code>NORM_STATS_ID</code> 와 실행기 manifest 를 같이 바꾼다</td></tr>
 <tr><td>4</td><td>C3: 학습한 checkpoint 로 실제 센서 dry-run</td><td>첫 행과 state 의 차이 분포, 채택 비율을 trace 로 본다. JIT 36 s 와 warm-up 60 s 의 여유도 다시 본다</td></tr>
 <tr><td>5</td><td>손 hold/release 값, 팔 명령 경로 (D)</td><td>쥔 물체를 놓지 않게. follower topic 과 zenoh publisher 는 미검증</td></tr>
 </table></div>
-<p>아직 하지 않은 것을 분명히 적어 둔다. 실제 π0.5 서버와는 GPU 서버 안에서 학습 안 한 가중치로만 붙어 봤다. 학습한 checkpoint, User PC 에서의 ssh 터널 연결, 실제 rig 의 카메라·Paxini·zenoh 팔, 전원이 들어간 LEAP 으로는 아직 돌리지 않았다.</p>
+<p>아직 하지 않은 것을 분명히 적어 둔다. 실제 π0.5 서버와는 학습 안 한 가중치로, GPU 서버 안과 Mac 의 ssh 터널에서만 붙어 봤다. 학습한 checkpoint, User PC 에서의 ssh 터널 연결, 실제 rig 의 카메라·Paxini·zenoh 팔, 전원이 들어간 LEAP 으로는 아직 돌리지 않았다.</p>
 
 </main>
 </div>
