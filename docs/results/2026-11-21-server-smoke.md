@@ -51,3 +51,27 @@ uv run policy-runner run config/runner.server-smoke.yaml &   # UI :8810
 uv run python audit/soak.py --seconds 60
 uv run python audit/audit_trace.py traces/<trace>.jsonl && uv run python audit/summary.py traces/<trace>.jsonl
 ```
+
+## Mac 에서 ssh 터널로 연결 (2026-11-21 21:07)
+
+같은 서버와 같은 checkpoint 에 Mac(가짜 rig)에서 `ssh -N -L 8000:127.0.0.1:8000 gpu`(계정 `hamin`)로 붙었다. 실행기 설정은 `config/runner.server-smoke.yaml` 그대로다.
+
+| 시험 | 서버 안 (위) | Mac + 터널 |
+|---|---|---|
+| `/healthz` | 200 | 200 (31 ms) |
+| `probe --count 50` 첫 요청 (새 서버 JIT) | 36.3 s | 36.7 s |
+| `probe` RTT 중앙값 / 최대 | 71.5 / 407.5 ms | 117.2 / 426.5 ms |
+| 서버 infer 중앙값 | 68.5 ms | 70.7 ms |
+| 60 s `run` + `soak.py` 감사기 | 0 problems | 3386 events, **0 problems** |
+| 요청 수 / 응답 실패 / FAULT | 601 / 0 / 0 | 395 / 0 / 0 |
+| `run` RTT p50 / p99 / max | 73.9 / 84.0 / 87.9 ms | 125.1 / 318.7 / 477.5 ms |
+| chunk | 600 전부 거부 (첫 행) | 394 전부 거부 (첫 행 1.05–1.37 rad) |
+
+- 망을 거치면 RTT 중앙값이 약 50 ms 늘고 꼬리가 길어진다(p99 318.7 ms). `infer_timeout_ms: 1000`, `chunk_max_delay_ms: 500` 안이지만 p99 가 K 10 (333 ms) 에 가깝다. 같은 망 경로라면 HOLD 비율이 커진다. 학습한 checkpoint 로 다시 잰다.
+- 요청 수가 601 → 395 로 줄었다. 사이클마다 응답을 기다리는 tick 이 늘었기 때문이다. 채택이 모두 거부되므로 사이클 = 대기 tick + 1 이다.
+- trace: `policy_runner/traces/2026-11-21_210708.jsonl` (git 제외).
+
+이번에 서버를 다시 띄우면서 바꾼 것:
+- smoke checkpoint 의 `params` symlink 가 없어진 경로(`/workspace/teams/tactile/openpi-RLT/checkpoints/...`)를 가리키고 있었다. `/workspace/teams/tactile/data/checkpoints/openpi-assets/checkpoints/pi05_base/params` 로 바꿨다.
+- 비대화형 ssh 에서는 `uv` 가 PATH 에 없다(`/workspace/users/hamin/conda/envs/hamin/bin/uv`). 그래서 worktree 의 `.venv/bin/python scripts/serve_policy.py ...` 로 띄웠다. 로그: `/workspace/users/hamin/logs/serve_smoke_mac.log`.
+- `serve_policy.py` 는 `0.0.0.0:8000` 에 bind 한다. 외부에서 8000 에 닿는지는 확인하지 않았다 (미검증).
