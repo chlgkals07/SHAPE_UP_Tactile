@@ -1078,6 +1078,56 @@ trace: {dir: ../traces}</code></pre>
 <p>요청 수가 601 → 395 로 준 것도 이 때문이다. 학습 안 한 가중치라 chunk 가 모두 거부되고, 사이클이 "응답 대기 tick + 1" 이 되어서 대기가 길어진 만큼 요청이 줄었다. 실제 User PC 의 망은 Mac 과 다를 수 있다 <span class="tag unv">미검증</span>.</p>
 </div>
 
+<h3>지연이 실행에 주는 영향 (계산값)</h3>
+<p>Mac 기준으로 정리하면 이렇다.</p>
+<ul>
+<li>망 왕복(RTT − infer)이 약 50 ms 이고, 서버 추론이 약 70 ms 라서 RTT 중앙값은 약 120 ms 다.</li>
+<li>겹치지 않는 chunk 실행(K 10, 30 Hz)에서 응답 대기 tick 은 <code>w = ⌈RTT/dt⌉</code> 이고, 사이클은 <code>w + K</code> tick 이다.</li>
+<li>마지막으로 실행되는 행은 사이클 길이만큼 지난 관측으로 만든 것이다.</li>
+</ul>
+<div class="tablewrap"><table>
+<tr><th>경우</th><th class="num">RTT</th><th class="num">대기 tick</th><th class="num">사이클</th><th class="num">HOLD</th><th class="num">재계획</th></tr>
+<tr><td>서버 안 p50</td><td class="num">73.9 ms</td><td class="num">3</td><td class="num">433.3 ms</td><td class="num">23.1%</td><td class="num">2.31 Hz</td></tr>
+<tr><td>서버 안 p99</td><td class="num">84.0 ms</td><td class="num">3</td><td class="num">433.3 ms</td><td class="num">23.1%</td><td class="num">2.31 Hz</td></tr>
+<tr><td>Mac + 터널 p50</td><td class="num">125.1 ms</td><td class="num">4</td><td class="num">466.7 ms</td><td class="num">28.6%</td><td class="num">2.14 Hz</td></tr>
+<tr><td>Mac + 터널 p99</td><td class="num">318.7 ms</td><td class="num">10</td><td class="num">666.7 ms</td><td class="num">50.0%</td><td class="num">1.50 Hz</td></tr>
+</table></div>
+<ul>
+<li><b>중앙값:</b> 망 50 ms 는 대기를 1 tick 늘린다. HOLD 는 23% → 29%, 마지막 행의 관측 나이는 433 → 467 ms (약 +8%) 다. 이미 K × dt = 333 ms 를 열린 루프로 실행하므로 50 ms 는 그 위에 조금 더해지는 몫이다.</li>
+<li><b>꼬리가 더 문제다.</b> p99 사이클에서는 HOLD 가 50% 다. 로봇이 0.33 s 멈췄다 움직이는 stop-and-go 가 커진다.</li>
+</ul>
+
+<div class="callout why"><div class="t">판단: 기준선에서는 충분히 작다. tactile 반응은 이 루프로 하지 않는다</div>
+<p><b>지금 기준선 π0.5 에는 tactile 이 입력으로 들어가지 않는다</b> (state 22 + 카메라). 그래서 tactile 지연은 지금 제어 루프에 없고, 기준선 실험에서 망 50 ms 는 critical 하지 않다.</p>
+<p><b>tactile 이 핵심인 반응은 망을 줄여도 이 구조로는 안 된다.</b> 미끄러짐에 쥐는 힘으로 반응하는 동작은 수십 ms 안에 일어나야 한다 (사람 반사 약 60–80 ms 로 알려져 있다, <span class="tag unv">미검증</span>). 정책은 약 2 Hz 로 재계획하고 333 ms 를 열린 루프로 실행한다. 이런 반응은 VLA 가 아니라 User PC 나 손 쪽의 로컬 고속 루프(50–100 Hz 이상)에 두고, VLA 는 느린 상위 계획을 맡는 구조가 맞다.</p>
+<p>tactile 을 VLA 입력에 넣는 경우에도, 촉각이 행동에 반영되기까지 "RTT + 최대 K × dt" (약 0.4–0.5 s)가 걸린다. 여기서도 망보다 K 와 열린 루프 실행이 지배적이다.</p>
+</div>
+
+<h3>로컬 추론 (5080 예정) 과 원격 서버</h3>
+<ul>
+<li><b>코드는 그대로 된다.</b> 실행기는 <code>policy.endpoint</code> 로 websocket 을 열 뿐이고, ssh 는 원격 서버를 <code>127.0.0.1:8000</code> 처럼 보이게 하는 장치다. GPU 서버 smoke 가 이미 "같은 기계, ssh 없음" 구성이었다.</li>
+<li><b>5080 PC 에서 할 일:</b> openpi-RLT <code>feat/omy-leap</code> 설치(uv), checkpoint 복사, <code>XLA_PYTHON_CLIENT_MEM_FRACTION</code> 설정. 원하면 Control Hub 에 openpi 서버 프로세스 항목을 추가한다.</li>
+<li><b>예상:</b> 망 약 50 ms 와 그 꼬리는 없어지지만 추론은 느려진다.
+  <ul>
+  <li>배치 1 추론은 메모리 대역폭에 묶인다. 5080 은 약 960 GB/s, RTX PRO 6000 은 약 1.8 TB/s 다(사양은 기억 기준).</li>
+  <li>그래서 같은 openpi 구현이면 5080 추론을 약 100–140 ms 로 추정한다 <span class="tag unv">미검증</span>.</li>
+  <li>공개 자료에 5080·RTX PRO 6000 의 π0.5 수치는 없었다. 5090 은 최적화 스택 기준 약 18 ms 가 보고됐다. 즉 GPU 보다 추론 스택 차이가 더 크다.</li>
+  </ul></li>
+<li><b>비교 기준:</b> 중앙값이 아니라 RTT p99 와 HOLD 비율. 로컬 추론이 약 150 ms 를 넘으면 원격 서버가 나을 수 있다 (추정).</li>
+</ul>
+
+<h3>더 줄일 수 있는 것 <span class="tag plan">미구현</span></h3>
+<div class="tablewrap"><table>
+<tr><th>방법</th><th>효과</th><th>비용 / 주의</th></tr>
+<tr><td>추론 겹치기 (prefetch): 남은 행이 대기 tick 만큼일 때 다음 요청</td><td>RTT &lt; K × dt (333 ms) 이면 HOLD 가 거의 0. stop-and-go 가 사라진다</td><td>Executor·테스트·감사기 수정. chunk 가 바뀔 때 목표가 튀지 않게, 첫 행 검사를 직전 목표 기준으로 바꿔야 한다</td></tr>
+<tr><td>이미지를 실행기에서 224×224 로 줄여 보내기</td><td>요청 305 KB → 150 KB (외부 카메라를 달면 1.2 MB → 301 KB). 업로드 몫(추정 25–30 ms)이 줄어든다</td><td>서버의 <code>resize_with_pad</code> 와 bit 단위로 같은지 테스트로 확인</td></tr>
+<tr><td>User PC 를 GPU 서버와 같은 유선망에</td><td>망 왕복과 꼬리가 줄어든다</td><td>설치 위치 문제</td></tr>
+<tr><td>denoising step 줄이기, 최적화 추론 스택</td><td>추론 약 70 ms 자체가 줄어든다</td><td>행동 품질은 학습한 checkpoint 로 확인. 스택 교체는 큰 작업</td></tr>
+<tr><td>RTC</td><td>chunk 사이를 매끄럽게 잇는다. 지연에 강하다</td><td>서버 쪽 모델 수정</td></tr>
+<tr><td>jax 컴파일 캐시</td><td>서버를 다시 띄울 때 첫 요청 36 s 가 줄어든다 (루프 지연과는 무관)</td><td><span class="tag unv">미검증</span></td></tr>
+</table></div>
+<p>순서: 학습한 checkpoint 로 실측(User PC 유선 + 터널, 나중에 5080 로컬) → 224 resize → denoising step → prefetch → 필요하면 RTC.</p>
+
 <div class="callout warn"><div class="t">이 Mac 에서만 잰 tick 정밀도</div>
 <p>실행기 없이 1/30 s 대기만 150번 해 보니 <code>Event.wait</code> 는 p50 9.35 ms, <code>time.sleep</code> 은 p50 8.55 ms 늦었다. 백그라운드 프로세스의 타이머 병합으로 보인다. 고장 주입 실험의 late 3.7% 는 이 기계의 대기 오차가 10 ms 한도에 닿은 결과로 본다. 실제로 돌릴 Ubuntu User PC 에서는 재지 않았다 <span class="tag unv">미검증</span>.</p>
 </div>
