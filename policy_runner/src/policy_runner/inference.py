@@ -12,6 +12,7 @@ from websockets.sync.client import ClientConnection, connect
 from policy_runner import wire
 from policy_runner.align_obs import ObsAligner, to_request
 from policy_runner.chunk import ActionChunk, check_reply
+from policy_runner.manifest import Manifest
 from policy_runner.trace import Trace
 
 ACTION_DIM = 22
@@ -30,10 +31,20 @@ class Disconnected(ConnectionError):
     pass
 
 
+class ManifestMismatch(ServerError):
+    pass
+
+
+def manifest_problems(manifest: Manifest, metadata: dict[str, Any]) -> list[str]:
+    server = metadata.get("manifest") or {}
+    return manifest.differences(server) if server else ["server metadata has no manifest"]
+
+
 class PolicyClient:
-    def __init__(self, endpoint: str, connect_timeout_s: float):
+    def __init__(self, endpoint: str, connect_timeout_s: float, manifest: Manifest | None = None):
         self.endpoint = endpoint
         self.connect_timeout_s = connect_timeout_s
+        self.manifest = manifest
         self.connection: ClientConnection | None = None
         self.metadata: dict[str, Any] = {}
 
@@ -50,6 +61,10 @@ class PolicyClient:
         except (OSError, TimeoutError, InvalidHandshake, InvalidURI, ConnectionClosed) as error:
             self.close()
             raise Disconnected(f"cannot connect to {self.endpoint}: {error}") from error
+        problems = manifest_problems(self.manifest, self.metadata) if self.manifest else []
+        if problems:
+            self.close()
+            raise ManifestMismatch("manifest differs from the server: " + "; ".join(problems))
         return self.metadata
 
     def infer(self, obs: dict[str, Any], timeout_s: float) -> dict[str, Any]:
@@ -136,13 +151,15 @@ class InferenceWorker:
             self._failures, self._obs_bad_since = 0, None
 
     def status(self) -> dict[str, Any]:
-        return {
-            "connected": self.client.connected,
-            "rtt_ms": self.last_rtt_ms,
-            "infer_ms": self.last_infer_ms,
-            "waiting": self._wanted is not None,
-            "obs_age_ms": dict(self.last_obs_ages_ms),
-        }
+        with self._wake:
+            return {
+                "connected": self.client.connected,
+                "rtt_ms": self.last_rtt_ms,
+                "infer_ms": self.last_infer_ms,
+                "waiting": self._wanted is not None,
+                "obs_age_ms": dict(self.last_obs_ages_ms),
+                "problems": list(self.problems),
+            }
 
     def _next_request(self) -> int | None:
         with self._wake:
@@ -217,8 +234,9 @@ class InferenceWorker:
                           f" {problem}")
 
     def _note(self, problem: str) -> None:
-        if not self.problems or self.problems[-1] != problem:
-            self.problems.append(problem)
+        with self._wake:
+            if not self.problems or self.problems[-1] != problem:
+                self.problems.append(problem)
 
 
 def last_line(text: str) -> str:

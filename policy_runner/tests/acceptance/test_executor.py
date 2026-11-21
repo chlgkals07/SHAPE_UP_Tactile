@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from tactile_rec.clock import FakeClock
 
-from policy_runner.executor import Executor, Limits
+from policy_runner.executor import Executor
 from policy_runner.trace import Trace
 
 from conftest import RecordingCommand, SimulatedInference, read_trace
@@ -21,22 +21,15 @@ DT = round(1e9 / 30)
 STATE = np.linspace(-0.5, 0.5, 22).astype(np.float32)
 
 
-def limits(**overrides) -> Limits:
-    values = {"chunk_max_delay_ns": 500 * MS, "tick_jitter_ns": 10 * MS}
-    values.update(overrides)
-    return Limits(**values)
-
-
 class Bench:
-    def __init__(self, tmp_path, k=10, latency_ms=150, **limit_overrides):
+    def __init__(self, tmp_path, k=10, latency_ms=150):
         self.clock = FakeClock(start_ns=100 * 10**9)
         self.measured = STATE.copy()
         self.chunks = SimulatedInference(self.clock, latency_ms * MS, lambda: self.measured)
         self.command = RecordingCommand()
         self.trace_path = tmp_path / "trace.jsonl"
         self.trace = Trace(self.trace_path)
-        self.executor = Executor(DT, k, limits(**limit_overrides), self.chunks,
-                                 [self.command], self.trace)
+        self.executor = Executor(DT, k, self.chunks, [self.command], self.trace)
         self.t0 = self.clock.now_ns()
         self.ticks = 0
 
@@ -70,7 +63,9 @@ def test_rows_go_out_one_per_dt_from_adoption(tmp_path):
     assert len(times) == 10
     assert np.all(np.diff(times) == DT)
     assert times[0] == bench.t0 + math.ceil(150 * MS / DT) * DT
-    assert audit(bench.events()) == []
+    events = bench.events()
+    assert [e["due_ns"] for e in events if e["ev"] == "send"] == times
+    assert audit(events) == []
 
 
 def test_at_most_k_rows_per_chunk_then_a_new_request(tmp_path):
@@ -103,14 +98,24 @@ def test_hold_while_waiting_for_a_chunk(tmp_path):
     assert bench.command.rows == []
 
 
-def test_stale_chunk_is_discarded(tmp_path):
+def test_a_late_tick_inside_its_dt_still_sends_the_row(tmp_path):
+    bench = Bench(tmp_path, k=10, latency_ms=30)
+    bench.executor.arm(bench.now())
+    bench.step(3)
+    sent = len(bench.command.rows)
+    grid = bench.t0 + bench.ticks * DT
+    bench.clock.set_ns(grid + 20 * MS)
+    bench.executor.tick(bench.now(), grid)
+    assert len(bench.command.rows) == sent + 1
+    assert audit(bench.events()) == []
+
+
+def test_a_slow_reply_is_still_executed(tmp_path):
     bench = Bench(tmp_path, k=10, latency_ms=600)
     bench.executor.arm(bench.now())
     bench.step(25)
-    assert bench.command.rows == []
-    adopted = [e for e in bench.events() if e["ev"] == "chunk"]
-    assert adopted and not adopted[0]["adopted"]
-    assert len(bench.chunks.requests) >= 2
+    assert len(bench.command.rows) > 0
+    assert audit(bench.events()) == []
 
 
 def test_fault_needs_explicit_reset(tmp_path):
@@ -155,13 +160,13 @@ def expected(k: int, latency_ms: int, ticks: int):
 @pytest.mark.parametrize("k", [10, 25])
 @pytest.mark.parametrize("latency_ms", [150, 280, 990])
 def test_sixty_seconds_match_the_cycle_formula(tmp_path, k, latency_ms):
-    bench = Bench(tmp_path, k=k, latency_ms=latency_ms, chunk_max_delay_ns=2000 * MS)
+    bench = Bench(tmp_path, k=k, latency_ms=latency_ms)
     ticks = int(60 * 10**9 // DT)
     bench.executor.arm(bench.now())
     bench.step(ticks)
     events = bench.events()
     rows, chunks, holds = expected(k, latency_ms, ticks)
     assert len(bench.command.rows) == rows
-    assert sum(e["ev"] == "chunk" and e["adopted"] for e in events) == chunks
+    assert sum(e["ev"] == "chunk" for e in events) == chunks
     assert sum(e["ev"] == "hold" for e in events) == holds
     assert audit(events) == []

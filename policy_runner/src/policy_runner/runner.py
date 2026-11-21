@@ -50,7 +50,7 @@ class Runner:
         self.trace_path = cfg.trace_dir / f"{time.strftime('%Y-%m-%d_%H%M%S')}.jsonl"
         self.trace = Trace(self.trace_path)
         self.aligner = ObsAligner(self.hub, cfg.cameras, cfg.max_age_ms, cfg.max_skew_ms)
-        self.client = PolicyClient(cfg.endpoint, cfg.connect_timeout_s)
+        self.client = PolicyClient(cfg.endpoint, cfg.connect_timeout_s, cfg.manifest)
         self.worker = InferenceWorker(self.client, self.aligner, cfg.prompt, self.clock,
                                       cfg.infer_timeout_s, cfg.manifest.pred_horizon, cfg.dt_ns,
                                       cfg.max_failures, int(cfg.obs_fail_after_ms * MS),
@@ -59,26 +59,19 @@ class Runner:
         self.commands: list[Any] = [self.dry_run]
         if cfg.mode == "hand":
             self.commands.append(HandUdpCommand(*cfg.hand_udp, cfg.rig.dataset.arm_dof))
-        self.executor = Executor(cfg.dt_ns, cfg.exec_horizon, cfg.limits, self.worker,
-                                 self.commands, self.trace)
+        self.executor = Executor(cfg.dt_ns, cfg.exec_horizon, self.worker, self.commands,
+                                 self.trace)
         self._stopping = threading.Event()
         self._ticker = threading.Thread(target=self._tick_forever, name="policy-ticks",
                                         daemon=True)
         self.started = False
-        self.server_manifest: dict[str, Any] = {}
         self.warmup_ms: float | None = None
 
     def start(self) -> None:
         try:
-            metadata = self.client.connect()
-        except Disconnected as error:
+            self.client.connect()
+        except (Disconnected, ServerError) as error:
             raise StartError(str(error)) from error
-        self.server_manifest = metadata.get("manifest") or {}
-        if not self.server_manifest:
-            raise StartError("server metadata has no manifest")
-        differences = self.cfg.manifest.differences(self.server_manifest)
-        if differences:
-            raise StartError("manifest differs from the server: " + "; ".join(differences))
         self.warmup_ms = self.warm_up()
         self.hub.start()
         self.worker.start()
@@ -126,8 +119,9 @@ class Runner:
         now_ns = self.clock.now_ns()
         executor = self.executor.status(now_ns)
         health = self.hub.health()
-        obs_age_ms = self.worker.last_obs_ages_ms
-        problems = list(self.worker.problems)
+        infer = self.worker.status()
+        obs_age_ms = infer["obs_age_ms"]
+        problems = infer.pop("problems")
         if executor["problem"] and executor["problem"] not in problems:
             problems.append(executor["problem"])
         return {
@@ -135,7 +129,7 @@ class Runner:
             "mode": self.cfg.mode,
             "endpoint": self.cfg.endpoint,
             "checkpoint": self.cfg.manifest.checkpoint,
-            "server_checkpoint": self.server_manifest.get("checkpoint"),
+            "server_checkpoint": (self.client.metadata.get("manifest") or {}).get("checkpoint"),
             "prompt": self.cfg.prompt,
             "warmup_ms": self.warmup_ms,
             "streams": {
@@ -143,7 +137,7 @@ class Runner:
                        "max_age_ms": self.cfg.max_age_ms[name]}
                 for name in self.cfg.required_streams
             },
-            "infer": self.worker.status(),
+            "infer": infer,
             "chunk": executor["chunk"],
             "sent": self.dry_run.status(),
             "problems": problems[-10:],

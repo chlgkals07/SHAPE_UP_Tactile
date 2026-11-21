@@ -191,7 +191,7 @@ svg .fill-line { fill: var(--line); }
   <div class="card"><div class="k">관측 → 정책</div><div class="v">state 22 + 이미지</div><div class="s">팔 6 관절(rad) + 손 16 관절(rad), 카메라 RGB, 프롬프트</div></div>
   <div class="card"><div class="k">정책 → 실행기</div><div class="v">(50, 22) chunk</div><div class="s">H = 50 행 중 앞 K = 10 행만 실행</div></div>
   <div class="card"><div class="k">실행 격자</div><div class="v">30 Hz</div><div class="s">dt = 33,333,333 ns, 녹화 데이터셋과 같은 fps</div></div>
-  <div class="card"><div class="k">검증</div><div class="v">78 + 170 테스트</div><div class="s">의도적 버그 11/11 검출, 실행 trace 감사기 0 위반</div></div>
+  <div class="card"><div class="k">검증</div><div class="v">79 + 170 테스트</div><div class="s">의도적 버그 10/10 검출, 실행 trace 감사기 0 위반</div></div>
 </div>
 
 <div class="tablewrap"><table>
@@ -338,8 +338,8 @@ svg .fill-line { fill: var(--line); }
 <li><b>관측 정렬.</b> 추론 스레드가 깨어나 <code>ObsAligner.align(t_obs)</code> 로 그 시각의 state(22)와 카메라 이미지를 만든다. 오래됐거나 빠진 stream 이 있으면 요청하지 않고 다음 tick 에 다시 시도한다.</li>
 <li><b>전송과 대기.</b> <code>PolicyClient.infer</code> 가 관측을 msgpack 으로 보내고 응답을 기다린다. 기다리는 시간은 최대 <code>infer_timeout_ms</code>(1000 ms)다.</li>
 <li><b>응답 검사.</b> <code>check_reply</code> 가 <code>actions</code> 의 모양 (50, 22), float 형, 모든 값이 유한한지 본다. 통과하면 <code>ActionChunk</code> 가 된다. 이 chunk 에는 관측 시각 <code>t_obs_ns</code> 와 도착 시각이 붙는다.</li>
-<li><b>채택.</b> 다음 tick 에 Executor 가 chunk 를 꺼낸다. chunk 가 너무 오래되지 않았는지(500 ms)만 본다. 통과하면 그 tick 이 행 0 의 시각이 되고, 상태는 RUNNING 이 된다. 관절 범위와 속도 제한은 실행기가 아니라 장치 제어기(LEAP 드라이버의 clip·slew)가 맡는다.</li>
-<li><b>실행.</b> 이어지는 tick 마다 행 1, 2, … 를 보낸다. 앞 K = 10 행만 쓴다. 예정보다 10 ms 넘게 늦은 행은 보내지 않고 <code>late</code> 로 기록한다.</li>
+<li><b>채택.</b> 다음 tick 에 Executor 가 chunk 를 꺼낸다. 형식 검사(<code>check_reply</code>)를 통과한 chunk 는 늦게 왔어도 그대로 쓴다(openpi 예제와 같음). 그 tick 이 행 0 의 시각이 되고, 상태는 RUNNING 이 된다. 관절 범위와 속도 제한은 실행기가 아니라 장치 제어기(LEAP 드라이버의 clip·slew)가 맡는다.</li>
+<li><b>실행.</b> 이어지는 tick 마다 행 1, 2, … 를 보낸다. 앞 K = 10 행만 쓴다. tick 이 늦게 깨도 그 칸(dt) 안이면 보낸다. 칸이 통째로 지나간 행만 <code>late</code> 로 기록하고 건너뛴다.</li>
 <li><b>다음 요청.</b> K 행을 다 쓴 tick 에 다음 요청을 하고 HOLD 로 간다. 1번으로 돌아간다.</li>
 </ol>
 
@@ -511,7 +511,7 @@ svg .fill-line { fill: var(--line); }
 <h3>시작할 때의 검사</h3>
 <ol class="steps">
 <li><b>연결 + metadata.</b> 연결되면 서버가 먼저 보내는 metadata 를 받는다. 받지 못하면 <code>StartError</code>.</li>
-<li><b>manifest 대조.</b> checkpoint 를 학습한 조건(manifest: fps, joint_names, cameras, mount, hand_action, pred_horizon, checkpoint, norm_stats_id)이 실행기 설정과 같은지 비교한다. 한 항목이라도 다르면 시작하지 않는다. 다른 rig 설정으로 학습한 정책을 잘못 돌리는 일을 막는다.</li>
+<li><b>manifest 대조.</b> checkpoint 를 학습한 조건(manifest: fps, joint_names, cameras, mount, hand_action, pred_horizon, checkpoint, norm_stats_id)이 실행기 설정과 같은지 비교한다. 한 항목이라도 다르면 시작하지 않는다. 실행 중에 끊겼다가 다시 연결할 때도 매번 비교하고, 다르면 FAULT 다. 다른 rig 설정으로 학습한 정책을 잘못 돌리는 일을 막는다.</li>
 <li><b>warm-up.</b> 0 state 와 0 이미지로 요청을 한 번 보내고 결과는 버린다. 실제 π0.5 는 첫 요청에서 JIT 컴파일로 수 초가 걸린다. 이 시간이 첫 chunk 의 timeout 으로 나타나지 않게 한다.</li>
 </ol>
 
@@ -800,12 +800,11 @@ policy_metadata={
             <span class="kw">return</span>
         self._step(now_ns, grid_ns)</code></pre>
 
-<h3>채택 검사 (<code>_adopt</code> → <code>_problems</code>)</h3>
-<div class="tablewrap"><table>
-<tr><th>검사</th><th>설정</th><th>왜</th></tr>
-<tr><td>chunk 나이 = 지금 − <code>t_obs_ns</code></td><td><code>chunk_max_delay_ms</code> 500</td><td>너무 오래된 관측으로 만든 계획은 지금 세계와 맞지 않는다 (M12)</td></tr>
-</table></div>
-<p>걸리면 그 chunk 는 trace 에 <code>adopted: false</code> 와 이유를 남기고 버린다. 그다음 바로 새 요청을 하고 HOLD 로 간다.</p>
+<h3>채택 (<code>_adopt</code>)</h3>
+<p>도착한 chunk 는 거부하지 않는다. 형식(모양·dtype·NaN)은 응답을 받을 때 <code>check_reply</code> 가 이미 봤고, 틀리면 FAULT 다. 채택하면 trace 에 <code>chunk</code> 를 남기고 RUNNING 이 된다.</p>
+<div class="callout"><div class="t">오래된 chunk 거부도 뺐다 (2026-11-21)</div>
+<p>chunk 나이가 <code>chunk_max_delay_ms</code>(500) 를 넘으면 버렸다. 채택은 도착 다음 tick 이라 나이 = RTT + 최대 1 tick 이고, 결국 "RTT 466.7 ms 초과면 버림" 이었다. infer timeout(1000 ms)과 역할이 겹치고, 버리면 RTT 만큼 또 기다려서 지연이 두 배가 된다. Mac 터널 실행에서 chunk 501개 중 1개(502.1 ms)가 이렇게 버려졌다. openpi 예제는 기다려 받은 chunk 를 그대로 실행한다. 검사와 M12 를 함께 지웠다.</p>
+</div>
 <div class="callout"><div class="t">동작 검사는 실행기에서 뺐다 (2026-11-21)</div>
 <p>처음에는 첫 행과 측정 상태의 차이(<code>first_row_max_rad</code> 0.15)와 행 사이 차이(<code>step_max_rad</code> 0.05)가 넘으면 chunk 를 버렸다. 그런데 이 숫자는 데이터에서 정한 값이 아니었고, 11/17 시연 데이터 자체가 자주 넘었다.</p>
 <ul>
@@ -819,13 +818,13 @@ policy_metadata={
 <ul>
 <li><b>행 i 의 예정 시각 = 채택 tick 의 격자 시각 + i·dt.</b> 응답이 도착한 시각을 기준으로 잡지 않는다 (M06).</li>
 <li><b>몰아 보내지 않는다.</b> tick 이 늦어 행 3, 4 를 놓쳤으면 둘 다 <code>late</code> 로 기록하고 지금 시각에 맞는 행만 보낸다. 밀린 목표를 한꺼번에 보내면 손이 급하게 움직인다 (M05).</li>
-<li><b>예정보다 <code>tick_jitter_ms</code>(10 ms) 넘게 늦으면</b> 그 행도 보내지 않는다.</li>
+<li><b>늦은 tick 도 자기 칸 안이면 보낸다.</b> 행 번호는 지금 시각으로 센다. 예전에는 10 ms(<code>tick_jitter_ms</code>) 넘게 늦으면 보내지 않았는데, 그러면 다음 tick 에 목표가 2행을 건너뛴다. openpi 예제도 늦은 step 을 건너뛰지 않는다. 그래서 2026-11-21 에 한도를 뺐다.</li>
 <li><b>K 행을 넘지 않는다.</b> H = 50 행이 와도 앞 10 행만 쓰고 다음 관측으로 다시 묻는다 (M07).</li>
 </ul>
 
 <div class="callout bad"><div class="t">평가 중에 찾은 버그: 행을 깬 시각 기준으로 셌다</div>
 <p>처음에는 chunk 시작 시각을 tick 스레드가 <b>실제로 깬 시각</b>으로 잡았다. 그런데 그 tick 이 늦게 깨면 다음 tick 들이 이 시작 시각에 비해 이르게 된다. Hub 화면을 띄운 채 돌린 실측 trace 에서 행 2 와 3 이 23.318 ms 간격으로 나갔다(최소 허용 dt − jitter = 23.333 ms). 감사기가 이것을 잡았다.</p>
-<p>수정(<code>9b73f4a</code>): tick 스레드가 <b>예정 격자 시각</b>을 같이 넘긴다(<code>tick(now, grid)</code>). 행 번호와 예정 시각은 격자로 계산하고, 늦음은 실제 시각으로 잰다. tick 스레드는 예정 시각보다 일찍 깨지 않으므로 두 전송 사이가 dt − jitter 보다 짧아질 수 없다. 수정한 뒤 60 s 실측 두 번에서 위반은 0 이었다.</p>
+<p>수정(<code>9b73f4a</code>): tick 스레드가 <b>예정 격자 시각</b>을 같이 넘긴다(<code>tick(now, grid)</code>). chunk 시작 시각은 격자로 잡는다. 수정한 뒤 60 s 실측 두 번에서 위반은 0 이었다. 지금은 늦은 행 한도를 없앴으므로 행 번호는 지금 시각으로 세고, 감사기는 두 행의 <b>예정 시각</b>이 dt 이상 떨어졌는지를 본다.</p>
 </div>
 
 <pre><code><span class="cm"># runner.py · 30 Hz 격자</span>
@@ -879,32 +878,31 @@ policy_metadata={
 <tr><td>연결 끊김</td><td><code>Disconnected</code></td><td>다음 요청에서 다시 연결. 3번 연속이면 FAULT</td></tr>
 <tr><td>서버 예외</td><td>텍스트 프레임 → <code>ServerError</code></td><td>바로 FAULT. traceback 의 마지막 줄을 화면에 보여 준다</td></tr>
 <tr><td>NaN·inf, 모양·형 오류</td><td><code>check_reply</code></td><td>바로 FAULT. 그 응답은 chunk 가 되지 않는다</td></tr>
-<tr><td>오래된 chunk</td><td><code>Executor._problems</code></td><td>그 chunk 만 버리고 새로 요청 (HOLD)</td></tr>
-<tr><td>tick 이 늦음</td><td>예정 대비 &gt; 10 ms</td><td>그 행만 건너뛰고 <code>late</code> 기록</td></tr>
+<tr><td>tick 이 칸을 통째로 놓침</td><td>지금 시각의 행 번호가 다음 행보다 큼</td><td>놓친 행만 <code>late</code> 기록, 지금 행을 보낸다</td></tr>
 <tr><td>명령 전송 실패 (UDP)</td><td><code>OSError</code></td><td>FAULT</td></tr>
 <tr><td>manifest 다름, 서버 없음, warm-up 실패</td><td><code>Runner.start</code></td><td>시작 거부 (<code>StartError</code>)</td></tr>
+<tr><td>다시 연결한 서버의 manifest 가 다름 (서버가 다른 checkpoint 로 재시작)</td><td><code>PolicyClient.connect</code> → <code>ManifestMismatch</code></td><td>바로 FAULT</td></tr>
 </table></div>
 
 <h3>trace: 모든 판단의 기록</h3>
 <p><code>traces/YYYY-MM-DD_HHMMSS.jsonl</code> 에 사건 하나가 한 줄로 남는다. 첫 줄은 <code>config</code> 다. 감사기는 이 파일만 보고 규칙을 다시 검사한다.</p>
 <div class="tablewrap"><table>
 <tr><th>사건</th><th>필드</th></tr>
-<tr><td><code>config</code></td><td>dt_ns, exec_horizon, chunk_max_delay_ns, tick_jitter_ns</td></tr>
+<tr><td><code>config</code></td><td>dt_ns, exec_horizon</td></tr>
 <tr><td><code>state</code></td><td>state, reason</td></tr>
 <tr><td><code>obs</code></td><td>obs_id, t_obs_ns, ok, problems, picks{stream: seq, t_ns, age_ns}</td></tr>
 <tr><td><code>request</code> / <code>reply</code></td><td>obs_id / ok, problems, rtt_ms, infer_ms</td></tr>
-<tr><td><code>chunk</code></td><td>chunk_id, obs_id, t_obs_ns, t_reply_ns, adopted, problems</td></tr>
+<tr><td><code>chunk</code></td><td>chunk_id, obs_id, t_obs_ns, t_reply_ns</td></tr>
 <tr><td><code>send</code> / <code>late</code> / <code>hold</code></td><td>due_ns, chunk_id, row, action[22] / due_ns, chunk_id, row / —</td></tr>
 </table></div>
 <p>감사기(<code>audit/audit_trace.py</code>, 표준 라이브러리만 씀)가 보는 규칙은 다음과 같다.</p>
 <ul>
 <li>미래 샘플을 쓰지 않았다.</li>
-<li>채택한 chunk 의 나이가 한도 안이다.</li>
 <li>보낸 행은 22개의 유한한 값이다.</li>
 <li>RUNNING 이 아닐 때, 또는 FAULT 뒤에는 보내지 않았다.</li>
 <li>채택하지 않은 chunk 의 행을 보내지 않았다.</li>
 <li>행 번호는 0…K−1 이고, chunk 하나에서 K 행을 넘지 않는다.</li>
-<li>예정보다 늦게 보내지 않았고, 두 전송 사이가 dt − jitter 보다 짧지 않다.</li>
+<li>예정 시각에서 dt 넘게 늦게 보내지 않았고, 두 전송의 예정 시각이 dt 이상 떨어져 있다.</li>
 <li>FAULT 에서는 reset 으로만 빠져나왔다.</li>
 </ul>
 
@@ -1010,11 +1008,11 @@ observation:
   max_age_ms: {cam_wrist: 200, arm_state: 50, hand: 100}
   max_skew_ms: 200
   fail_after_ms: 1000
-execution: {mode: dry_run, exec_horizon: 10, chunk_max_delay_ms: 500, tick_jitter_ms: 10}
+execution: {mode: dry_run, exec_horizon: 10}
 hand_udp: {host: 127.0.0.1, port: 47810}
 ui: {host: 127.0.0.1, port: 8810}
 trace: {dir: ../traces}</code></pre>
-<p>모든 한도는 코드에 박지 않고 설정에 둔다. 지금 값은 첫 출발점이다. 특히 <code>infer_timeout_ms</code>, <code>chunk_max_delay_ms</code>, K 는 실제 π0.5 지연을 보고 정한다. GPU 서버 안에서 잰 RTT 는 p50 74 ms, p99 84 ms 라 지금 값(1000 ms, 500 ms, K 10 = 333 ms)으로 여유가 있다. Mac 에서 ssh 터널로 잰 RTT 는 p50 125 ms, p99 319 ms 다. timeout 은 여유가 있지만 p99 가 K 10 에 가까워서, 학습한 checkpoint 로 다시 잰 뒤 K 를 정한다. <code>warmup_timeout_s</code>, <code>max_failures</code>, <code>fail_after_ms</code> 는 고정 테스트 설정보다 나중에 생겨서 코드에서 기본값(60, 3, 1000)으로도 읽는다.</p>
+<p>모든 한도는 코드에 박지 않고 설정에 둔다. 지금 값은 첫 출발점이다. 특히 <code>infer_timeout_ms</code> 와 K 는 실제 π0.5 지연을 보고 정한다. GPU 서버 안에서 잰 RTT 는 p50 74 ms, p99 84 ms 라 지금 값(1000 ms, K 10 = 333 ms)으로 여유가 있다. Mac 에서 ssh 터널로 잰 RTT 는 p50 125 ms, p99 319 ms 다. timeout 은 여유가 있지만 p99 가 K 10 에 가까워서, 학습한 checkpoint 로 다시 잰 뒤 K 를 정한다. <code>warmup_timeout_s</code>, <code>max_failures</code>, <code>fail_after_ms</code> 는 고정 테스트 설정보다 나중에 생겨서 코드에서 기본값(60, 3, 1000)으로도 읽는다.</p>
 
 <!-- ============================================================ 13 -->
 <h2 id="eval"><span class="n">13</span>평가</h2>
@@ -1025,10 +1023,10 @@ trace: {dir: ../traces}</code></pre>
 </ul>
 
 <div class="cards">
-  <div class="card"><div class="k">policy_runner 수락 테스트</div><div class="v">78 passed</div><div class="s">처음 83개. 동작 검사를 빼며 그 테스트 2개와 감사기 위반 사례 3개를 지웠다</div></div>
+  <div class="card"><div class="k">policy_runner 수락 테스트</div><div class="v">79 passed</div><div class="s">처음 83개. 동작 검사·오래된 chunk 검사를 빼며 테스트 3개와 감사기 위반 사례 4개를 지우고, 늦은 tick·느린 응답·재연결 manifest 테스트 3개를 더했다</div></div>
   <div class="card"><div class="k">leap_teleop</div><div class="v">170 passed</div></div>
   <div class="card"><div class="k">control_hub</div><div class="v">110 passed</div><div class="s">1 실패는 Linux 전용 <code>/proc</code> 테스트(main 과 같음), 36 skip 은 tmux 없음</div></div>
-  <div class="card"><div class="k">의도적 버그</div><div class="v">11 / 11</div><div class="s">각각 그 버그를 노린 테스트가 잡았다. M11(첫 행 검사)은 검사와 함께 삭제</div></div>
+  <div class="card"><div class="k">의도적 버그</div><div class="v">10 / 10</div><div class="s">각각 그 버그를 노린 테스트가 잡았다. M11(첫 행 검사)·M12(오래된 chunk)는 검사와 함께 삭제</div></div>
 </div>
 
 <h3>실제 프로세스로 돌린 결과</h3>
@@ -1133,7 +1131,7 @@ trace: {dir: ../traces}</code></pre>
 <p>순서: 학습한 checkpoint 로 실측(User PC 유선 + 터널, 나중에 5080 로컬) → 224 resize → denoising step → prefetch → 필요하면 RTC.</p>
 
 <div class="callout warn"><div class="t">이 Mac 에서만 잰 tick 정밀도</div>
-<p>실행기 없이 1/30 s 대기만 150번 해 보니 <code>Event.wait</code> 는 p50 9.35 ms, <code>time.sleep</code> 은 p50 8.55 ms 늦었다. 백그라운드 프로세스의 타이머 병합으로 보인다. 고장 주입 실험의 late 3.7% 는 이 기계의 대기 오차가 10 ms 한도에 닿은 결과로 본다. 실제로 돌릴 Ubuntu User PC 에서는 재지 않았다 <span class="tag unv">미검증</span>.</p>
+<p>실행기 없이 1/30 s 대기만 150번 해 보니 <code>Event.wait</code> 는 p50 9.35 ms, <code>time.sleep</code> 은 p50 8.55 ms 늦었다. 백그라운드 프로세스의 타이머 병합으로 보인다. 고장 주입 실험의 late 3.7% 는 이 기계의 대기 오차가 10 ms 한도에 닿은 결과로 본다. 이 한도는 2026-11-21 에 뺐고, 같은 조건 10 s soak 에서 late 가 2 → 0 이 됐다. 실제로 돌릴 Ubuntu User PC 에서는 재지 않았다 <span class="tag unv">미검증</span>.</p>
 </div>
 
 <!-- ============================================================ 14 -->

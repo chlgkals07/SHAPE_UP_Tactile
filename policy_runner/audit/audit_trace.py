@@ -8,12 +8,12 @@ from pathlib import Path
 ACTION_DIM = 22
 
 SCHEMA = {
-    "config": ["dt_ns", "exec_horizon", "chunk_max_delay_ns", "tick_jitter_ns"],
+    "config": ["dt_ns", "exec_horizon"],
     "state": ["state", "reason"],
     "obs": ["obs_id", "t_obs_ns", "ok", "problems", "picks"],
     "request": ["obs_id"],
     "reply": ["obs_id", "ok", "problems", "rtt_ms"],
-    "chunk": ["chunk_id", "obs_id", "t_obs_ns", "t_reply_ns", "adopted", "problems"],
+    "chunk": ["chunk_id", "obs_id", "t_obs_ns", "t_reply_ns"],
     "send": ["due_ns", "chunk_id", "row", "action"],
     "late": ["due_ns", "chunk_id", "row"],
     "hold": [],
@@ -53,10 +53,8 @@ def audit(events: list[dict]) -> list[str]:
             for name, pick in event["picks"].items():
                 if pick["t_ns"] > event["t_obs_ns"]:
                     problems.append(f"{where}: obs {event['obs_id']} used {name} from the future")
-        elif kind == "chunk" and event["adopted"]:
+        elif kind == "chunk":
             adopted[event["chunk_id"]] = event
-            if event["t_ns"] - event["t_obs_ns"] > cfg["chunk_max_delay_ns"]:
-                problems.append(f"{where}: chunk {event['chunk_id']} adopted too late")
         elif kind == "send":
             action = event["action"]
             if len(action) != ACTION_DIM or not all(math.isfinite(v) for v in action):
@@ -73,11 +71,11 @@ def audit(events: list[dict]) -> list[str]:
             rows_per_chunk[event["chunk_id"]] = rows_per_chunk.get(event["chunk_id"], 0) + 1
             if rows_per_chunk[event["chunk_id"]] > cfg["exec_horizon"]:
                 problems.append(f"{where}: chunk {event['chunk_id']} sent more than K rows")
-            if event["t_ns"] - event["due_ns"] > cfg["tick_jitter_ns"]:
+            if event["t_ns"] - event["due_ns"] >= cfg["dt_ns"]:
                 problems.append(f"{where}: sent {event['t_ns'] - event['due_ns']} ns late")
             if (last_send is not None
-                    and event["t_ns"] - last_send["t_ns"] < cfg["dt_ns"] - cfg["tick_jitter_ns"]):
-                problems.append(f"{where}: two sends closer than dt")
+                    and event["due_ns"] - last_send["due_ns"] < cfg["dt_ns"]):
+                problems.append(f"{where}: two sends in one dt")
             last_send = event
     return problems
 

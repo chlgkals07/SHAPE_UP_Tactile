@@ -10,7 +10,6 @@ from tactile_rec.convert import align
 from tactile_rec.hub import Hub
 from tactile_rec.types import SRC_MONO
 
-from policy_runner.executor import Limits
 from policy_runner.manifest import Manifest
 
 MS = 1_000_000
@@ -35,7 +34,6 @@ class RunnerConfig:
     max_skew_ms: float
     mode: str
     exec_horizon: int
-    limits: Limits
     hand_udp: tuple[str, int]
     ui: tuple[str, int]
     trace_dir: Path
@@ -81,10 +79,6 @@ def parse(raw: dict[str, Any], base: Path, allow_hand: bool = False) -> RunnerCo
             max_skew_ms=float(observation["max_skew_ms"]),
             mode=str(execution["mode"]),
             exec_horizon=int(execution["exec_horizon"]),
-            limits=Limits(
-                chunk_max_delay_ns=int(float(execution["chunk_max_delay_ms"]) * MS),
-                tick_jitter_ns=int(float(execution["tick_jitter_ms"]) * MS),
-            ),
             hand_udp=(str(raw["hand_udp"]["host"]), int(raw["hand_udp"]["port"])),
             ui=(str(raw["ui"]["host"]), int(raw["ui"]["port"])),
             trace_dir=resolve(base, raw["trace"]["dir"]),

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Sequence
-from dataclasses import dataclass
 from typing import Protocol
 
 import numpy as np
@@ -12,12 +11,6 @@ from policy_runner.trace import Trace
 
 READY, RUNNING, HOLD, FAULT = "READY", "RUNNING", "HOLD", "FAULT"
 MS = 1_000_000
-
-
-@dataclass(frozen=True)
-class Limits:
-    chunk_max_delay_ns: int
-    tick_jitter_ns: int
 
 
 class ChunkSource(Protocol):
@@ -33,11 +26,10 @@ class Command(Protocol):
 
 
 class Executor:
-    def __init__(self, dt_ns: int, exec_horizon: int, limits: Limits, chunks: ChunkSource,
+    def __init__(self, dt_ns: int, exec_horizon: int, chunks: ChunkSource,
                  commands: Sequence[Command], trace: Trace):
         self.dt_ns = dt_ns
         self.k = exec_horizon
-        self.limits = limits
         self.chunks = chunks
         self.commands = list(commands)
         self.trace = trace
@@ -48,9 +40,7 @@ class Executor:
         self.cursor = 0
         self.last_problem = ""
         self._lock = threading.Lock()
-        trace.write("config", 0, dt_ns=dt_ns, exec_horizon=exec_horizon,
-                    chunk_max_delay_ns=limits.chunk_max_delay_ns,
-                    tick_jitter_ns=limits.tick_jitter_ns)
+        trace.write("config", 0, dt_ns=dt_ns, exec_horizon=exec_horizon)
 
     def arm(self, now_ns: int) -> None:
         with self._lock:
@@ -84,7 +74,7 @@ class Executor:
             if self.active is None and not self._adopt(now_ns, grid_ns):
                 self._hold(now_ns, "waiting for a chunk")
                 return
-            self._step(now_ns, grid_ns)
+            self._step(now_ns)
 
     def status(self, now_ns: int) -> dict:
         with self._lock:
@@ -101,9 +91,9 @@ class Executor:
                 },
             }
 
-    def _step(self, now_ns: int, grid_ns: int) -> None:
+    def _step(self, now_ns: int) -> None:
         assert self.active is not None
-        row = (grid_ns - self.t_start_ns) // self.dt_ns
+        row = (now_ns - self.t_start_ns) // self.dt_ns
         for skipped in range(self.cursor, min(row, self.k)):
             self._late(now_ns, skipped)
         if row >= self.k:
@@ -114,34 +104,17 @@ class Executor:
         if row < self.cursor:
             return
         self.cursor = row + 1
-        due_ns = self.t_start_ns + row * self.dt_ns
-        if now_ns - due_ns > self.limits.tick_jitter_ns:
-            self._late(now_ns, row)
-            return
-        self._send(now_ns, due_ns, row)
+        self._send(now_ns, self.t_start_ns + row * self.dt_ns, row)
 
     def _adopt(self, now_ns: int, grid_ns: int) -> bool:
         chunk = self.chunks.take(now_ns)
         if chunk is None:
             return False
-        problems = self._problems(chunk, now_ns)
         self.trace.write("chunk", now_ns, chunk_id=chunk.chunk_id, obs_id=chunk.obs_id,
-                         t_obs_ns=chunk.t_obs_ns, t_reply_ns=chunk.t_reply_ns,
-                         adopted=not problems, problems=problems)
-        if problems:
-            self.last_problem = problems[0]
-            self.chunks.request(now_ns)
-            return False
+                         t_obs_ns=chunk.t_obs_ns, t_reply_ns=chunk.t_reply_ns)
         self.active, self.adopted, self.t_start_ns, self.cursor = chunk, chunk, grid_ns, 0
         self._enter(RUNNING, now_ns, f"chunk {chunk.chunk_id}")
         return True
-
-    def _problems(self, chunk: ActionChunk, now_ns: int) -> list[str]:
-        age_ns = now_ns - chunk.t_obs_ns
-        if age_ns > self.limits.chunk_max_delay_ns:
-            return [f"chunk {chunk.chunk_id} is {age_ns / MS:.0f} ms old "
-                    f"(limit {self.limits.chunk_max_delay_ns / MS:.0f})"]
-        return []
 
     def _send(self, now_ns: int, due_ns: int, row: int) -> None:
         assert self.active is not None

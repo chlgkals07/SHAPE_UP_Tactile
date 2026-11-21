@@ -5,7 +5,7 @@
 
 - 관측: 각 stream 에서 `t_obs` 까지 도착한 샘플만 쓴다. 시각 규칙(recv / mono src, `latency_ms`), 손 feedback 필터, 이미지 JPEG 왕복이 녹화기 변환과 같다. 그래서 학습 데이터와 bit 단위로 같은 입력이 나간다.
 - 실행: 요청 1개만 기다린다. 받은 chunk 는 다음 tick 에 채택해 K 행을 보내고, 다 보내면 다음 요청을 한다. 늦은 행은 건너뛰고 기록하며, 밀린 행을 몰아 보내지 않는다.
-- 안전: 오래된 chunk 는 버린다. NaN·모양 오류·서버 오류, 연속 실패, 관측 실패 지속은 FAULT 로 간다. FAULT 는 reset 해야만 풀린다. 관절 범위·속도 제한은 실행기가 아니라 장치 제어기(LEAP 드라이버의 clip·slew)가 맡는다.
+- 안전: 받은 chunk 는 늦어도 실행한다(openpi 예제와 같음). NaN·모양 오류·서버 오류, 재연결한 서버의 manifest 불일치, 연속 실패, 관측 실패 지속은 FAULT 로 간다. FAULT 는 reset 해야만 풀린다. 관절 범위·속도 제한은 실행기가 아니라 장치 제어기(LEAP 드라이버의 clip·slew)가 맡는다.
 - 손: `mode: hand` 이면 `leap_teleop --source policy` 에 UDP(deg)로 보낸다. USB 는 `leap_teleop` 만 연다. 팔 명령은 아직 없다.
 - 모든 판단은 `traces/*.jsonl` 에 남는다. `audit/audit_trace.py` 가 그 trace 를 독립적으로 검사한다.
 

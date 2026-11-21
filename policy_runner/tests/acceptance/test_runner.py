@@ -47,7 +47,7 @@ def test_dry_run_end_to_end_with_fake_server(files, server):
         runner.stop()
     events = read_trace(runner.trace_path)
     assert audit(events) == []
-    assert sum(e["ev"] == "chunk" and e["adopted"] for e in events) >= 1
+    assert sum(e["ev"] == "chunk" for e in events) >= 1
     assert sum(e["ev"] == "send" for e in events) >= 10
     assert status["chunk"]["id"] >= 1
 

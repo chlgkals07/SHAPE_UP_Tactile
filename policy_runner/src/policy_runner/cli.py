@@ -10,7 +10,14 @@ from tactile_rec.hub import Hub
 from policy_runner import config as runner_config
 from policy_runner import fake_server
 from policy_runner.chunk import check_reply
-from policy_runner.inference import ACTION_DIM, Disconnected, PolicyClient
+from policy_runner.inference import (
+    ACTION_DIM,
+    Disconnected,
+    InferTimeout,
+    PolicyClient,
+    ServerError,
+    manifest_problems,
+)
 from policy_runner.manifest import Manifest
 from policy_runner.runner import Runner, StartError, synthetic_request
 
@@ -57,21 +64,24 @@ def cmd_probe(args: argparse.Namespace) -> int:
     except Disconnected as error:
         print(error, file=sys.stderr)
         return 1
-    server_manifest = metadata.get("manifest") or {}
-    differences = cfg.manifest.differences(server_manifest) if server_manifest else [
-        "server metadata has no manifest"]
+    differences = manifest_problems(cfg.manifest, metadata)
     print(f"metadata keys {sorted(metadata)}")
     for line in differences:
         print(f"manifest: {line}")
     request = synthetic_request(cfg, Hub(cfg.rig))
     rtts, infers, problems = [], [], []
-    for _ in range(args.count):
-        start = time.monotonic()
-        reply = client.infer(request, args.timeout_ms / 1000)
-        rtts.append((time.monotonic() - start) * 1000)
-        infers.append(reply.get("server_timing", {}).get("infer_ms"))
-        problems += check_reply(reply, cfg.manifest.pred_horizon, ACTION_DIM)
-    client.close()
+    try:
+        for _ in range(args.count):
+            start = time.monotonic()
+            reply = client.infer(request, args.timeout_ms / 1000)
+            rtts.append((time.monotonic() - start) * 1000)
+            infers.append(reply.get("server_timing", {}).get("infer_ms"))
+            problems += check_reply(reply, cfg.manifest.pred_horizon, ACTION_DIM)
+    except (InferTimeout, Disconnected, ServerError) as error:
+        print(f"probe stopped after {len(rtts)} replies: {error}", file=sys.stderr)
+        return 1
+    finally:
+        client.close()
     print(f"first {rtts[0]:.1f} ms; rest median {statistics.median(rtts[1:] or rtts):.1f} ms, "
           f"max {max(rtts[1:] or rtts):.1f} ms over {len(rtts)} requests")
     server_ms = [v for v in infers[1:] if v is not None]

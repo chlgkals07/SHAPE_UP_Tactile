@@ -8,7 +8,16 @@ import pytest
 
 from policy_runner import fake_server, wire
 from policy_runner.chunk import check_reply
-from policy_runner.inference import Disconnected, InferTimeout, PolicyClient, ServerError
+from policy_runner.inference import (
+    Disconnected,
+    InferTimeout,
+    ManifestMismatch,
+    PolicyClient,
+    ServerError,
+)
+from policy_runner.manifest import Manifest
+
+from conftest import manifest_dict
 
 
 def request(value: float) -> dict:
@@ -60,6 +69,18 @@ def test_hold_reply_repeats_the_state(serve):
     reply = client_for(serve()).infer(request(0.25), timeout_s=2.0)
     assert reply["actions"].shape == (50, 22)
     assert np.allclose(reply["actions"], 0.25)
+
+
+def test_reconnecting_to_another_manifest_raises(serve):
+    first = serve(metadata={"manifest": manifest_dict()})
+    other = serve(metadata={"manifest": manifest_dict(fps=15)})
+    client = PolicyClient(f"ws://127.0.0.1:{first.port}", 2.0, Manifest(**manifest_dict()))
+    client.infer(request(0.0), timeout_s=2.0)
+    client.close()
+    client.endpoint = f"ws://127.0.0.1:{other.port}"
+    with pytest.raises(ManifestMismatch, match="fps"):
+        client.infer(request(0.0), timeout_s=2.0)
+    assert not client.connected
 
 
 def test_string_reply_raises_server_error(serve):

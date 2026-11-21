@@ -4,7 +4,8 @@
 
 - Stage A (관측 정렬), Stage B (가짜 서버·dry-run·UI·CLI) 구현 완료. `leap_teleop --source policy` 와 Control Hub "정책" 페이지까지 구현했다.
 - 동작 검사(첫 행–측정 상태, 행 사이 차이)로 chunk 를 거부하던 것을 뺐다. 관절 범위·속도 제한은 LEAP 드라이버(clip·slew)가 맡는다. [결정](../docs/superpowers/plans/2026-11-20-policy-runner.md)
-- 평가 통과: 수락 테스트 78 (동작 검사 테스트를 지우기 전 83), leap_teleop 170, 의도적 버그 11/11 (M11 삭제). control_hub 1 실패는 Linux 전용 `/proc` 테스트다(main 과 동일). [결과](../docs/results/2026-11-21-policy-runner-eval.md)
+- 오래된 chunk 거부(`chunk_max_delay_ms`)와 늦은 행 한도(`tick_jitter_ms`)도 뺐다(openpi 예제와 같게). 재연결할 때도 manifest 를 비교하고, UI 상태 읽기를 lock 안으로 넣고, `probe` 가 서버 오류에서 traceback 대신 한 줄로 끝나게 했다.
+- 평가 통과: 수락 테스트 79, leap_teleop 170, 의도적 버그 10/10 (M11·M12 삭제). 가짜 서버 10 s soak 감사기 0 위반, late 0. control_hub 1 실패는 Linux 전용 `/proc` 테스트다(main 과 동일). [결과](../docs/results/2026-11-21-policy-runner-eval.md)
 - 실제 프로세스로 확인한 것: 가짜 rig + 가짜 서버 60 s (고장 주입 포함) 감사기 0 위반, 손 UDP → leap_teleop dry-run 의 live/hold/release, Hub iframe 화면.
 - Stage C 서버 연결: openpi-RLT `feat/omy-leap` 에 `OmyLeapInputs/Outputs` 와 `pi05_omy_leap` (metadata 에 manifest) 를 추가했다. 학습 안 한 pi05_base 로 serving 하고 GPU 서버 안에서 `probe`·`run` 으로 연결을 확인했다. manifest 일치, 응답 601/601 정상, 감사기 0 위반, RTT p50 74 ms, 첫 요청 JIT 36 s. chunk 는 학습 안 한 가중치라 모두 첫 행 검사로 거부됐다. [결과](../docs/results/2026-11-21-server-smoke.md)
 
@@ -13,7 +14,7 @@
 1. Ubuntu User PC 에서 `./audit/run_all.sh` 와 60 s soak 를 다시 돈다. tmux 테스트와 tick 정밀도가 이 Mac 과 다를 수 있다. late 비율과 예정 대비 지연 p99 를 결과 문서에 추가한다.
 2. User PC 에서 ssh 터널로 `probe` 를 돌려 망 지연을 잰다. User PC 에 GPU 서버 ssh key 가 필요하다.
 3. 영상이 있는 실데이터 수집 → norm stats → 학습. checkpoint 를 바꾸면 서버의 `OMY_LEAP_CHECKPOINT_ID`/`OMY_LEAP_NORM_STATS_ID` 와 실행기 manifest 를 같이 바꾼다. 그 뒤 실제 센서 dry-run(C3).
-4. 실물 손 모드 전에 정할 것: 정책 모드의 `--release-timeout`·`--safe-pose`.
+4. 실물 손 모드 전에 정할 것: 정책 모드의 `--release-timeout`·`--safe-pose`. 지금 기본값(3 s, open)이면 연속 timeout 3번(3 × 1000 ms + 재시도 2 × dt = 3066.7 ms)이 FAULT 가 되기 전에 손이 먼저 열려 쥔 물체를 놓는다.
 
 ## 미해결
 

@@ -16,8 +16,7 @@ ROW = [0.0] * 22
 
 def good_trace() -> list[dict]:
     events = [
-        {"ev": "config", "t_ns": 0, "dt_ns": DT, "exec_horizon": 3,
-         "chunk_max_delay_ns": 500 * MS, "tick_jitter_ns": 10 * MS},
+        {"ev": "config", "t_ns": 0, "dt_ns": DT, "exec_horizon": 3},
         {"ev": "state", "t_ns": 0, "state": "HOLD", "reason": "arm"},
         {"ev": "obs", "t_ns": 0, "obs_id": 1, "t_obs_ns": 0, "ok": True, "problems": [],
          "picks": {"arm_state": {"seq": 1, "t_ns": -2 * MS, "age_ns": 2 * MS}}},
@@ -25,7 +24,7 @@ def good_trace() -> list[dict]:
         {"ev": "reply", "t_ns": 90 * MS, "obs_id": 1, "ok": True, "problems": [], "rtt_ms": 90},
         {"ev": "hold", "t_ns": 0},
         {"ev": "chunk", "t_ns": 4 * DT, "chunk_id": 1, "obs_id": 1, "t_obs_ns": 0,
-         "t_reply_ns": 90 * MS, "adopted": True, "problems": []},
+         "t_reply_ns": 90 * MS},
         {"ev": "state", "t_ns": 4 * DT, "state": "RUNNING", "reason": "chunk 1"},
     ]
     for row in range(3):
@@ -58,10 +57,9 @@ VIOLATIONS = {
     "nan action": lambda e: set_send(e, 1, action=[float("nan")] * 22),
     "short action": lambda e: set_send(e, 1, action=[0.0] * 21),
     "chunk never adopted": lambda e: set_send(e, 0, chunk_id=9),
-    "adopted too late": lambda e: e[index_of(e, "chunk")].update(t_ns=600 * MS),
     "future pick": lambda e: e[index_of(e, "obs")]["picks"]["arm_state"].update(t_ns=5 * MS),
     "sends closer than dt": lambda e: set_send(e, 1, t_ns=4 * DT + MS, due_ns=4 * DT + MS),
-    "sent late": lambda e: set_send(e, 2, t_ns=6 * DT + 20 * MS),
+    "sent a dt late": lambda e: set_send(e, 2, t_ns=7 * DT),
     "send while hold": lambda e: e.insert(index_of(e, "send", 2),
                                           {"ev": "state", "t_ns": 6 * DT, "state": "HOLD",
                                            "reason": "x"}),

@@ -33,6 +33,8 @@
 | 실행 격자 기준 (2026-11-21) | chunk 시작과 행 번호는 ticker 의 예정 격자 시각, 늦음은 실제 시각으로 잰다 (`tick(now, grid)`) | 실제 깬 시각 기준 | 실측 trace 에서 두 행이 23.318 ms 간격으로 나갔다 (`9b73f4a`) |
 | 의도적 버그 방식 (2026-11-21) | `audit/mutants.py` 의 문자열 치환 표 (정확히 한 번 일치, 항상 복원) | `.patch` 파일 | 패치가 엉뚱한 곳에 적용될 일이 없고 한 파일로 읽힌다 |
 | 동작 검사 삭제 (2026-11-21) | 실행기는 chunk 를 동작 기준(첫 행–측정 상태 `first_row_max_rad`, 행 사이 `step_max_rad`)으로 거부하지 않는다. 관절 범위·속도 제한은 장치 제어기(LEAP 드라이버 clip·slew)가 맡는다. 남긴 검사: 형식(NaN·모양·manifest), 오래된 chunk, 관측 나이·어긋남, 늦은 행 건너뛰기 | 데이터 기반 그룹별 한도로 유지, 기록만 하는 모드 | 사용자 결정. 0.15 / 0.05 는 데이터에서 정한 값이 아니었고 11/17 시연이 자주 넘었다(손 sent−pos p99 0.18 rad, 10행 창 손 23–44 % / 팔 10–17 % 가 0.05 초과). openpi 예제 클라이언트도 하지 않는다. 감사기 규칙 2개, 테스트 2개, M11 을 함께 지웠다 |
+| 오래된 chunk·늦은 행 한도 삭제 (2026-11-21) | `chunk_max_delay_ms` 와 `tick_jitter_ms` 를 뺐다. 받은 chunk 는 늦어도 실행하고, 늦게 깬 tick 도 자기 dt 칸 안이면 행을 보낸다. 칸이 통째로 지나간 행만 `late` | 유지, 한도를 infer timeout 에 맞춤 | openpi 예제(ALOHA `Runtime`, DROID `main.py`)가 하지 않는다. chunk 나이 한도는 RTT 466.7 ms 초과 거부와 같아 timeout 과 겹치고, 버리면 지연이 두 배가 된다(Mac 터널 501개 중 1개 거부). 늦은 행을 안 보내면 다음 tick 에 2행을 건너뛴다. M12 삭제, M06 은 예정 시각 확인 테스트로 잡는다 |
+| 재연결 manifest (2026-11-21) | `PolicyClient` 가 연결할 때마다 manifest 를 비교하고 다르면 `ManifestMismatch`(FAULT) | 시작 때만 비교 | timeout·끊김 뒤 자동 재연결하므로, 공유 GPU 서버가 다른 checkpoint 로 다시 떠도 모르고 돌 수 있었다 |
 | 실패 한도 (2026-11-21) | `policy.max_failures`(3) 연속 실패, `observation.fail_after_ms`(1000) 관측 실패 지속이면 FAULT. 시작 때 warm-up 1회(`policy.warmup_timeout_s` 60) | 무한 재시도 | §4 상태 기계. 고정 테스트 설정에 없는 키라 코드 기본값으로 읽는다 |
 | websockets (2026-11-21) | `websockets>=17.1`, `connect(..., legacy=True)`, Python ≥ 3.11 | context manager 연결 | 연결을 오래 유지한다. 17.1 부터 직접 연결은 `legacy=True` 가 필요하다 (설치된 17.4 소스에서 확인) |
 

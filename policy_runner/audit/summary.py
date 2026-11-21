@@ -27,8 +27,7 @@ def summarize(events: list[dict]) -> list[str]:
         f"events {dict(kinds)}",
         f"ticks while armed {ticks}: send {kinds['send']}, late {kinds['late']}, "
         f"hold {kinds['hold']} ({100 * kinds['hold'] / max(ticks, 1):.1f}%)",
-        f"chunks {len(chunks)}: adopted {sum(c['adopted'] for c in chunks)}, "
-        f"rejected {sum(not c['adopted'] for c in chunks)}",
+        f"chunks {len(chunks)}",
         f"replies ok {len(rtts)}, failed {dict(failed)}",
         f"faults {len(faults)}: {Counter(f['reason'].split(':')[0] for f in faults)}",
     ]

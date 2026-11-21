@@ -46,9 +46,6 @@ MUTANTS = {
         ("            if self.state not in (RUNNING, HOLD):\n",
          "            if self.state == FAULT:\n"),
     ]),
-    "M12": ("executor.py", [
-        ("if age_ns > self.limits.chunk_max_delay_ns:", "if False:"),
-    ]),
 }
 
 
