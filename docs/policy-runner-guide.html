@@ -225,7 +225,7 @@ svg .fill-line { fill: var(--line); }
     <line x1="20" y1="50" x2="60" y2="50" class="ln" marker-end="url(#ah)"/><text x="70" y="54">데이터 흐름 (구현·확인)</text>
     <line x1="20" y1="74" x2="60" y2="74" class="ln-acc" marker-end="url(#ah-acc)"/><text x="70" y="78">WebSocket 요청·응답</text>
     <line x1="20" y1="98" x2="60" y2="98" class="ln-ok" marker-end="url(#ah-ok)"/><text x="70" y="102">손 목표 (UDP)</text>
-    <rect x="20" y="114" width="40" height="18" rx="4" class="box-plan"/><text x="70" y="128">Stage C 계획</text>
+    <rect x="20" y="114" width="40" height="18" rx="4" class="box-ok"/><text x="70" y="128">Stage C 에서 추가 (5절)</text>
   </g>
 
   <rect x="270" y="10" width="430" height="90" rx="12" class="zone"/>
@@ -440,7 +440,7 @@ svg .fill-line { fill: var(--line); }
     <text x="52" y="248" font-weight="700" font-size="12.5">반복 (요청 1개 in-flight)</text>
     <line x1="140" y1="274" x2="816" y2="274" class="ln-acc" marker-end="url(#ah-acc)"/>
     <text x="160" y="268" class="mono">msgpack({state: f32[22], images: {cam: u8[H,W,3]}, prompt: str})</text>
-    <rect x="828" y="284" width="110" height="34" rx="6" class="box-plan"/>
+    <rect x="828" y="284" width="110" height="34" rx="6" class="box-ok"/>
     <text x="838" y="305" font-size="11.5">policy.infer(obs)</text>
     <line x1="820" y1="336" x2="144" y2="336" class="ln-ok" marker-end="url(#ah-ok)"/>
     <text x="160" y="330" class="mono">msgpack({actions: f32[50,22], server_timing: {infer_ms, prev_total_ms}})</text>
@@ -983,7 +983,7 @@ policy_metadata={
 <tr><td>openpi-RLT <code>src/openpi/policies/omy_leap_policy.py</code> <span class="tag new">새</span></td><td class="num">132</td><td>요청 → π0.5 입력, 출력 → (50, 22), manifest 생성 (5절)</td></tr>
 <tr><td>openpi-RLT <code>src/openpi/training/config.py</code> <span class="tag mod">변경</span></td><td class="num">+84</td><td><code>LerobotOmyLeapDataConfig</code>, <code>pi05_omy_leap</code></td></tr>
 <tr><td>openpi-RLT <code>src/openpi/policies/omy_leap_policy_test.py</code> <span class="tag new">새</span></td><td class="num">148</td><td>변환·전체 경로·manifest 테스트 7개</td></tr>
-<tr><td><code>policy_runner/config/{rig,manifest,runner}.server-smoke.yaml</code> <span class="tag new">새</span></td><td class="num">30 + 13 + 13</td><td>GPU 서버 안에서 실행기를 돌리는 설정. 가짜 rig 에서 <code>cam_ext</code> 만 뺐고, manifest 는 서버 config 와 같은 값</td></tr>
+<tr><td><code>policy_runner/config/{rig,manifest,runner}.server-smoke.yaml</code> <span class="tag new">새</span></td><td class="num">34 + 13 + 13</td><td>GPU 서버 안에서 실행기를 돌리는 설정. 가짜 rig 에서 <code>cam_ext</code> 만 뺐고, manifest 는 서버 config 와 같은 값</td></tr>
 <tr><td><code>docs/results/2026-11-21-server-smoke.md</code> <span class="tag new">새</span></td><td class="num"></td><td>smoke 조건, 결과, 재현 명령</td></tr>
 </table></div>
 

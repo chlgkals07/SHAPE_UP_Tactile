@@ -1,16 +1,17 @@
 # policy_runner 진행 상황
 
-## 현재 (2026-11-21, `feat/policy-runner`, merge 전)
+## 현재 (2026-11-21, `feat/policy-runner` + `feat/policy-runner-server-smoke`, merge 전)
 
 - Stage A (관측 정렬), Stage B (가짜 서버·dry-run·UI·CLI) 구현 완료. `leap_teleop --source policy` 와 Control Hub "정책" 페이지까지 구현했다.
 - 고정 평가 통과: 수락 테스트 83, leap_teleop 170, 의도적 버그 12/12. control_hub 1 실패는 Linux 전용 `/proc` 테스트다(main 과 동일). [결과](../docs/results/2026-11-21-policy-runner-eval.md)
 - 실제 프로세스로 확인한 것: 가짜 rig + 가짜 서버 60 s (고장 주입 포함) 감사기 0 위반, 손 UDP → leap_teleop dry-run 의 live/hold/release, Hub iframe 화면.
+- Stage C 서버 연결: openpi-RLT `feat/omy-leap` 에 `OmyLeapInputs/Outputs` 와 `pi05_omy_leap` (metadata 에 manifest) 를 추가했다. 학습 안 한 pi05_base 로 serving 하고 GPU 서버 안에서 `probe`·`run` 으로 연결을 확인했다. manifest 일치, 응답 601/601 정상, 감사기 0 위반, RTT p50 74 ms, 첫 요청 JIT 36 s. chunk 는 학습 안 한 가중치라 모두 첫 행 검사로 거부됐다. [결과](../docs/results/2026-11-21-server-smoke.md)
 
 ## 다음 할 일
 
 1. Ubuntu User PC 에서 `./audit/run_all.sh` 와 60 s soak 를 다시 돈다. tmux 테스트와 tick 정밀도가 이 Mac 과 다를 수 있다. late 비율과 예정 대비 지연 p99 를 결과 문서에 추가한다.
-2. Stage C1: 실제 π0.5 지연 측정. 지금 `probe` 는 우리 rig 모양의 요청(state 22, cam_wrist/cam_ext)만 보낸다. 그래서 ALOHA checkpoint(`--env ALOHA`) 서버에는 맞지 않는다. 방법은 둘이다. `probe --example aloha` 를 추가하거나, 서버 쪽 openpi 의 `examples/simple_client` 로 잰다. 어느 쪽인지 정해야 한다.
-3. Stage C2: openpi-RLT 에 `OmyLeapInputs/Outputs`, `pi05_omy_leap`. serving 할 때 policy metadata 에 `manifest` 를 넣어야 한다(runner 가 시작할 때 대조한다).
+2. User PC 에서 ssh 터널로 `probe` 를 돌려 망 지연을 잰다. User PC 에 GPU 서버 ssh key 가 필요하다.
+3. 영상이 있는 실데이터 수집 → norm stats → 학습. checkpoint 를 바꾸면 서버의 `OMY_LEAP_CHECKPOINT_ID`/`OMY_LEAP_NORM_STATS_ID` 와 실행기 manifest 를 같이 바꾼다. 그 뒤 실제 센서 dry-run(C3).
 4. 실물 손 모드 전에 정할 것: 정책 모드의 `--release-timeout`·`--safe-pose`.
 
 ## 미해결
