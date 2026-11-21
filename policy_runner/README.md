@@ -43,4 +43,4 @@ uv run python audit/summary.py traces/<file>.jsonl
 uv run python audit/soak.py --seconds 60             # 실행 중인 runner 를 FAULT 마다 reset 하며 돌린다
 ```
 
-결과: [docs/results/2026-11-21-policy-runner-eval.md](../docs/results/2026-11-21-policy-runner-eval.md). 설계와 결정: [계획](../docs/superpowers/plans/2026-11-20-policy-runner.md).
+결과: [docs/results/2026-11-21-policy-runner-eval.md](../docs/results/2026-11-21-policy-runner-eval.md). 설계와 결정: [계획](../docs/superpowers/plans/2026-11-20-policy-runner.md). 전체 흐름 설명: [시스템 가이드](../docs/policy-runner-guide.html).
