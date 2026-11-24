@@ -1,8 +1,9 @@
 """OMY arm topics from the Robot PC, read without ROS through `zenoh-ros2-sdk`.
 
-The Robot PC runs ROS 2 Jazzy on rmw_zenoh. The User PC's Humble rmw_zenoh cannot receive
-those topics (it puts no type hash in the data key), so this adapter connects to the Robot
-PC's zenohd as a plain zenoh client and builds the Jazzy-style key itself.
+The Robot PC runs ROS 2 Jazzy on rmw_zenoh. This adapter connects to the Robot PC's zenohd
+as a plain zenoh client and builds the Jazzy-style key itself, so the recorder venv needs no
+ROS install. It was first needed because the old Humble User PC's rmw_zenoh could not receive
+those topics (no type hash in the data key); the Jazzy User PC could, but the venv stays ROS-free.
 
 Field 2026-11-17: receives /joint_states (~400 Hz) and /leader/joint_trajectory (~300 Hz)
 once the session runs in client mode (see `use_client_mode`).

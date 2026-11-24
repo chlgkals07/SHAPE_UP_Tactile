@@ -129,7 +129,8 @@ button:focus-visible,.chk:focus-within{outline:3px solid #6fc8bd;outline-offset:
       <li>LEAP은 플랜지에서 <b>오른쪽 90° 돌려 단 것이 최종 장착</b>이다. 팔은 <code>omy_ai</code> 대신 <code>omy_ai_wrist_flip</code>으로 띄운다 (“zenohd와 omy_ai” 단계).</li>
       <li>Manus → LEAP 텔레옵은 약 80% 완성. 남은 것: 잡기 위한 리타겟팅/IK 보정, 글러브 SDK 캘리브레이션을 다시 한 뒤 엄지 IK 확인.</li>
       <li>손목 카메라 D405 <span class="tag meas">실측 11/12</span>, Paxini 촉각 센서 연동 <span class="tag meas">실측 11/12</span> 확인.</li>
-      <li>기록은 Cyclo 대신 <b>자체 녹화기 <code>tactile-rec</code></b>(LeRobot 형식)로 한다 (11/15). ROS 없이 팔·손·촉각·카메라를 직접 받아서 Humble↔Jazzy 불통과 무관하다. 장치 켜고 끄기는 <b>컨트롤 허브</b>(브라우저)로 한다. 둘 다 실물 검증 전이다 → <b>단계 5·6 (검증 후 삭제)</b>.</li>
+      <li>기록은 Cyclo 대신 <b>자체 녹화기 <code>tactile-rec</code></b>(LeRobot 형식)로 한다 (11/15). ROS 없이 팔·손·촉각·카메라를 직접 받아서 Humble↔Jazzy 불통과 무관하다.</li>
+      <li><b>11/24부터 User PC는 RTX 5080 PC(Ubuntu 24.04 + ROS 2 Jazzy)다.</b> 아래 명령은 Jazzy 기준이다. Humble↔Jazzy 불통은 이 PC에서는 생기지 않는다(실물 미확인). 장치 켜고 끄기는 <b>컨트롤 허브</b>(브라우저)로 한다. 둘 다 실물 검증 전이다 → <b>단계 5·6 (검증 후 삭제)</b>.</li>
     </ul>
   </div>
   <div class="diagram">
@@ -193,14 +194,13 @@ button:focus-visible,.chk:focus-within{outline:3px solid #6fc8bd;outline-offset:
   <h2>처음 한 번 설정</h2>
   <span class="where user">USER PC</span>
   <h3>① 단축 함수와 환경 변수</h3>
-  <p><code>~/.bashrc</code> 끝에 넣는다 (이 User PC에는 11/03에 넣었다). 새 터미널부터는 <code>leap_env</code>만 치면 된다.</p>
+  <p><code>~/.bashrc</code> 끝에 넣는다 (RTX 5080 User PC에는 11/24에 넣었다. 레포 경로는 PC마다 맞춘다). 새 터미널부터는 <code>leap_env</code>만 치면 된다.</p>
   <div class="cmd"><pre><code># --- SHAPE_UP_Tactile LEAP/Manus teleop ---
 source ~/SHAPE_UP_Tactile/user_pc/scripts/leap_aliases.sh
-export LEAP_ROS_DISTRO=humble       # 이 User PC는 Ubuntu 22.04 + ROS 2 Humble
+export LEAP_ROS_DISTRO=jazzy        # User PC는 Ubuntu 24.04 + ROS 2 Jazzy
 export OMY_ROBOT_IP=10.42.0.241     # ROBOT PC IP (44B1050)
 export LEAP_MANUS_WS="$HOME/SHAPE_UP_Tactile/third_party/manus/ROS2 package"
-export LEAP_NO_ZENOH=1              # 기본(3·4·5단계). 2단계 셸에서만 unset LEAP_NO_ZENOH
-export PYTEST_ADDOPTS="-p no:anyio" # ~/.local anyio 플러그인과 apt pytest(6.x) 충돌 회피</code></pre></div>
+export LEAP_NO_ZENOH=1              # 기본(3·4·5단계). 2단계 셸에서만 unset LEAP_NO_ZENOH</code></pre></div>
   <div class="tblw"><table>
     <tr><th>단축 명령</th><th>하는 일</th></tr>
     <tr><td><code>leap_env</code></td><td>ROS + Manus msgs + PYTHONPATH, <code>user_pc/</code>로 이동. <code>LEAP_NO_ZENOH</code>가 있으면 남은 zenoh 변수도 지운다</td></tr>
@@ -209,13 +209,15 @@ export PYTEST_ADDOPTS="-p no:anyio" # ~/.local anyio 플러그인과 apt pytest(
     <tr><td><code>leap_check</code></td><td>LEAP 모터 ID 0~15 응답 확인</td></tr>
     <tr><td><code>leap_leader</code> / <code>leap_record</code> / <code>leap_topics</code></td><td>2단계 leader 트리거 / <code>/leap/*</code> ROS 발행 (Cyclo용, 지금은 안 씀. 녹화는 <code>leap_manus --record-udp</code>) / 토픽 목록</td></tr>
   </table></div>
-  <h3>①-b Humble용 패키지 (한 번)</h3>
-  <p><code>dynamixel_sdk</code>는 <code>python3-serial</code>이 없으면 import가 안 된다 (pytest는 하드웨어 없이 돌아서 통과해 버린다). <span class="tag meas">실측 11/03</span> 설치함.</p>
-  <div class="cmd"><pre><code>sudo apt install ros-humble-rmw-zenoh-cpp ros-humble-dynamixel-sdk python3-serial</code></pre></div>
-  <div class="warn">Robot PC 컨테이너는 Jazzy다. Humble <code>rmw_zenoh_cpp</code>(0.1.11)로 붙으면 <b>토픽 목록은 보이지만 Robot PC 토픽의 메시지는 0개</b>다 <span class="tag meas">실측 11/12</span>. 타입 해시 차이로 추정. 팔·손 텔레옵(2~4단계)은 영향 없다. User PC에서 팔 토픽을 받아야 하는 기록에서만 문제다 (<code>docs/field-test/2026-11-12-results.md</code> 8절).</div>
+  <h3>①-b Jazzy 패키지 (한 번)</h3>
+  <p><code>dynamixel_sdk</code>는 <code>python3-serial</code>이 없으면 import가 안 된다 (pytest는 하드웨어 없이 돌아서 통과해 버린다). <code>ros-base</code>는 <code>ros2</code> 명령, <code>ros-dev-tools</code>는 colcon이다. 공용 PC라 <code>--no-upgrade</code>로 기존 패키지는 올리지 않는다. RTX 5080 PC에는 11/24에 설치함.</p>
+  <div class="cmd"><pre><code>sudo apt install --no-upgrade ros-jazzy-ros-base ros-dev-tools \
+  ros-jazzy-rmw-zenoh-cpp ros-jazzy-dynamixel-sdk python3-serial</code></pre></div>
+  <div class="warn">Robot PC 컨테이너는 Jazzy다. 예전 Humble User PC의 <code>rmw_zenoh_cpp</code>(0.1.11)로 붙으면 <b>토픽 목록은 보이지만 Robot PC 토픽의 메시지는 0개</b>였다 <span class="tag meas">실측 11/12</span> (<code>docs/field-test/2026-11-12-results.md</code> 8절). 지금 User PC는 Jazzy라 해결될 것으로 본다. 처음 붙일 때 <code>ros2 topic echo /joint_states --once</code>로 확인한다.</div>
   <h3>①-d 손목 카메라와 Paxini (한 번)</h3>
-  <div class="cmd"><pre><code>sudo apt install ros-humble-realsense2-camera              # D405 (librealsense2 2.58)
-pip install -e ~/SHAPE_UP_Tactile/third_party/paxini       # Paxini SDK (의존성은 pyserial)</code></pre></div>
+  <div class="cmd"><pre><code># 녹화기는 venv 의 pyrealsense2 로 D405 를 직접 읽는다. ROS 노드로 볼 때만 (공용 PC 에서는 mesa 업그레이드를 같이 끌고 온다)
+sudo apt install ros-jazzy-realsense2-camera
+cd ~/SHAPE_UP_Tactile/recorder &amp;&amp; uv pip install -e ../third_party/paxini   # Paxini SDK 는 녹화기 venv 안에 (24.04 시스템 pip 는 막혀 있다)</code></pre></div>
   <h3>①-c 영점 파일 (한 번)</h3>
   <p><code>leap_env</code>는 <code>user_pc/</code>로 이동하므로 영점 파일은 <code>user_pc/config/hardware_motors.yaml</code>이어야 한다. 이 PC에는 아직 없고, 예전 작업 폴더에 하나 있다. 같은 LEAP 실물의 최신 파일인지 확인한 뒤 복사한다.</p>
   <div class="cmd"><pre><code>cp ~/Documents/antigravity/charming-pascal/leap-hand/calibration/hardware_motors.yaml \
@@ -225,7 +227,8 @@ pip install -e ~/SHAPE_UP_Tactile/third_party/paxini       # Paxini SDK (의존�
   <h3>③ Manus 노드 빌드 (Manus PC에서 한 번)</h3>
   <div class="cmd"><pre><code>source /opt/ros/$LEAP_ROS_DISTRO/setup.bash
 sudo apt install libncurses-dev      # 없으면 ncursesw/ncurses.h 에러
-cd "$LEAP_MANUS_WS" &amp;&amp; colcon build</code></pre></div>
+# uv 가 ~/.local/bin 에 python3.11 을 두면 CMake 가 그것을 잡아 'No module named em' 으로 실패한다
+cd "$LEAP_MANUS_WS" &amp;&amp; colcon build --cmake-args -DPython3_EXECUTABLE=/usr/bin/python3</code></pre></div>
   <ul>
     <li>동글용 udev 규칙 <code>third_party/manus/70-manus-hid.rules</code>를 <code>/etc/udev/rules.d/</code>에 넣고 다시 꽂는다.</li>
     <li>MANUS Core Dashboard(213 MB)는 git에 없다. integrated 모드에는 필요 없고, 글러브 펌웨어·캘리브레이션 등에 쓸 때만 MANUS 배포본을 받아 <code>third_party/manus/MANUS Core Dashboard (Linux build)/</code>에 둔다 (gitignore).</li>
@@ -357,7 +360,7 @@ ros2 run rqt_image_view rqt_image_view               # /camera/cam_wrist/color/i
   <h3>Paxini 촉각 <span class="tag meas">실측 11/12</span></h3>
   <p>연동은 확인했다. 실행 절차는 정리 중이다.</p>
   <ul>
-    <li>설치: <code>pip install -e ~/SHAPE_UP_Tactile/third_party/paxini</code> (“처음 한 번 설정” ①-d)</li>
+    <li>설치: 녹화기 venv 안에서 <code>uv pip install -e ../third_party/paxini</code> (“처음 한 번 설정” ①-d)</li>
     <li>사용법: <code>third_party/paxini/README.md</code>, <code>docs/SETUP_LINUX.md</code>, <code>docs/USAGE_GUIDE.md</code></li>
     <li>이 SDK는 공식 Paxini SDK가 아니라 커뮤니티 래퍼다 (<code>docs/FINDINGS.md</code>).</li>
   </ul>
@@ -528,10 +531,9 @@ leap_manus</code></pre></div>
   <h3>① 설치 (한 번)</h3>
   <span class="where user">USER PC · ROS를 source 하지 않은 새 터미널</span>
   <div class="cmd"><pre><code>cd ~/SHAPE_UP_Tactile/recorder
-python3 -m venv .venv &amp;&amp; source .venv/bin/activate
-pip install -e '.[ui,arm,tactile,camera]'
-pip install -e ../third_party/paxini
-pip install -e '.[dev]' &amp;&amp; env -u PYTHONPATH python -m pytest -q</code></pre></div>
+uv sync --extra ui --extra arm --extra tactile --extra camera --extra dev   # uv.lock 과 Python 3.12 고정을 따른다
+uv pip install -e ../third_party/paxini
+uv run --extra dev pytest -q</code></pre></div>
   <ul>
     <li><b>첫 실행은 인터넷이 되는 상태에서</b> 한다. 팔 스트림이 메시지 정의를 git에서 내려받는다.</li>
     <li>셸에 ROS가 올라와 있으면 명령 앞에 <code>env -u PYTHONPATH</code>를 붙인다.</li>
@@ -884,7 +886,7 @@ control-hub serve --config config/hub.yaml         # http://localhost:8700</code
     <tr><td>follower joint6이 한쪽으로 덜 돎</td><td>joint6을 π 근처에 두면 모터 한계(±π)에 걸린다. 90° 장착 + <code>omy_ai_wrist_flip</code>(π/2)을 쓴다</td></tr>
     <tr><td><code>leap_check</code>에서 한 모터만 ±180°</td><td>혼이 반 바퀴 돌아 조립됨 (11/12 ID 11). 편 손에서 1·5·9번(약 −85°) 말고는 0 근처(±15°)여야 한다</td></tr>
     <tr><td>LEAP 일부 ID(예: 0~3)만 ping 실패</td><td>그 손가락 쪽 케이블을 다시 꽂는다 <span class="tag meas">실측 11/12</span></td></tr>
-    <tr><td>User PC에서 Robot PC 토픽이 보이는데 메시지 0개</td><td>Humble↔Jazzy <code>rmw_zenoh</code> 불통 (“처음 한 번 설정”). 텔레옵은 무관</td></tr>
+    <tr><td>User PC에서 Robot PC 토픽이 보이는데 메시지 0개</td><td>예전 Humble User PC에서는 Humble↔Jazzy <code>rmw_zenoh</code> 불통이었다 (“처음 한 번 설정”). Jazzy User PC에서도 나오면 <code>ROS_DOMAIN_ID=30</code>, <code>ZENOH_CONFIG_OVERRIDE</code>(client + 로봇 IP)를 확인한다</td></tr>
     <tr><td>D405가 안 보임 / 느림</td><td>OMY를 다시 켰으면 다시 꽂는다. USB2로 잡히면 424x240@30, 깊이 끔 (“손목 카메라와 Paxini” 단계)</td></tr>
   </table></div>
 </section>
@@ -901,7 +903,7 @@ control-hub serve --config config/hub.yaml         # http://localhost:8700</code
     <tr><td><s>검지 PIP가 0에 붙음</s></td><td colspan="2"><span class="tag meas">실측 11/12</span> SDK 캘리브레이션 누락이 원인 (“글러브 캘리브레이션” ①)</td></tr>
     <tr><td>엄지 IK (SDK 캘리브레이션 뒤 나빠짐)</td><td>충전 후 재캘리브레이션, <code>--log-csv</code></td><td><code>ThumbCMCStretch</code> 범위 확인</td></tr>
     <tr><td>SDK 캘리브레이션이 글러브 재부팅 후 유지되는가</td><td>껐다 켜고 PIP 확인</td><td>ROS 노드가 <code>.mcal</code>을 불러오게 (<code>CoreSdk_SetGloveCalibration</code>)</td></tr>
-    <tr><td><s>Humble <code>rmw_zenoh</code>(User PC) ↔ Jazzy <code>zenohd</code>(Robot PC)</s></td><td><span class="tag meas">실측 11/12</span> 탐색만 되고 데이터 0개</td><td>DDS 통일 / Jazzy 컨테이너 / 24.04</td></tr>
+    <tr><td><s>Humble <code>rmw_zenoh</code>(User PC) ↔ Jazzy <code>zenohd</code>(Robot PC)</s></td><td><span class="tag meas">실측 11/12</span> 탐색만 되고 데이터 0개</td><td><b>User PC를 24.04 + Jazzy로 바꿈 (11/24, RTX 5080 PC).</b> 실물 확인 남음</td></tr>
     <tr><td>녹화기가 SDK로 Robot PC(Jazzy) 팔 토픽을 받는가, 그 Hz</td><td>5-3 <code>check arm_state</code></td><td>Robot PC 컨테이너 중계 노드 (<code>streams/arm_zenoh.py</code>)</td></tr>
     <tr><td>Paxini 한 보드에 센서 여러 개일 때 Hz, 모듈 이름</td><td>5-3 <code>check tactile_a</code></td><td><code>places</code></td></tr>
     <tr><td>D405 프레임 시각 종류(<code>ts_domain</code>), 화면 방향</td><td>5-3, 5-4</td><td><code>dataset.time</code>, <code>rotation_deg</code></td></tr>

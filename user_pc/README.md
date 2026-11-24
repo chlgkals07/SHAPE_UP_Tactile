@@ -23,7 +23,7 @@ Cyclo 기록은 5단계에서 `--publish`를 붙여 한다 (구현됨, 실물 �
 ## 구성
 - **Robot PC**: OMY 내부 PC (컨테이너 `open_manipulator`). `zenohd`, `omy_ai`.
 - **User PC**: LEAP USB(`/dev/ttyUSB0`)가 꽂힌 PC. `leap_teleop`.
-- **Manus 글러브**: SDK ROS 2 노드(`manus_ros2`)가 도는 PC에서 `/manus_glove_0` 토픽을 낸다. 이 PC는 Ubuntu 22.04 + ROS 2 Humble이다. `leap_teleop`을 같은 PC에서 돌리면 별도 설정이 필요 없고, 다른 PC면 두 PC가 같은 ROS 토픽을 볼 수 있어야 한다(`ROS_DOMAIN_ID`, DDS/zenoh 설정).
+- **Manus 글러브**: SDK ROS 2 노드(`manus_ros2`)가 도는 PC에서 `/manus_glove_0` 토픽을 낸다. 이 PC는 Ubuntu 24.04 + ROS 2 Jazzy다 (2026-11-24부터 RTX 5080 PC. 예전 `jiwoo-950QDB`는 22.04 + Humble이었다). `leap_teleop`을 같은 PC에서 돌리면 별도 설정이 필요 없고, 다른 PC면 두 PC가 같은 ROS 토픽을 볼 수 있어야 한다(`ROS_DOMAIN_ID`, DDS/zenoh 설정).
 - Manus 노드는 Integrated 모드로 고정이고, 라이선스에 `integrated` 기능이 있어야 한다 (없으면 "SDK Integrated license" 에러).
 
 ## 안전 (매 단계 공통)
@@ -34,18 +34,18 @@ Cyclo 기록은 5단계에서 `--publish`를 붙여 한다 (구현됨, 실물 �
 - 이상하면 먼저 5V를 끊고, 다음에 `Ctrl+C`.
 
 ## 0. 준비
-`dynamixel-sdk`는 `ros-jazzy-dynamixel-sdk`라서 **ROS를 source 해야** 시스템 `python3`에서 import 된다 (Humble이면 `ros-humble-dynamixel-sdk`). source 하지 않은 셸에서는 `ModuleNotFoundError: dynamixel_sdk`가 난다. 둘 중 하나로 실행한다.
+`dynamixel-sdk`는 `ros-jazzy-dynamixel-sdk`라서 **ROS를 source 해야** 시스템 `python3`에서 import 된다. source 하지 않은 셸에서는 `ModuleNotFoundError: dynamixel_sdk`가 난다. 둘 중 하나로 실행한다.
 
 ```bash
 cd user_pc
 # A) 시스템 파이썬 + ROS (leader·Manus 구동에 필요)
-source /opt/ros/<jazzy|humble>/setup.bash && export PYTHONPATH="src:$PYTHONPATH" && PY=python3
+source /opt/ros/jazzy/setup.bash && export PYTHONPATH="src:$PYTHONPATH" && PY=python3
 # B) .venv (dynamixel-sdk 포함, 키보드·도구 전용)
 export PYTHONPATH=src && PY=.venv/bin/python
 
 $PY -m pytest -q                 # 하드웨어 없이 전부 통과해야 한다
 ```
-`pip`를 쓸 수 있으면 `pip install -e ".[dev,hardware]"` 후 `leap-teleop` 명령을 쓸 수 있다. 아래에서는 `$PY -m leap_teleop.cli`로 쓴다. 명령은 줄이 잘리지 않게 한 줄로 붙여 넣는다.
+24.04 시스템 Python에서는 `pip install`이 막혀 있다(`externally-managed-environment`). 그래서 `PYTHONPATH=src` 방식(`leap_env`)으로 쓴다. 아래에서는 `$PY -m leap_teleop.cli`로 쓴다. 명령은 줄이 잘리지 않게 한 줄로 붙여 넣는다.
 `assets/leap_hand_right.urdf`를 소스 트리에서 읽으므로 `PYTHONPATH=src` 또는 `pip install -e`로 실행한다 (`pip install .`은 안 됨).
 
 ## 1. LEAP 단독 준비 (건너뛰지 않는다)
@@ -82,7 +82,7 @@ Manus 없이 팔, zenoh, LEAP 구동 경로가 정상인지 먼저 확인한다.
 
 User PC 셸 (A 방식만 가능, rclpy가 필요하다):
 ```bash
-source /opt/ros/<jazzy|humble>/setup.bash
+source /opt/ros/jazzy/setup.bash
 export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp
 export ZENOH_CONFIG_OVERRIDE='mode="client";connect/endpoints=["tcp/<ROBOT_IP>:7447"]'   # 44B1050: 10.42.0.241
 export PYTHONPATH="src:$PYTHONPATH"
@@ -135,8 +135,8 @@ export PYTHONPATH="src:$PYTHONPATH"
 글러브를 착용하고 Manus PC에서 `manus_ros2` 워크스페이스를 빌드·source한 뒤 노드를 띄운다 (패키지 `manus_ros2`, 실행 파일 `manus_data_publisher`, `third_party/manus/ROS2 package`의 CMakeLists에서 확인).
 빌드는 처음 한 번만 한다. 동글 접근용 udev 규칙(`third_party/manus/70-manus-hid.rules`)이 `/etc/udev/rules.d/`에 있어야 한다.
 ```bash
-source /opt/ros/<humble|jazzy>/setup.bash
-cd "<repo>/third_party/manus/ROS2 package" && colcon build          # 처음 한 번
+source /opt/ros/jazzy/setup.bash
+cd "<repo>/third_party/manus/ROS2 package" && colcon build --cmake-args -DPython3_EXECUTABLE=/usr/bin/python3   # 처음 한 번
 source install/setup.bash                     # manus_ros2_msgs. 이 경로를 LEAP_MANUS_WS로 export하면 leap_* 함수가 자동 source
 ros2 run manus_ros2 manus_data_publisher      # 별도 셸. 오른손을 /manus_glove_right로 고정하려면 -p glove_topic_template:=manus_glove_{side}
 ros2 topic list | grep -i manus

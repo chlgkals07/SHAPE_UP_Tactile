@@ -24,16 +24,16 @@ envs:
     - source /opt/ros/jazzy/setup.bash
     - export ROS_DOMAIN_ID=30 RMW_IMPLEMENTATION=rmw_zenoh_cpp
     - source /workspace/omy_ws/install/setup.bash
-  # User PC, 손만 (3, 4단계): Humble, zenoh 끔. Manus 노드와 leap_manus 는 반드시 같은 환경
+  # User PC, 손만 (3, 4단계): Jazzy, zenoh 끔. Manus 노드와 leap_manus 는 반드시 같은 환경
   teleop:
-    - export LEAP_ROS_DISTRO=humble OMY_ROBOT_IP=10.42.0.241 LEAP_NO_ZENOH=1
+    - export LEAP_ROS_DISTRO=jazzy OMY_ROBOT_IP=10.42.0.241 LEAP_NO_ZENOH=1
     - export LEAP_MANUS_WS="{repo}/third_party/manus/ROS2 package"
     - source "{repo}/user_pc/scripts/leap_aliases.sh"
     - leap_env
   # User PC, zenoh 켬 (2단계 leader 트리거): Robot PC 의 팔 토픽을 읽는다
   teleop_zenoh:
     - unset LEAP_NO_ZENOH
-    - export LEAP_ROS_DISTRO=humble OMY_ROBOT_IP=10.42.0.241
+    - export LEAP_ROS_DISTRO=jazzy OMY_ROBOT_IP=10.42.0.241
     - export LEAP_MANUS_WS="{repo}/third_party/manus/ROS2 package"
     - source "{repo}/user_pc/scripts/leap_aliases.sh"
     - leap_env
@@ -52,7 +52,7 @@ hints:
   - {match: "No such container|is not running", hint: "Robot PC 에서 cd /data/docker/open_manipulator && ./docker/container.sh start (인터넷 필요)"}
   - {match: "No module named 'manus_ros2_msgs'", hint: "LEAP_MANUS_WS 가 맞는지, Manus 워크스페이스를 colcon build 했는지 확인한다"}
   - {match: "No module named '?rclpy", hint: "PYTHONPATH 가 ROS 경로를 덮어썼다. envs 의 leap_env 줄이 있는지 확인한다"}
-  - {match: "ModuleNotFoundError: No module named '?dynamixel_sdk", hint: "ROS 를 source 하지 않은 환경이다. sudo apt install ros-humble-dynamixel-sdk"}
+  - {match: "ModuleNotFoundError: No module named '?dynamixel_sdk", hint: "ROS 를 source 하지 않은 환경이다. sudo apt install ros-jazzy-dynamixel-sdk"}
   - {match: "No module named '?serial", hint: "sudo apt install python3-serial"}
 
 processes:
