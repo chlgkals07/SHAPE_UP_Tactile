@@ -92,7 +92,7 @@
 # ~/.bashrc 끝에 넣는다 (RTX 5080 User PC에는 11/24에 넣었다. 레포 경로는 PC마다 맞춘다). 새 터미널부터는 leap_env만 치면 된다.
 # --- SHAPE_UP_Tactile LEAP/Manus teleop ---
 source ~/SHAPE_UP_Tactile/user_pc/scripts/leap_aliases.sh
-export LEAP_ROS_DISTRO=jazzy        # User PC는 Ubuntu 24.04 + ROS 2 Jazzy
+export LEAP_ROS_DISTRO=jazzy        # RTX 5080 PC는 24.04 + Jazzy. 예전 PC(jiwoo-950QDB)는 humble, apt 도 ros-humble-*
 export OMY_ROBOT_IP=10.42.0.241     # ROBOT PC IP (44B1050)
 export LEAP_MANUS_WS="$HOME/SHAPE_UP_Tactile/third_party/manus/ROS2 package"
 export LEAP_NO_ZENOH=1              # 기본은 손만(3·4단계). 2·5단계 셸에서는 unset LEAP_NO_ZENOH
