@@ -85,6 +85,10 @@ class UiConfig:
     preview_hz: float = 15.0
     preview_width: int = 800
     shutdown_timeout_s: int = 2  # on exit, how long to wait for open browser connections
+    # Tactile force arrows, drawn in sensor millimetres per newton of force.
+    taxel_arrow_mm_per_n: float = 3.0
+    resultant_arrow_mm_per_n: float = 1.5
+    arrow_deadband_n: float = 0.15  # taxel forces below this are not drawn (1 count = 0.1 N)
 
 
 @dataclass(frozen=True)

@@ -193,10 +193,14 @@ function buildFingers() {
 // ---- tactile view: the same picture as paxini_sdk/tools/to_rerun.py ----------------------------
 // 3D taxel points at the vendor coordinates. Unloaded points are light grey; loaded points
 // follow a blue ramp that is darkest at the chosen full-scale force (3 N by default, as in the
-// SDK viewer) and grow with Fz. Under each sensor: resultant Fx / Fy / Fz over the last seconds.
+// SDK viewer) and grow with Fz. With "화살표" on, the dots give way to one arrow per taxel for
+// its (Fx, Fy, Fz) and three axis arrows for the resultant from the centre of pressure, all
+// drawn as given in the sensor's coordinate axes (UNVERIFIED: the vendor documents which frame
+// the per-taxel forces use). Under each sensor: resultant Fx / Fy / Fz over the last seconds.
 
 const REST = [210, 215, 220], RAMP_LOW = [230, 241, 251], RAMP_HIGH = [24, 95, 165];
 const SERIES = [["Fx", "#8a909b"], ["Fy", "#c9861a"], ["Fz", "rgb(24,95,165)"]];
+const TAXEL_ARROW = "rgba(31,41,55,0.8)";
 const HISTORY = 150;                       // resultant samples kept per sensor (about 15 s)
 const DEFAULT_VIEW = { yaw: -0.35, pitch: 0.6 };
 let view = { ...DEFAULT_VIEW };            // one camera for all sensors; drag to rotate
@@ -246,7 +250,8 @@ function drawTactile(place, values) {
   const { context, width, height } = fitted;
   const { points, reach } = item.geometry;
   const full = Number($("tactile-scale").value);
-  const drawn = points.map((point, index) => [...project(point), values.fz[index] || 0]);
+  const forces = values.f.map((f) => f.map((counts) => counts * 0.1));   // newtons
+  const drawn = points.map((point, index) => [...project(point), values.f[index] ? values.f[index][2] : 0]);
   // Fill the canvas at the current viewing angle, leaving room for the largest dot
   // (1.9 mm radius in sensor units) at every edge.
   const xs = drawn.map((p) => p[0]), ys = drawn.map((p) => p[1]);
@@ -256,21 +261,73 @@ function drawTactile(place, values) {
     (height - 8) / (Math.max(...ys) - Math.min(...ys) + 3.8),
     (Math.min(width, height) - 8) / reach,           // a flat-on view must not grow without limit
   );
+  const screen = ([x, y]) => [width / 2 + (x - midX) * scale, height / 2 - (y - midY) * scale];
+  const arrows = $("tactile-arrows").checked;
   drawn.sort((p, q) => p[2] - q[2]);                    // far points first
   for (const [x, y, , counts] of drawn) {
+    if (arrows) {                                       // arrow view: dots only mark where taxels are
+      context.beginPath();
+      context.arc(...screen([x, y]), 2, 0, Math.PI * 2);
+      context.fillStyle = `rgb(${REST})`;
+      context.fill();
+      continue;
+    }
     const radius = (0.4 + Math.min(1.5, Math.max(0, counts * 0.05))) * scale;   // SDK rule, in mm
     context.beginPath();
-    context.arc(width / 2 + (x - midX) * scale, height / 2 - (y - midY) * scale, Math.max(3, radius), 0, Math.PI * 2);
+    context.arc(...screen([x, y]), Math.max(3, radius), 0, Math.PI * 2);
     context.fillStyle = fzColour(counts, full);
     context.fill();
     context.lineWidth = 0.75;
     context.strokeStyle = counts > 0 ? "rgba(24,95,165,0.55)" : "#aeb4bd";
     context.stroke();
   }
+  if (arrows) drawArrows(context, screen, points, forces, values.r);
   item.fz.textContent = values.r[2].toFixed(1);
   item.history.push(values.r);
   if (item.history.length > HISTORY) item.history.shift();
   drawSeries(item);
+}
+
+function drawArrows(context, screen, points, forces, resultant) {
+  const ui = info.config.ui;
+  points.forEach((point, index) => {
+    const f = forces[index];
+    if (!f || Math.hypot(...f) < ui.arrow_deadband_n) return;
+    drawArrow(context, screen(project(point)),
+      screen(project(point.map((value, k) => value + f[k] * ui.taxel_arrow_mm_per_n))), TAXEL_ARROW, 1.25, 4);
+  });
+  if (Math.hypot(...resultant) > 0) {
+    // The resultant starts at the centre of pressure (taxels weighted by Fz), or the sensor centre
+    // when no taxel is pressed.
+    const weight = forces.reduce((sum, f) => sum + Math.max(0, f[2]), 0);
+    const origin = weight > 0
+      ? [0, 1, 2].map((k) => points.reduce((sum, p, i) => sum + p[k] * Math.max(0, forces[i][2]), 0) / weight)
+      : [0, 0, 0];
+    // One arrow per axis, in the colours of the Fx / Fy / Fz graph below.
+    SERIES.forEach(([, colour], axis) => {
+      const end = origin.map((value, k) => value + (k === axis ? resultant[k] * ui.resultant_arrow_mm_per_n : 0));
+      drawArrow(context, screen(project(origin)), screen(project(end)), colour, 2.5, 7);
+    });
+  }
+}
+
+function drawArrow(context, [x0, y0], [x1, y1], colour, lineWidth, head) {
+  const length = Math.hypot(x1 - x0, y1 - y0);
+  if (length < 1) return;
+  const ux = (x1 - x0) / length, uy = (y1 - y0) / length, tip = Math.min(head, length);
+  const shape = () => {
+    context.beginPath(); context.moveTo(x0, y0); context.lineTo(x1 - ux * tip, y1 - uy * tip);
+    context.moveTo(x1, y1);
+    context.lineTo(x1 - ux * tip - uy * tip * 0.5, y1 - uy * tip + ux * tip * 0.5);
+    context.lineTo(x1 - ux * tip + uy * tip * 0.5, y1 - uy * tip - ux * tip * 0.5);
+    context.closePath();
+  };
+  shape();                                               // white halo keeps it readable over the dots
+  context.lineJoin = "round"; context.strokeStyle = "rgba(255,255,255,0.9)"; context.lineWidth = lineWidth + 2.5;
+  context.stroke();
+  shape();
+  context.strokeStyle = colour; context.fillStyle = colour; context.lineWidth = lineWidth;
+  context.stroke(); context.fill();
 }
 
 function drawSeries(item) {
@@ -293,6 +350,16 @@ function drawSeries(item) {
     context.stroke();
   });
   item.range.textContent = `±${peak.toFixed(0)} N`;
+}
+
+function setupArrowToggle() {
+  // Per viewer, remembered in this browser only.
+  const box = $("tactile-arrows");
+  try { box.checked = localStorage.getItem("tactile-arrows") !== "off"; } catch (error) { /* default on */ }
+  box.addEventListener("change", () => {
+    try { localStorage.setItem("tactile-arrows", box.checked ? "on" : "off"); } catch (error) { /* ignore */ }
+    redrawTactile();
+  });
 }
 
 function redrawTactile() {
@@ -642,6 +709,7 @@ function show(name) {
 window.addEventListener("hashchange", () => show(location.hash.slice(1)));
 $("episodes-refresh").addEventListener("click", loadEpisodes);
 $("zero-btn").addEventListener("click", actZero);
+setupArrowToggle();
 show(location.hash.slice(1));
 // Draw once from a plain request so a page is never empty while the socket connects.
 Promise.all([loadInfo(), api("GET", "/api/state").then(onState).catch(() => {})]).then(() => show(page));

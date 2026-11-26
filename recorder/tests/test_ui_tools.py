@@ -110,7 +110,8 @@ def test_state_and_live_messages_are_json_and_carry_the_panels_data(client):
     assert state["streams"]["glove"]["required"] is False
     message = build_live(client.rig.hub)
     json.dumps(message)
-    assert len(message["tactile"]) == 8 and len(message["tactile"]["thumb_tip"]["fz"]) == 52
+    tip = message["tactile"]["thumb_tip"]
+    assert len(message["tactile"]) == 8 and len(tip["f"]) == 52 and len(tip["f"][0]) == 3
     assert len(message["hand"]["cmd"]) == 16 and len(message["arm"]["state"]) == 6
 
 

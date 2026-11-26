@@ -89,7 +89,7 @@ def build_live(hub: Hub) -> dict[str, Any]:
     for place, values in live.tactile_now(hub).items():
         out["tactile"][place] = {
             "r": [round(float(v) * 0.1, 1) for v in values["resultant"]],  # fx, fy, fz in newtons
-            "fz": values["distributed"][:, 2].astype(int).tolist(),  # counts, 0.1 N each
+            "f": values["distributed"].astype(int).tolist(),  # per taxel [fx, fy, fz] counts, 0.1 N
         }
     hand = hub.streams.get(cfg.hand)
     sample = hand.latest() if hand is not None else None
