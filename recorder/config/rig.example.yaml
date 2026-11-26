@@ -82,4 +82,5 @@ dataset:
 
 # host 를 0.0.0.0 으로 바꾸면 같은 네트워크의 태블릿에서도 열린다. 로그인이 없으므로 믿을 수 있는 망에서만.
 # shutdown_timeout_s: 끌 때 열려 있는 브라우저 연결(카메라 미리보기)을 기다리는 시간
-ui: {host: 127.0.0.1, port: 8800, preview_hz: 15, preview_width: 800, shutdown_timeout_s: 2}
+ui: {host: 127.0.0.1, port: 8800, preview_hz: 15, preview_width: 800, shutdown_timeout_s: 2,
+     taxel_arrow_mm_per_n: 3.0, resultant_arrow_mm_per_n: 1.5, arrow_deadband_n: 0.15}
