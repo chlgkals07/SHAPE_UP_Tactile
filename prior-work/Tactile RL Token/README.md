@@ -17,6 +17,8 @@ Tactile RL Token 연구와 관련된 논문 정리 목록입니다. 논문을 �
 | Paper | Venue | Year |
 | --- | --- | --- |
 | [ReTouch: Empowering Contact-Rich Dexterous Manipulation with Online-Refined Tactile Prediction](./ReTouch.md) | ECCV DexHand Workshop | 2026 |
+| [AT-VLA: Adaptive Tactile Injection for Enhanced Feedback Reaction in Vision-Language-Action Models](./AT-VLA.md) | CVPR | 2026 |
+| [TacForcing: Streaming Action Generation with Execution-Time Tactile Feedback](./TacForcing.md) | arXiv (ICLR 2027 submitted) | 2026 |
 
 ## Representation
 
